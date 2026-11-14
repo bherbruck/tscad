@@ -31,6 +31,14 @@ These have NOT been filed upstream.
 - Repro: `crates/tscad-wasm/tests/select_debug.rs` (`rounded_rect_top_fillet`, "shell" cases).
 - Workaround: none yet; use `outward` or build the cavity with a boolean.
 
+## 5. Sweep along a helix fails or is slow
+- `sweep` (frame follow) of a circle along a helix NURBS: 10–23 s on the dev wasm, then
+  "the result is not a closed solid"; `frame: "translate"` gives a near-zero volume.
+- `sweep` along a polyline path with a sharp corner fails with status 1001.
+
+## 6. Booleans are ~1 s per cut on the dev wasm
+- A plate with 24 slot holes: 18–21 s cut one by one, ~7 s as one `difference(outer, union(holes))`.
+
 ## Notes (tscad bugs found and fixed, not kernel bugs)
 - `solidcore_ops::blend` takes the kernel's *native* edge order, not record order (its
   `SetBack` docs say so; the function's own docs read as record indices). tscad now uses

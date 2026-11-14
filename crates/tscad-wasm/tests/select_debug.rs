@@ -45,3 +45,19 @@ fn rounded_rect_top_fillet() {
         println!("{name}: {:?}", vol(&node));
     }
 }
+
+#[test]
+fn export_agent_fillet_cases() {
+    let pi = std::f64::consts::PI;
+    let v = vol(r#"{"type":"fillet","radius":4,"edges":{"type":"parallel","axis":"z"},"children":[{"type":"box","size":[80,30,12]}]}"#).unwrap();
+    let e = 80.0 * 30.0 * 12.0 - 4.0 * (16.0 - 4.0 * pi) * 12.0;
+    assert!((v - e).abs() < 1e-3, "{v} {e}");
+    let v = vol(r#"{"type":"fillet","radius":10,"edges":{"type":"parallel","axis":"z"},"children":[{"type":"box","size":[80,30,40]}]}"#).unwrap();
+    let e = 80.0 * 30.0 * 40.0 - 4.0 * (100.0 - 25.0 * pi) * 40.0;
+    assert!((v - e).abs() < 1e-3, "{v} {e}");
+    for r in [2.0, 3.1] {
+        let v = vol(&format!(r#"{{"type":"fillet","radius":{r},"edges":{{"type":"parallel","axis":"z"}},"children":[{{"type":"box","size":[100,80,3]}}]}}"#)).unwrap();
+        let e = 100.0 * 80.0 * 3.0 - 4.0 * (r * r - r * r * pi / 4.0) * 3.0;
+        assert!((v - e).abs() < 1e-3, "{v} {e}");
+    }
+}
