@@ -366,3 +366,8 @@ describe("nested assemblies, gears, limits, cache", () => {
     expect(a.warnings.length).toBe(1);
   });
 });
+
+test("loose sketch consumers with 2D placement props don't trip anchor collection", () => {
+  const r = compile(<revolve><sketch at={[10, 0]} rotate={0}><rect size={2} /></sketch></revolve>);
+  expect(r.document.parts!.length).toBe(1);
+});
