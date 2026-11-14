@@ -19,32 +19,30 @@ export default function CableComb(p: ParamValues<typeof params>) {
   const width = cables * pitch + spacing
   const height = cable_d + 2 * spacing
   return (
-    <difference>
-      <extrude height={thickness}>
+    <extrude height={thickness}>
+      <difference2d>
         <offset distance={1}>
           <offset distance={-1} round={false}><rect size={[width, height]} center={false} /></offset>
         </offset>
-      </extrude>
-      <union>
-        {$range(0, cables - 1).map((i: number) => (
-          <>
-            {(() => {
-              const x = spacing + cable_d / 2 + i * pitch
-              return (
-                <>
-                  <translate by={[x, height / 2, 0]}>
-                    <extrude height={thickness}><circle r={cable_d / 2} /></extrude>
-                  </translate>
-                  <translate by={[x - cable_d * slot / 2, height / 2, 0]}>
-                    <extrude height={thickness}><rect size={[cable_d * slot, height]} center={false} /></extrude>
-                  </translate>
-                </>
-              )
-            })()}
-          </>
-        ))}
-      </union>
-    </difference>
+        <union2d>
+          {$range(0, cables - 1).map((i: number) => (
+            <>
+              {(() => {
+                const x = spacing + cable_d / 2 + i * pitch
+                return (
+                  <>
+                    <sketch at={[x, height / 2]}><circle r={cable_d / 2} /></sketch>
+                    <sketch at={[x - cable_d * slot / 2, height / 2]}>
+                      <rect size={[cable_d * slot, height]} center={false} />
+                    </sketch>
+                  </>
+                )
+              })()}
+            </>
+          ))}
+        </union2d>
+      </difference2d>
+    </extrude>
   )
 }
 

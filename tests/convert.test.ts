@@ -185,6 +185,22 @@ describe("geometric equivalence (kernel volumes)", () => {
     expect(warnings.some((w) => w.message.startsWith("3D hull() is only converted for prisms"))).toBe(true);
   });
 
+  test("2D booleans become one exact 2D boolean per extrusion", async () => {
+    const a = await run("linear_extrude(5) difference() { square(20); translate([10, 10]) circle(5); }");
+    expect(a.tsx).toMatch(/<extrude height=\{5\}>\s*<difference2d>/);
+    // a union with a shape inside another: OpenSCAD keeps it solid (no even-odd hole)
+    const b = await run("linear_extrude(1) union() { square(10); translate([5, 5]) circle(2); }");
+    near(b.volume, 100);
+    // a difference inside offset() is exact now (no even-odd warning)
+    const c = await run("linear_extrude(1) offset(delta = 1) difference() { square(10); translate([3, 3]) square(4); }");
+    expect(c.warnings).toEqual([]);
+    near(c.volume, 144 - 4);
+    // revolve: one revolve of the 2D difference; loops and modules as operands
+    const d = await run("module holes() { for (y = [2, 8]) translate([15, y]) circle(1); } rotate_extrude() difference() { translate([10, 0]) square([10, 10]); holes(); }");
+    expect(d.tsx).toContain("<revolve>");
+    near(d.volume, PI * (400 - 100) * 10 - 2 * (2 * PI * 15 * PI));
+  }, 30_000);
+
   test("minkowski: 2D ⊕ circle = rounded offset", async () => {
     const { volume, warnings } = await run("linear_extrude(2) minkowski() { square([10, 6]); circle(r = 2); }");
     expect(warnings).toEqual([]);
@@ -315,7 +331,7 @@ describe("corpus of realistic models", () => {
     near(volume, 2 * PI * Cx * Math.abs(A)); // the spokes lie inside the base ring
   }, 30_000);
 
-  test("cable comb: offset-rounded plate minus circle+slot cutouts (2D booleans pushed to 3D)", async () => {
+  test("cable comb: offset-rounded plate minus circle+slot cutouts (one exact 2D difference)", async () => {
     const { volume, warnings } = await run(src("cable-comb.scad"));
     expect(warnings).toEqual([]);
     const n = 6, d = 5.5, sp = 2, t = 4, slot = 0.8;

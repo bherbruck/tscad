@@ -16,14 +16,14 @@ export const params = defineParams({
 export default function Cam(p: ParamValues<typeof params>) {
   const { base_r, nose_r, lift, thickness, bore } = p
   return (
-    <difference>
-      <extrude height={thickness}>
+    <extrude height={thickness}>
+      <difference2d>
         <hull>
           <circle r={base_r} />
           <sketch at={[base_r + lift - nose_r, 0]}><circle r={nose_r} /></sketch>
         </hull>
-      </extrude>
-      <extrude height={thickness}><circle r={bore / 2} /></extrude>
-    </difference>
+        <circle r={bore / 2} />
+      </difference2d>
+    </extrude>
   )
 }

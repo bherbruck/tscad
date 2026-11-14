@@ -626,18 +626,18 @@ export class Gen {
       case "union":
       case "group":
       case "render":
+        // 2D: a real 2D union (nested shapes would otherwise read as holes)
+        if (ctx.mode !== "3d" && s.name === "union" && this.operands(s.children).length > 1) return this.bool2d("union2d", s, ctx);
         if (ctx.mode === "raw" || s.name !== "union") return kids();
         return [el("union", [], kids())];
       case "difference":
       case "intersection": {
+        // 2D: one exact 2D boolean, extruded/revolved once
+        if (ctx.mode !== "3d") return this.bool2d(`${s.name}2d`, s, ctx);
         const ops = s.children.flatMap((c) => {
           const one = this.single(c, ctx);
           return one ? [one] : [];
         });
-        if (ctx.mode === "raw") {
-          this.warn(s.line, `2D ${s.name}() inside offset(): approximated by even-odd nesting (nested shapes become holes)`);
-          return ops;
-        }
         return [el(s.name, [], ops)];
       }
       case "hull": {
@@ -925,6 +925,24 @@ export class Gen {
     if (h === undefined || !kids.length) return undefined;
     if (assumed) this.warn(stmts[0]!.line, "hull() of prisms: translate() offsets that aren't literal are assumed to have z = 0");
     return { h, center: center ?? "", kids };
+  }
+
+  /**
+   * A 2D boolean (`<difference2d>`...) of raw 2D operands: each child statement is one operand
+   * (several shapes, a loop or a module call are united by a `<union2d>`), then the result is
+   * one leaf of the extrusion.
+   */
+  private bool2d(tag: string, s: Extract<Stmt, { t: "inst" }>, ctx: Ctx): string[] {
+    const raw: Ctx = { env: ctx.env, mode: "raw", wrap: (x) => x, linear: false, ...(ctx.module ? { module: ctx.module } : {}) };
+    const ops = s.children.flatMap((c) => {
+      const k = this.stmt(c, raw);
+      if (!k.length) return [];
+      const single = k.length === 1 && /^<[a-z]/.test(k[0]!);
+      // several shapes (a loop, a module call): their union is the operand
+      return [single ? k[0]! : el("union2d", [], k)];
+    });
+    const shape = el(tag, [], ops);
+    return [ctx.mode === "raw" ? shape : ctx.wrap(shape)];
   }
 
   /** The geometric children of a statement list (blocks flattened, empty statements dropped). */

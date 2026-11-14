@@ -121,18 +121,21 @@ OpenSCAD's placement conventions are kept, so shapes land exactly where they did
 | `resize([x, y, z])` on one sphere/circle/cylinder of literal size | `<scale by>` of the computed factors |
 | 3D `hull()` of straight prisms on one base (cylinders and cubes of one height, moved by `translate([x, y, 0])`, `rotate([0, 0, a])` or `for` loops) | `<extrude height><hull>` of their footprints: exact, e.g. rounded plates from four corner cylinders |
 
-**2D booleans.** tscad has no 2D boolean kernel. Instead, each 2D leaf under an extrusion is
-extruded on its own, and the 2D `difference` / `intersection` / `union` become 3D booleans of
-the extruded leaves. This is exact, because linear and rotational extrusion both distribute
-over the booleans. Under `linear_extrude`, 2D transforms become 3D transforms of the extruded
-leaves, which is also exact since planar motions commute with the extrusion. Under
-`rotate_extrude`, they become `<sketch at rotate mirror>` placements. A module that draws 2D
-gets a `$leaf` prop, so the caller decides how its shapes become solids (extruded or
-revolved). A 2D object where a solid is expected (top level) is extruded 1 mm, with a warning.
+**2D booleans.** A 2D `difference` / `intersection` (and a `union` of several shapes)
+becomes one exact 2D boolean: `<difference2d>`, `<intersection2d>` or `<union2d>`. It is
+extruded or revolved once: `<extrude><difference2d>…</difference2d></extrude>`. Each child
+statement is one operand, and several shapes from a loop or a module call are united first. 2D
+booleans inside `offset()` and `hull()` are exact too. Plain sibling shapes under an extrusion
+are still extruded one by one and unioned as solids, which is exact and lets 2D transforms
+under `linear_extrude` become 3D transforms. Inside a 2D boolean, transforms are sketch
+placements (`<sketch at rotate mirror>`), and 2D `scale()` there only converts for a circle (to
+an ellipse). A module that draws 2D gets a `$leaf` prop, so the caller decides how its shapes
+become solids. A 2D object where a solid is expected (top level) is extruded 1 mm, with a
+warning.
 
 **Not converted (warnings):** other 3D `hull`s and `minkowski`s (children unioned),
 `polyhedron`, `import`, `surface`, `projection`, other `resize`s (`auto`, expressions), `linear_extrude` `twist` / `scale`,
-`offset(chamfer)`, 2D booleans inside `offset()` (even-odd approximation), `color` (set it on
+`offset(chamfer)`, 2D `scale()` of non-circles inside a 2D boolean or `rotate_extrude`, `color` (set it on
 the `<part>`), text fonts (metrics differ, so check the size), `search`, `rands` (works but
 random).
 
