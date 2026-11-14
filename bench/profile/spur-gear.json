@@ -1,0 +1,383 @@
+{
+  "kernel_ms": 4140.361719,
+  "ok": true,
+  "ops": [
+    {
+      "call": "union_all",
+      "count": 3,
+      "total_ms": 1289.597948
+    },
+    {
+      "call": "blend",
+      "count": 1,
+      "total_ms": 1164.700147
+    },
+    {
+      "call": "SmApiBoolean",
+      "count": 1,
+      "total_ms": 941.733684
+    },
+    {
+      "call": "extrude",
+      "count": 1,
+      "total_ms": 484.561573
+    },
+    {
+      "call": "brep_volume",
+      "count": 1,
+      "total_ms": 118.202348
+    },
+    {
+      "call": "area",
+      "count": 1,
+      "total_ms": 55.459686
+    },
+    {
+      "call": "bounds",
+      "count": 1,
+      "total_ms": 33.449979
+    },
+    {
+      "call": "SmApiBrepCopy",
+      "count": 31,
+      "total_ms": 29.909557
+    },
+    {
+      "call": "brep::to_record",
+      "count": 2,
+      "total_ms": 7.939795
+    },
+    {
+      "call": "face_surface::of",
+      "count": 896,
+      "total_ms": 7.322386
+    },
+    {
+      "call": "create_cylinder",
+      "count": 3,
+      "total_ms": 5.270536
+    },
+    {
+      "call": "face_surface::closest_point",
+      "count": 896,
+      "total_ms": 1.805453
+    },
+    {
+      "call": "face_surface::normal",
+      "count": 896,
+      "total_ms": 0.221708
+    },
+    {
+      "call": "SmBrep::Transform",
+      "count": 7,
+      "total_ms": 0.186328
+    },
+    {
+      "call": "counts",
+      "count": 1,
+      "total_ms": 0.000591
+    }
+  ],
+  "ops_calls": 2741,
+  "phases": [
+    {
+      "build": 3934.333740234375,
+      "error": null,
+      "measure": 173.66943359375,
+      "mesh": 42.6474609375,
+      "ok": true,
+      "part": "gear",
+      "record": 3.6669921875
+    }
+  ],
+  "scopes": [
+    {
+      "count": 18,
+      "counters": {},
+      "name": "mass::enclosure::volume_sign",
+      "self_ms": 2006.298865,
+      "total_ms": 2006.298865
+    },
+    {
+      "count": 1136,
+      "counters": {
+        "CoincidenceCandidates": 12630,
+        "CoincidenceQueries": 6311
+      },
+      "name": "validation::coincidence::edge_face",
+      "self_ms": 414.502019,
+      "total_ms": 414.502019
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "sweep::linear",
+      "self_ms": 161.90634,
+      "total_ms": 161.90634
+    },
+    {
+      "count": 8,
+      "counters": {},
+      "name": "boolean::intersect_insert_relate",
+      "self_ms": 104.917928,
+      "total_ms": 104.917928
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::executive::refuse_blends_cutting_the_part",
+      "self_ms": 65.620049,
+      "total_ms": 65.620049
+    },
+    {
+      "count": 8,
+      "counters": {},
+      "name": "boolean::manifold_boolean",
+      "self_ms": 27.545448,
+      "total_ms": 132.463376
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::session::merge",
+      "self_ms": 19.77944,
+      "total_ms": 37.046221
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::session::insert_intersection_topology",
+      "self_ms": 17.171489,
+      "total_ms": 17.171489
+    },
+    {
+      "count": 18,
+      "counters": {},
+      "name": "validation::coincidence",
+      "self_ms": 13.173648,
+      "total_ms": 430.724723
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::executive::refuse_irregular_balls",
+      "self_ms": 5.603383,
+      "total_ms": 5.603383
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::executive::classify_rails",
+      "self_ms": 3.521538,
+      "total_ms": 3.521538
+    },
+    {
+      "count": 2,
+      "counters": {
+        "TracePasses": 2
+      },
+      "name": "blend::solver::trace",
+      "self_ms": 2.693635,
+      "total_ms": 2.693635
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::session::keep_features",
+      "self_ms": 1.627584,
+      "total_ms": 1.627584
+    },
+    {
+      "count": 18,
+      "counters": {
+        "CoincidenceCandidates": 6269,
+        "CoincidenceQueries": 3
+      },
+      "name": "validation::coincidence::vertex_edge",
+      "self_ms": 1.502185,
+      "total_ms": 1.502185
+    },
+    {
+      "count": 1136,
+      "counters": {
+        "CoincidenceCandidates": 6268,
+        "CoincidenceQueries": 4
+      },
+      "name": "validation::coincidence::vertex_face",
+      "self_ms": 0.880466,
+      "total_ms": 0.880466
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::executive::stitch",
+      "self_ms": 0.388673,
+      "total_ms": 0.388673
+    },
+    {
+      "count": 18,
+      "counters": {},
+      "name": "validation::coincidence::vertex_vertex",
+      "self_ms": 0.357637,
+      "total_ms": 0.357637
+    },
+    {
+      "count": 18,
+      "counters": {
+        "CoincidenceQueries": 3187
+      },
+      "name": "validation::coincidence::edge_edge",
+      "self_ms": 0.260497,
+      "total_ms": 0.260497
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::executive::corner_vertices",
+      "self_ms": 0.200744,
+      "total_ms": 0.200744
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::session::filleting",
+      "self_ms": 0.122173,
+      "total_ms": 117.185242
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::executive::build_faces",
+      "self_ms": 0.117835,
+      "total_ms": 0.117835
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::session::tag_and_merge",
+      "self_ms": 0.095292,
+      "total_ms": 0.095292
+    },
+    {
+      "count": 2,
+      "counters": {},
+      "name": "blend::solver::calc_fillet_geom",
+      "self_ms": 0.077327,
+      "total_ms": 2.825697
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::executive::shrink_faces",
+      "self_ms": 0.053733,
+      "total_ms": 0.053733
+    },
+    {
+      "count": 18,
+      "counters": {},
+      "name": "validation::coincidence::face_face",
+      "self_ms": 0.048271,
+      "total_ms": 0.048271
+    },
+    {
+      "count": 2,
+      "counters": {},
+      "name": "blend::solver::trace_setup",
+      "self_ms": 0.036019,
+      "total_ms": 0.036019
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::executive::corner_edges",
+      "self_ms": 0.035528,
+      "total_ms": 0.035528
+    },
+    {
+      "count": 2,
+      "counters": {},
+      "name": "blend::solver::sort_points",
+      "self_ms": 0.018054,
+      "total_ms": 0.018054
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::executive::trim_rails",
+      "self_ms": 0.007314,
+      "total_ms": 0.007314
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::executive::create_fillet_brep",
+      "self_ms": 0.006905,
+      "total_ms": 78.335531
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::session::create_corners",
+      "self_ms": 0.005199,
+      "total_ms": 0.005199
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::executive::refuse_rails_below_resolution",
+      "self_ms": 0.002264,
+      "total_ms": 0.002264
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::executive::refuse_collapsed_offsets",
+      "self_ms": 0.001923,
+      "total_ms": 0.001923
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::executive::solver_geometry",
+      "self_ms": 0.001524,
+      "total_ms": 2.827221
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::session::split_at_radius_corners",
+      "self_ms": 0.000872,
+      "total_ms": 0.000872
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::executive::refuse_balls_past_an_end",
+      "self_ms": 0.000852,
+      "total_ms": 0.000852
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::executive::refuse_blends_larger_than_faces",
+      "self_ms": 0.000731,
+      "total_ms": 0.000731
+    },
+    {
+      "count": 2,
+      "counters": {},
+      "name": "blend::solver::post_process",
+      "self_ms": 0.000662,
+      "total_ms": 0.000662
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::executive::adjust_corner_topology",
+      "self_ms": 0.000571,
+      "total_ms": 0.000571
+    }
+  ],
+  "wall_ms": 4155.022962,
+  "workload": "spur-gear"
+}

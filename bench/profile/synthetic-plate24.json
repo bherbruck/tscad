@@ -1,0 +1,153 @@
+{
+  "kernel_ms": 3357.260524,
+  "ok": true,
+  "ops": [
+    {
+      "call": "union_all",
+      "count": 1,
+      "total_ms": 1500.287516
+    },
+    {
+      "call": "SmApiBoolean",
+      "count": 1,
+      "total_ms": 930.231825
+    },
+    {
+      "call": "extrude",
+      "count": 25,
+      "total_ms": 780.246757
+    },
+    {
+      "call": "brep_volume",
+      "count": 1,
+      "total_ms": 69.32033
+    },
+    {
+      "call": "area",
+      "count": 1,
+      "total_ms": 34.850499
+    },
+    {
+      "call": "bounds",
+      "count": 1,
+      "total_ms": 27.965403
+    },
+    {
+      "call": "SmApiBrepCopy",
+      "count": 51,
+      "total_ms": 12.520477
+    },
+    {
+      "call": "brep::to_record",
+      "count": 1,
+      "total_ms": 1.837597
+    },
+    {
+      "call": "counts",
+      "count": 1,
+      "total_ms": 0.00012
+    }
+  ],
+  "ops_calls": 83,
+  "phases": [
+    {
+      "build": 3224.256103515625,
+      "error": null,
+      "measure": 104.17626953125,
+      "mesh": 33.613525390625,
+      "ok": true,
+      "part": "plate24",
+      "record": 1.839599609375
+    }
+  ],
+  "scopes": [
+    {
+      "count": 52,
+      "counters": {},
+      "name": "mass::enclosure::volume_sign",
+      "self_ms": 2484.101209,
+      "total_ms": 2484.101209
+    },
+    {
+      "count": 24,
+      "counters": {},
+      "name": "boolean::intersect_insert_relate",
+      "self_ms": 214.03384,
+      "total_ms": 214.03384
+    },
+    {
+      "count": 558,
+      "counters": {
+        "CoincidenceCandidates": 4896,
+        "CoincidenceQueries": 2448
+      },
+      "name": "validation::coincidence::edge_face",
+      "self_ms": 105.802234,
+      "total_ms": 105.802234
+    },
+    {
+      "count": 24,
+      "counters": {},
+      "name": "boolean::manifold_boolean",
+      "self_ms": 80.676793,
+      "total_ms": 294.710633
+    },
+    {
+      "count": 25,
+      "counters": {},
+      "name": "sweep::linear",
+      "self_ms": 57.533175,
+      "total_ms": 57.533175
+    },
+    {
+      "count": 52,
+      "counters": {},
+      "name": "validation::coincidence",
+      "self_ms": 3.486253,
+      "total_ms": 110.326886
+    },
+    {
+      "count": 52,
+      "counters": {
+        "CoincidenceCandidates": 2448
+      },
+      "name": "validation::coincidence::vertex_edge",
+      "self_ms": 0.535022,
+      "total_ms": 0.535022
+    },
+    {
+      "count": 558,
+      "counters": {
+        "CoincidenceCandidates": 2448
+      },
+      "name": "validation::coincidence::vertex_face",
+      "self_ms": 0.214607,
+      "total_ms": 0.214607
+    },
+    {
+      "count": 52,
+      "counters": {},
+      "name": "validation::coincidence::vertex_vertex",
+      "self_ms": 0.130631,
+      "total_ms": 0.130631
+    },
+    {
+      "count": 52,
+      "counters": {
+        "CoincidenceQueries": 1224
+      },
+      "name": "validation::coincidence::edge_edge",
+      "self_ms": 0.117953,
+      "total_ms": 0.117953
+    },
+    {
+      "count": 52,
+      "counters": {},
+      "name": "validation::coincidence::face_face",
+      "self_ms": 0.040186,
+      "total_ms": 0.040186
+    }
+  ],
+  "wall_ms": 3363.9509690000004,
+  "workload": "synthetic-plate24"
+}

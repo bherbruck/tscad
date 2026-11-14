@@ -1,0 +1,92 @@
+{
+  "kernel_ms": 8544.856491,
+  "ok": false,
+  "ops": [
+    {
+      "call": "sweep",
+      "count": 1,
+      "total_ms": 8544.856491
+    }
+  ],
+  "ops_calls": 1,
+  "phases": [
+    {
+      "build": 8544.92138671875,
+      "error": "the result is not a closed solid",
+      "measure": 0.0,
+      "mesh": 0.0,
+      "ok": false,
+      "part": "spring",
+      "record": 0.0
+    }
+  ],
+  "scopes": [
+    {
+      "count": 1,
+      "counters": {},
+      "name": "mass::enclosure::volume_sign",
+      "self_ms": 8286.894332,
+      "total_ms": 8286.894332
+    },
+    {
+      "count": 3,
+      "counters": {
+        "CoincidenceCandidates": 7,
+        "CoincidenceQueries": 2
+      },
+      "name": "validation::coincidence::edge_face",
+      "self_ms": 0.281879,
+      "total_ms": 0.281879
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "validation::coincidence",
+      "self_ms": 0.050375,
+      "total_ms": 0.341132
+    },
+    {
+      "count": 1,
+      "counters": {
+        "CoincidenceCandidates": 4
+      },
+      "name": "validation::coincidence::vertex_edge",
+      "self_ms": 0.003296,
+      "total_ms": 0.003296
+    },
+    {
+      "count": 3,
+      "counters": {
+        "CoincidenceCandidates": 4
+      },
+      "name": "validation::coincidence::vertex_face",
+      "self_ms": 0.002185,
+      "total_ms": 0.002185
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "validation::coincidence::face_face",
+      "self_ms": 0.001613,
+      "total_ms": 0.001613
+    },
+    {
+      "count": 1,
+      "counters": {
+        "CoincidenceQueries": 3
+      },
+      "name": "validation::coincidence::edge_edge",
+      "self_ms": 0.001062,
+      "total_ms": 0.001062
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "validation::coincidence::vertex_vertex",
+      "self_ms": 0.000722,
+      "total_ms": 0.000722
+    }
+  ],
+  "wall_ms": 8544.924230999999,
+  "workload": "synthetic-helix-sweep"
+}

@@ -1,0 +1,133 @@
+{
+  "kernel_ms": 266.099259,
+  "ok": true,
+  "ops": [
+    {
+      "call": "revolve",
+      "count": 1,
+      "total_ms": 217.579174
+    },
+    {
+      "call": "brep_volume",
+      "count": 1,
+      "total_ms": 29.610411
+    },
+    {
+      "call": "area",
+      "count": 1,
+      "total_ms": 10.560338
+    },
+    {
+      "call": "bounds",
+      "count": 1,
+      "total_ms": 7.542863
+    },
+    {
+      "call": "brep::to_record",
+      "count": 1,
+      "total_ms": 0.440713
+    },
+    {
+      "call": "SmApiBrepCopy",
+      "count": 1,
+      "total_ms": 0.365549
+    },
+    {
+      "call": "counts",
+      "count": 1,
+      "total_ms": 0.000211
+    }
+  ],
+  "ops_calls": 7,
+  "phases": [
+    {
+      "build": 217.969970703125,
+      "error": null,
+      "measure": 40.177734375,
+      "mesh": 10.848388671875,
+      "ok": true,
+      "part": "pulley",
+      "record": 0.442626953125
+    }
+  ],
+  "scopes": [
+    {
+      "count": 1,
+      "counters": {},
+      "name": "mass::enclosure::volume_sign",
+      "self_ms": 186.456929,
+      "total_ms": 186.456929
+    },
+    {
+      "count": 16,
+      "counters": {
+        "CoincidenceCandidates": 139,
+        "CoincidenceClassifications": 4,
+        "CoincidenceQueries": 97
+      },
+      "name": "validation::coincidence::edge_face",
+      "self_ms": 9.261089,
+      "total_ms": 9.261089
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "sweep::rotational",
+      "self_ms": 6.002156,
+      "total_ms": 6.002156
+    },
+    {
+      "count": 16,
+      "counters": {
+        "CoincidenceCandidates": 54,
+        "CoincidenceClassifications": 4,
+        "CoincidenceQueries": 22
+      },
+      "name": "validation::coincidence::vertex_face",
+      "self_ms": 0.092689,
+      "total_ms": 0.092689
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "validation::coincidence",
+      "self_ms": 0.077048,
+      "total_ms": 9.458069
+    },
+    {
+      "count": 1,
+      "counters": {
+        "CoincidenceCandidates": 50,
+        "CoincidenceQueries": 14
+      },
+      "name": "validation::coincidence::vertex_edge",
+      "self_ms": 0.019688,
+      "total_ms": 0.019688
+    },
+    {
+      "count": 1,
+      "counters": {
+        "CoincidenceQueries": 26
+      },
+      "name": "validation::coincidence::edge_edge",
+      "self_ms": 0.003727,
+      "total_ms": 0.003727
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "validation::coincidence::vertex_vertex",
+      "self_ms": 0.002535,
+      "total_ms": 0.002535
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "validation::coincidence::face_face",
+      "self_ms": 0.001293,
+      "total_ms": 0.001293
+    }
+  ],
+  "wall_ms": 269.444992,
+  "workload": "sketch-pulley"
+}

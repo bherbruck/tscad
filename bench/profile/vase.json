@@ -1,0 +1,157 @@
+{
+  "kernel_ms": 2161.692171,
+  "ok": true,
+  "ops": [
+    {
+      "call": "SmApiShellBrepFull",
+      "count": 1,
+      "total_ms": 1882.211065
+    },
+    {
+      "call": "brep_volume",
+      "count": 1,
+      "total_ms": 113.598409
+    },
+    {
+      "call": "revolve",
+      "count": 1,
+      "total_ms": 91.233332
+    },
+    {
+      "call": "area",
+      "count": 1,
+      "total_ms": 68.640939
+    },
+    {
+      "call": "bounds",
+      "count": 1,
+      "total_ms": 5.063199
+    },
+    {
+      "call": "brep::to_record",
+      "count": 2,
+      "total_ms": 0.53386
+    },
+    {
+      "call": "SmApiBrepCopy",
+      "count": 2,
+      "total_ms": 0.411297
+    },
+    {
+      "call": "counts",
+      "count": 1,
+      "total_ms": 0.00007
+    }
+  ],
+  "ops_calls": 10,
+  "phases": [
+    {
+      "build": 1974.177001953125,
+      "error": null,
+      "measure": 182.24560546875,
+      "mesh": 14.330322265625,
+      "ok": true,
+      "part": "vase",
+      "record": 0.37548828125
+    }
+  ],
+  "scopes": [
+    {
+      "count": 4,
+      "counters": {},
+      "name": "mass::enclosure::volume_sign",
+      "self_ms": 1404.314105,
+      "total_ms": 1404.314105
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "offset::shell",
+      "self_ms": 228.499969,
+      "total_ms": 389.403942
+    },
+    {
+      "count": 12,
+      "counters": {},
+      "name": "boolean::intersect_insert_relate",
+      "self_ms": 118.185987,
+      "total_ms": 118.185987
+    },
+    {
+      "count": 11,
+      "counters": {},
+      "name": "boolean::manifold_boolean",
+      "self_ms": 42.717986,
+      "total_ms": 160.896569
+    },
+    {
+      "count": 24,
+      "counters": {
+        "CoincidenceCandidates": 102,
+        "CoincidenceQueries": 47
+      },
+      "name": "validation::coincidence::edge_face",
+      "self_ms": 42.575583,
+      "total_ms": 42.575583
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "sweep::rotational",
+      "self_ms": 5.723091,
+      "total_ms": 5.723091
+    },
+    {
+      "count": 4,
+      "counters": {},
+      "name": "validation::coincidence",
+      "self_ms": 0.311415,
+      "total_ms": 43.148026
+    },
+    {
+      "count": 4,
+      "counters": {
+        "CoincidenceCandidates": 54,
+        "CoincidenceQueries": 4
+      },
+      "name": "validation::coincidence::vertex_edge",
+      "self_ms": 0.165818,
+      "total_ms": 0.165818
+    },
+    {
+      "count": 24,
+      "counters": {
+        "CoincidenceCandidates": 45,
+        "CoincidenceQueries": 5
+      },
+      "name": "validation::coincidence::vertex_face",
+      "self_ms": 0.082115,
+      "total_ms": 0.082115
+    },
+    {
+      "count": 4,
+      "counters": {
+        "CoincidenceQueries": 35
+      },
+      "name": "validation::coincidence::edge_edge",
+      "self_ms": 0.006842,
+      "total_ms": 0.006842
+    },
+    {
+      "count": 4,
+      "counters": {},
+      "name": "validation::coincidence::vertex_vertex",
+      "self_ms": 0.003327,
+      "total_ms": 0.003327
+    },
+    {
+      "count": 4,
+      "counters": {},
+      "name": "validation::coincidence::face_face",
+      "self_ms": 0.002926,
+      "total_ms": 0.002926
+    }
+  ],
+  "wall_ms": 2171.147666,
+  "workload": "vase"
+}

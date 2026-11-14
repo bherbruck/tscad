@@ -1,0 +1,367 @@
+{
+  "kernel_ms": 2492.393198,
+  "ok": true,
+  "ops": [
+    {
+      "call": "union_all",
+      "count": 2,
+      "total_ms": 1259.295441
+    },
+    {
+      "call": "SmApiBoolean",
+      "count": 1,
+      "total_ms": 721.932218
+    },
+    {
+      "call": "blend",
+      "count": 1,
+      "total_ms": 286.525016
+    },
+    {
+      "call": "revolve",
+      "count": 2,
+      "total_ms": 112.150458
+    },
+    {
+      "call": "brep_volume",
+      "count": 1,
+      "total_ms": 41.460638
+    },
+    {
+      "call": "area",
+      "count": 1,
+      "total_ms": 25.921793
+    },
+    {
+      "call": "extrude",
+      "count": 1,
+      "total_ms": 25.398221
+    },
+    {
+      "call": "bounds",
+      "count": 1,
+      "total_ms": 12.382545
+    },
+    {
+      "call": "SmApiBrepCopy",
+      "count": 30,
+      "total_ms": 4.830194
+    },
+    {
+      "call": "brep::to_record",
+      "count": 2,
+      "total_ms": 1.385291
+    },
+    {
+      "call": "face_surface::of",
+      "count": 48,
+      "total_ms": 0.572272
+    },
+    {
+      "call": "SmBrep::Transform",
+      "count": 8,
+      "total_ms": 0.483035
+    },
+    {
+      "call": "face_surface::closest_point",
+      "count": 48,
+      "total_ms": 0.044635
+    },
+    {
+      "call": "face_surface::normal",
+      "count": 48,
+      "total_ms": 0.011361
+    },
+    {
+      "call": "counts",
+      "count": 1,
+      "total_ms": 0.00008
+    }
+  ],
+  "ops_calls": 195,
+  "phases": [
+    {
+      "build": 2411.927001953125,
+      "error": null,
+      "measure": 67.3876953125,
+      "mesh": 17.031494140625,
+      "ok": true,
+      "part": "board-mount",
+      "record": 1.17578125
+    }
+  ],
+  "scopes": [
+    {
+      "count": 18,
+      "counters": {},
+      "name": "mass::enclosure::volume_sign",
+      "self_ms": 1859.507032,
+      "total_ms": 1859.507032
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::executive::refuse_blends_cutting_the_part",
+      "self_ms": 170.515283,
+      "total_ms": 170.515283
+    },
+    {
+      "count": 253,
+      "counters": {
+        "CoincidenceCandidates": 1802,
+        "CoincidenceQueries": 954
+      },
+      "name": "validation::coincidence::edge_face",
+      "self_ms": 82.212559,
+      "total_ms": 82.212559
+    },
+    {
+      "count": 8,
+      "counters": {},
+      "name": "boolean::intersect_insert_relate",
+      "self_ms": 31.565593,
+      "total_ms": 31.565593
+    },
+    {
+      "count": 8,
+      "counters": {},
+      "name": "boolean::manifold_boolean",
+      "self_ms": 10.203926,
+      "total_ms": 41.769519
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::executive::refuse_irregular_balls",
+      "self_ms": 8.71667,
+      "total_ms": 8.71667
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::session::merge",
+      "self_ms": 5.668367,
+      "total_ms": 9.551247
+    },
+    {
+      "count": 2,
+      "counters": {},
+      "name": "sweep::rotational",
+      "self_ms": 5.165755,
+      "total_ms": 5.165755
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "sweep::linear",
+      "self_ms": 3.724006,
+      "total_ms": 3.724006
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::session::insert_intersection_topology",
+      "self_ms": 3.690682,
+      "total_ms": 3.690682
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::executive::classify_rails",
+      "self_ms": 1.754567,
+      "total_ms": 1.754567
+    },
+    {
+      "count": 18,
+      "counters": {},
+      "name": "validation::coincidence",
+      "self_ms": 1.509946,
+      "total_ms": 84.24033
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::executive::stitch",
+      "self_ms": 1.462449,
+      "total_ms": 1.462449
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::executive::corner_vertices",
+      "self_ms": 0.945138,
+      "total_ms": 0.945138
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::executive::build_faces",
+      "self_ms": 0.353737,
+      "total_ms": 0.353737
+    },
+    {
+      "count": 8,
+      "counters": {},
+      "name": "blend::solver::calc_fillet_geom",
+      "self_ms": 0.329281,
+      "total_ms": 0.384987
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::executive::corner_edges",
+      "self_ms": 0.232755,
+      "total_ms": 0.232755
+    },
+    {
+      "count": 18,
+      "counters": {
+        "CoincidenceCandidates": 818,
+        "CoincidenceQueries": 17
+      },
+      "name": "validation::coincidence::vertex_edge",
+      "self_ms": 0.21361,
+      "total_ms": 0.21361
+    },
+    {
+      "count": 253,
+      "counters": {
+        "CoincidenceCandidates": 796,
+        "CoincidenceQueries": 34
+      },
+      "name": "validation::coincidence::vertex_face",
+      "self_ms": 0.194274,
+      "total_ms": 0.194274
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::session::tag_and_merge",
+      "self_ms": 0.192198,
+      "total_ms": 0.192198
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::session::create_corners",
+      "self_ms": 0.121984,
+      "total_ms": 0.121984
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::executive::refuse_rails_below_resolution",
+      "self_ms": 0.104971,
+      "total_ms": 0.104971
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::executive::refuse_collapsed_offsets",
+      "self_ms": 0.101023,
+      "total_ms": 0.101023
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::executive::shrink_faces",
+      "self_ms": 0.08865,
+      "total_ms": 0.08865
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::session::keep_features",
+      "self_ms": 0.076947,
+      "total_ms": 0.076947
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::executive::refuse_balls_past_an_end",
+      "self_ms": 0.071958,
+      "total_ms": 0.071958
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::executive::create_fillet_brep",
+      "self_ms": 0.059504,
+      "total_ms": 184.732608
+    },
+    {
+      "count": 8,
+      "counters": {},
+      "name": "blend::solver::sort_points",
+      "self_ms": 0.055706,
+      "total_ms": 0.055706
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::session::filleting",
+      "self_ms": 0.048183,
+      "total_ms": 194.497635
+    },
+    {
+      "count": 18,
+      "counters": {
+        "CoincidenceQueries": 467
+      },
+      "name": "validation::coincidence::edge_edge",
+      "self_ms": 0.04747,
+      "total_ms": 0.04747
+    },
+    {
+      "count": 18,
+      "counters": {},
+      "name": "validation::coincidence::vertex_vertex",
+      "self_ms": 0.044817,
+      "total_ms": 0.044817
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::executive::trim_rails",
+      "self_ms": 0.02627,
+      "total_ms": 0.02627
+    },
+    {
+      "count": 18,
+      "counters": {},
+      "name": "validation::coincidence::face_face",
+      "self_ms": 0.017654,
+      "total_ms": 0.017654
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::executive::solver_geometry",
+      "self_ms": 0.002385,
+      "total_ms": 0.387372
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::executive::adjust_corner_topology",
+      "self_ms": 0.000691,
+      "total_ms": 0.000691
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::session::split_at_radius_corners",
+      "self_ms": 0.000531,
+      "total_ms": 0.000531
+    },
+    {
+      "count": 1,
+      "counters": {},
+      "name": "blend::executive::refuse_blends_larger_than_faces",
+      "self_ms": 0.00022,
+      "total_ms": 0.00022
+    }
+  ],
+  "wall_ms": 2497.621236,
+  "workload": "component-library"
+}

@@ -1,0 +1,181 @@
+{
+  "kernel_ms": 1331.26636,
+  "ok": true,
+  "ops": [
+    {
+      "call": "union_all",
+      "count": 6,
+      "total_ms": 794.594363
+    },
+    {
+      "call": "SmApiBoolean",
+      "count": 2,
+      "total_ms": 438.86025
+    },
+    {
+      "call": "brep_volume",
+      "count": 3,
+      "total_ms": 47.116131
+    },
+    {
+      "call": "area",
+      "count": 3,
+      "total_ms": 23.884305
+    },
+    {
+      "call": "bounds",
+      "count": 3,
+      "total_ms": 10.336149
+    },
+    {
+      "call": "create_cylinder",
+      "count": 4,
+      "total_ms": 5.890863
+    },
+    {
+      "call": "SmApiBrepCopy",
+      "count": 52,
+      "total_ms": 5.555888
+    },
+    {
+      "call": "brep::to_record",
+      "count": 3,
+      "total_ms": 2.308025
+    },
+    {
+      "call": "create_cone",
+      "count": 1,
+      "total_ms": 1.436048
+    },
+    {
+      "call": "SmBrep::Transform",
+      "count": 13,
+      "total_ms": 0.781446
+    },
+    {
+      "call": "create_box",
+      "count": 1,
+      "total_ms": 0.502551
+    },
+    {
+      "call": "counts",
+      "count": 3,
+      "total_ms": 0.000341
+    }
+  ],
+  "ops_calls": 94,
+  "phases": [
+    {
+      "build": 773.24853515625,
+      "error": null,
+      "measure": 37.76806640625,
+      "mesh": 8.1513671875,
+      "ok": true,
+      "part": "leafA",
+      "record": 1.243408203125
+    },
+    {
+      "build": 473.250732421875,
+      "error": null,
+      "measure": 28.900390625,
+      "mesh": 5.65625,
+      "ok": true,
+      "part": "leafB",
+      "record": 0.93896484375
+    },
+    {
+      "build": 1.71142578125,
+      "error": null,
+      "measure": 4.343994140625,
+      "mesh": 3.935302734375,
+      "ok": true,
+      "part": "pin",
+      "record": 0.129638671875
+    }
+  ],
+  "scopes": [
+    {
+      "count": 27,
+      "counters": {},
+      "name": "mass::enclosure::volume_sign",
+      "self_ms": 932.134144,
+      "total_ms": 932.134144
+    },
+    {
+      "count": 215,
+      "counters": {
+        "CoincidenceCandidates": 1913,
+        "CoincidenceQueries": 1069
+      },
+      "name": "validation::coincidence::edge_face",
+      "self_ms": 79.981587,
+      "total_ms": 79.981587
+    },
+    {
+      "count": 13,
+      "counters": {},
+      "name": "boolean::intersect_insert_relate",
+      "self_ms": 30.020948,
+      "total_ms": 30.020948
+    },
+    {
+      "count": 13,
+      "counters": {},
+      "name": "boolean::manifold_boolean",
+      "self_ms": 12.348258,
+      "total_ms": 42.369206
+    },
+    {
+      "count": 215,
+      "counters": {
+        "CoincidenceCandidates": 938,
+        "CoincidenceQueries": 140
+      },
+      "name": "validation::coincidence::vertex_face",
+      "self_ms": 4.426368,
+      "total_ms": 4.426368
+    },
+    {
+      "count": 27,
+      "counters": {},
+      "name": "validation::coincidence",
+      "self_ms": 1.088462,
+      "total_ms": 85.822957
+    },
+    {
+      "count": 27,
+      "counters": {
+        "CoincidenceCandidates": 952,
+        "CoincidenceQueries": 140
+      },
+      "name": "validation::coincidence::vertex_edge",
+      "self_ms": 0.209771,
+      "total_ms": 0.209771
+    },
+    {
+      "count": 27,
+      "counters": {},
+      "name": "validation::coincidence::vertex_vertex",
+      "self_ms": 0.049317,
+      "total_ms": 0.049317
+    },
+    {
+      "count": 27,
+      "counters": {
+        "CoincidenceQueries": 445
+      },
+      "name": "validation::coincidence::edge_edge",
+      "self_ms": 0.047916,
+      "total_ms": 0.047916
+    },
+    {
+      "count": 27,
+      "counters": {},
+      "name": "validation::coincidence::face_face",
+      "self_ms": 0.019536,
+      "total_ms": 0.019536
+    }
+  ],
+  "wall_ms": 1339.306148,
+  "workload": "hinge"
+}
