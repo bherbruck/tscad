@@ -60,8 +60,19 @@ pub struct PartResult {
     pub counts: Option<[usize; 3]>,
     pub warnings: Vec<String>,
     pub millis: f64,
+    /// Where the time went, ms: build (the tree), measure (volume, area, box), record, mesh.
+    pub phases: Phases,
     /// Whether the part's whole tree came from the cache.
     pub cached: bool,
+}
+
+/// Milliseconds per phase of a part's evaluation.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Tsify)]
+pub struct Phases {
+    pub build: f64,
+    pub measure: f64,
+    pub record: f64,
+    pub mesh: f64,
 }
 
 /// What [`Engine::evaluate`] gave.
@@ -156,7 +167,9 @@ impl Engine {
             let misses = self.cache.misses;
             let name = if part.name.is_empty() { format!("part{i}") } else { part.name.clone() };
             let mut out = PartResult { name: name.clone(), ..Default::default() };
-            match eval::eval(&part.node, &format!("parts/{i}"), &mut self.cache) {
+            let built = eval::eval(&part.node, &format!("parts/{i}"), &mut self.cache);
+            out.phases.build = self.now() - t;
+            match built {
                 Err(e) => {
                     out.error = Some(e);
                     result.ok = false;
@@ -167,9 +180,12 @@ impl Engine {
                 }
                 Ok(Some(body)) => {
                     out.ok = true;
+                    let t1 = self.now();
                     out.counts = body.counts().ok();
                     out.volume = body.volume(1e-6).ok();
                     out.area = body.area(1e-6).ok();
+                    let t2 = self.now();
+                    out.phases.measure = t2 - t1;
                     let record = match body.to_record() {
                         Ok((r, _)) => Some(r),
                         Err(e) => {
@@ -177,6 +193,8 @@ impl Engine {
                             None
                         }
                     };
+                    let t3 = self.now();
+                    out.phases.record = t3 - t2;
                     let mut mesh = None;
                     // the exact box (surfaces included): a sphere's poles are its only vertices
                     out.bbox = body.bounds().ok().map(|(lo, hi)| [lo, hi]);
@@ -193,6 +211,7 @@ impl Engine {
                             }
                         }
                     }
+                    out.phases.mesh = self.now() - t3;
                     self.parts.insert(name, PartState { body, record, mesh });
                 }
             }
