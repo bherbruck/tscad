@@ -153,6 +153,22 @@ Levenberg–Marquardt in minimum-norm form `dx = −Jᵀ(JJᵀ + λI)⁻¹F` wit
 Minimum-norm steps keep under-constrained geometry where it was drawn. Convergence: largest
 residual < 1e-10 × max(1, sketch size) mm. Deterministic.
 
+**Closed loops without drawn positions.** A loop of lines and arcs with at most one placed point
+(a fixed start, or a fixed centre) is laid out as a whole. The layout walks the loop: fixed
+line directions (`horizontal`, `vertical`, `angle`) stay fixed, tangent joints carry the
+direction through, and the unknown corners and arc sweeps share the turning a counter-clockwise
+loop needs (2π in all; concave `cw` arcs take a small share). Unknown line lengths are then sized
+so the loop closes (least squares around a typical length), and the points and arc centres are
+placed and moved onto the anchor. A fillet arc between two arcs with known centres and radii
+starts where its offset circles cross, on the outside. Rounded squares, slots, obrounds,
+keyholes, D shapes and six-arc gaskets all solve without drawn positions (see
+`tests/sketch.layout.test.tsx`).
+
+**Relax restarts.** If the solve doesn't converge, or converges to an unsound shape (a collapsed
+line or arc, or a self-crossing profile), the solver retries from up to 16 deterministic
+perturbations of the start, in two sizes. Points the user drew move less in these retries.
+It keeps the first sound solution, and only then reports a conflict.
+
 **Initial guess.** Points without `x`/`y` are laid out by walking the curves: a line continues
 from its known end along its constraint direction (horizontal/vertical/angle/parallel...), or
 turns left (CCW polygon) by default, at its `length` (else a typical size from the dimensions);
@@ -311,6 +327,5 @@ arc + line paths from SVG data and from a constraint sketch. See
 `<section z={...}>`. Each section's metadata carries its own plane. Sections with the same
 structure (the same lines and arcs in the same order) loft cleanly. See
 `examples/sketch-vase.tsx`: three rounded squares (four lines and four tangent arcs, sized by
-params) at the foot, belly and neck, smoothly lofted and shelled. That sketch has rough point
-positions so the solver starts on the intended branch; that is the usual CAD workflow for
-closed sketches made of tangent arcs.
+params) at the foot, belly and neck, smoothly lofted and shelled. No point positions are
+drawn at all: the loop layout below finds the shape.

@@ -903,7 +903,8 @@ function layout(m: Model): void {
     const K = ka ? l.a : l.b, U = ka ? l.b : l.a;
     const forward = ka;
     const arr = arriving(K, l);
-    let w: Vec2 = arr ? (arr.smooth ? arr.t : forward ? rotL(arr.t) : rotR(arr.t)) : forward ? [1, 0] : [0, 1];
+    // at a corner, prefer a left turn but stay close to the way we were going (~27° left)
+    let w: Vec2 = arr ? (arr.smooth ? arr.t : unit(vadd(arr.t, vsc(forward ? rotL(arr.t) : rotR(arr.t), 0.5)))) : forward ? [1, 0] : [0, 1];
     const cands = lineDirs(l);
     if (cands) {
       const ws = cands.map((c) => (forward ? c : vsc(c, -1)));
@@ -913,12 +914,13 @@ function layout(m: Model): void {
     return true;
   };
 
+  const bulged = new Map<ArcE, number>();
   const placeArc = (a: ArcE): boolean => {
     const r0 = radiusOf.get(a);
     const ks = known(a.s), ke = known(a.e), kc = known(a.c);
     const defaultSweep = () => sweepOf.get(a) ?? (m.specs.some((s) => (s.k === "tanLC" && s.c === a) || (s.k === "tanCC" && (s.c1 === a || s.c2 === a))) ? Math.PI : Math.PI / 2);
     if (kc && (ks || ke) && !(ks && ke)) {
-      const t = defaultSweep() * (a.ccw ? 1 : -1);
+      const t = (bulged.get(a) ?? defaultSweep()) * (a.ccw ? 1 : -1);
       if (ks) set(a.e, rotAbout(get(a.s), get(a.c), t));
       else set(a.s, rotAbout(get(a.e), get(a.c), -t));
       return true;
@@ -929,7 +931,12 @@ function layout(m: Model): void {
       const others = m.points.filter((q) => q !== a.c && known(q)).map(get);
       const cen: Vec2 = others.length ? [others.reduce((t, q) => t + q[0], 0) / others.length, others.reduce((t, q) => t + q[1], 0) / others.length] : [C[0] - 1, C[1]];
       const away = vlen(vsub(C, cen)) > 1e-9 ? unit(vsub(C, cen)) : ([1, 0] as Vec2);
-      const half = (defaultSweep() / 2) * (a.ccw ? 1 : -1);
+      // a tangent arc (slot end, boss) turns about half way round; a plain one (a keyhole's
+      // head between two lines) most of the way
+      const tangentArc = m.specs.some((x) => (x.k === "tanLC" && x.c === a) || (x.k === "tanCC" && (x.c1 === a || x.c2 === a)));
+      const sw = sweepOf.get(a) ?? (tangentArc ? Math.PI : 1.5 * Math.PI);
+      bulged.set(a, sw);
+      const half = (sw / 2) * (a.ccw ? 1 : -1);
       const t0 = Math.atan2(away[1], away[0]) - half;
       const r = r0 ?? L0 / 2;
       set(a.s, [C[0] + r * Math.cos(t0), C[1] + r * Math.sin(t0)]);
@@ -975,7 +982,62 @@ function layout(m: Model): void {
     return true;
   };
 
+  // point-to-point dimensions first (a second centre at a set distance, along an axis...)
+  for (let pass = 0; pass < m.points.length; pass++) {
+    let moved = false;
+    for (const sp of m.specs) {
+      if (sp.k === "dxy") {
+        const [a, b] = [sp.p, sp.q];
+        const k = sp.axis;
+        if (known(a) && !known(b)) {
+          const v = get(a);
+          v[k] += sp.v;
+          set(b, v);
+          moved = true;
+        } else if (known(b) && !known(a)) {
+          const v = get(b);
+          v[k] -= sp.v;
+          set(a, v);
+          moved = true;
+        }
+      } else if (sp.k === "dist") {
+        const hv = m.specs.find((o): o is Extract<Spec, { k: "hv" }> => o.k === "hv" && ((o.p === sp.p && o.q === sp.q) || (o.p === sp.q && o.q === sp.p)));
+        if (!hv) continue;
+        const dir: Vec2 = hv.axis === 0 ? [1, 0] : [0, 1];
+        if (known(sp.p) && !known(sp.q)) set(sp.q, vadd(get(sp.p), vsc(dir, sp.v))), (moved = true);
+        else if (known(sp.q) && !known(sp.p)) set(sp.p, vsub(get(sp.q), vsc(dir, sp.v))), (moved = true);
+      }
+    }
+    if (!moved) break;
+  }
   layoutLoops(m, { known, get, set, lineDirs, isTangent, lengthOf, radiusOf, sweepOf, L0 });
+
+  // a fillet arc between two arcs with known centres and radii: its centre is where the two
+  // offset circles cross (R + ρ for a concave fillet, |ρ − R| for a convex blend), on the
+  // outside of the drawing; its ends lie on the centre lines
+  for (const f of m.curves) {
+    if (f.kind !== "arc" || known(f.c) || known(f.s) || known(f.e)) continue;
+    const rho = radiusOf.get(f);
+    if (rho === undefined) continue;
+    const nb = (p: Pt) => m.curves.find((c): c is ArcE => c !== f && c.kind === "arc" && (c.s === p || c.e === p) && known(c.c) && radiusOf.has(c));
+    const A = nb(f.s), B = nb(f.e);
+    if (!A || !B) continue;
+    const dA = f.ccw ? Math.abs(rho - radiusOf.get(A)!) : radiusOf.get(A)! + rho;
+    const dB = f.ccw ? Math.abs(rho - radiusOf.get(B)!) : radiusOf.get(B)! + rho;
+    const cA = get(A.c), cB = get(B.c), D = vlen(vsub(cB, cA));
+    if (D < 1e-9 || D > dA + dB || D < Math.abs(dA - dB)) continue;
+    const along = (dA * dA - dB * dB + D * D) / (2 * D), h = Math.sqrt(Math.max(0, dA * dA - along * along));
+    const u = unit(vsub(cB, cA)), base = vadd(cA, vsc(u, along));
+    const kn = m.points.filter(known).map(get);
+    const cen: Vec2 = [kn.reduce((t, q) => t + q[0], 0) / kn.length, kn.reduce((t, q) => t + q[1], 0) / kn.length];
+    const cands = [vadd(base, vsc(rotL(u), h)), vadd(base, vsc(rotL(u), -h))];
+    const C = cands.reduce((a, b) => (vlen(vsub(b, cen)) > vlen(vsub(a, cen)) ? b : a));
+    // tangent points: on the line between the centres, at each circle
+    const tp = (c: Vec2, R: number) => vadd(c, vsc(unit(vsub(C, c)), f.ccw ? -R : R));
+    set(f.c, C);
+    set(f.s, tp(cA, radiusOf.get(A)!));
+    set(f.e, tp(cB, radiusOf.get(B)!));
+  }
 
   let seeds = 0;
   for (let pass = 0; pass < 10 * (m.points.length + 1); pass++) {
@@ -1473,6 +1535,24 @@ function snapVal(v: number): number {
   return Math.abs(v - r) < 1e-9 * Math.max(1, Math.abs(v)) ? r + 0 : v;
 }
 
+/** A converged solution worth keeping: no collapsed line or arc, no self-crossing profile. */
+function acceptable(m: Model, x: Float64Array, S: number): boolean {
+  const P = (p: Pt): Vec2 => [x[p.ix]!, x[p.ix + 1]!];
+  const tiny = 1e-6 * Math.max(1, S);
+  for (const c of m.curves) {
+    if (c.kind === "line" && vlen(vsub(P(c.a), P(c.b))) < tiny) return false;
+    if (c.kind === "arc" && (vlen(vsub(P(c.s), P(c.e))) < tiny || !(x[c.ir]! > tiny))) return false;
+    if (c.kind === "circle" && !(x[c.ir]! > tiny)) return false;
+  }
+  try {
+    const info = { points: m.points.map((p) => ({ id: p.name, x: x[p.ix]!, y: x[p.ix + 1]!, free: false })) } as unknown as SolvedSketch;
+    const loops = profile({ m, x, info, rest: [] }, "loops");
+    return !crossing(loops);
+  } catch {
+    return true; // not a closed profile (a path, or open): nothing more to check
+  }
+}
+
 interface Solved {
   m: Model;
   x: Float64Array;
@@ -1487,10 +1567,42 @@ function solve(sketch: Host, hooks: SolveHooks): Solved {
   const pts = m.points.map((p) => [x0[p.ix]!, x0[p.ix + 1]!] as Vec2);
   const ext = pts.length ? Math.hypot(Math.max(...pts.map((p) => p[0])) - Math.min(...pts.map((p) => p[0])), Math.max(...pts.map((p) => p[1])) - Math.min(...pts.map((p) => p[1]))) : 0;
   const S = Math.max(1, ext, ...m.specs.map((s) => ("v" in s && s.k !== "ang" && s.k !== "angle" && s.k !== "angAbs" && s.k !== "sweep" ? s.v : 0)));
-  const constraints = equations(m, x0, S);
-  const sys: System = { x0, constraints, scale: S };
+  let constraints = equations(m, x0, S);
+  let sys: System = { x0, constraints, scale: S };
   const order = [...constraints.keys()].sort((a, b) => Number(!constraints[a]!.structural) - Number(!constraints[b]!.structural));
-  const r = lm(sys, order);
+  let r = lm(sys, order);
+  if (!r.converged || !acceptable(m, r.x, S)) {
+    // relax: restart from perturbed guesses (deterministic) and keep the first solution that
+    // converges to a sound shape (no collapsed curve, no self-crossing profile)
+    const drawn = new Set(m.points.filter((p) => p.host).map((p) => p.ix));
+    let seed = 12345;
+    const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff) * 2 - 1;
+    for (let k = 1; k <= 16; k++) {
+      const xk = Float64Array.from(x0);
+      const amp = S * (k <= 8 ? 0.15 : 0.4);
+      for (const p of m.points) {
+        if (m.fixed.has(p)) continue;
+        // points drawn by the user move less: their guess is information
+        const a = drawn.has(p.ix) ? amp / 4 : amp;
+        xk[p.ix] = xk[p.ix]! + a * rnd();
+        xk[p.ix + 1] = xk[p.ix + 1]! + a * rnd();
+      }
+      const ck = equations(m, xk, S);
+      const sk: System = { x0: xk, constraints: ck, scale: S };
+      const rk = lm(sk, order);
+      if (rk.converged && acceptable(m, rk.x, S)) {
+        r = rk;
+        constraints = ck;
+        sys = sk;
+        break;
+      }
+      if (rk.converged && !r.converged) {
+        r = rk;
+        constraints = ck;
+        sys = sk;
+      }
+    }
+  }
   if (!r.converged) {
     const c = findConflict(sys, order);
     const spec = (i: number) => constraints[i]!.data as Spec;

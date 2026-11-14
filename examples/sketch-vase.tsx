@@ -34,10 +34,6 @@ function RoundedSquare({ w, r, z }: { w: number; r: number; z: number }) {
       <dimension a="b0" b="top" distance={w} />
       <dimension a="r0" b="left" distance={w} />
       <symmetric a="b0" b="t0" about="c" />
-      {/* rough positions so the solver starts the right way round */}
-      {([["b0", -1, -2], ["b1", 1, -2], ["r0", 2, -1], ["r1", 2, 1], ["t0", 1, 2], ["t1", -1, 2], ["l0", -2, 1], ["l1", -2, -1]] as const).map(([id, x, y]) => (
-        <point id={id} x={(x * w) / 4} y={(y * w) / 4} />
-      ))}
     </sketch>
   )
 }
