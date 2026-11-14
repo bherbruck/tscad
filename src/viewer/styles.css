@@ -1925,3 +1925,13 @@ kbd {
 .check-summary .bad {
   color: var(--err);
 }
+
+button.err-loc {
+  border: 0;
+  cursor: pointer;
+}
+
+button.err-loc:hover {
+  color: var(--text);
+  text-decoration: underline;
+}

@@ -8,6 +8,11 @@ import type { Server, ServerWebSocket } from "bun";
 import { rmSync } from "node:fs";
 import { APP_PREFIX, type Asset, buildApp, buildUser, BundleError, type BuildMessage, mime, SRC, WASM_DIR } from "./bundle";
 import { EvalSession } from "./eval-server";
+import { type DiagnosticItem, DiagnosticsRunner } from "./diagnostics";
+import { createHash } from "node:crypto";
+import { tmpdir } from "node:os";
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { bundleModel, type BunBundle } from "./model";
 import { loadKernel, WasmKernelHost } from "../kernel";
 
@@ -24,6 +29,10 @@ export interface DevOptions {
    * kernel loads). Default `"auto"`.
    */
   evaluate?: "auto" | "server" | "browser";
+  /** Paths in source maps and diagnostics are relative to this (default: the model's directory). */
+  root?: string;
+  /** Evaluate after every rebuild and publish problems (`/__diagnostics`, `diagnostics` socket messages). */
+  diagnostics?: boolean;
 }
 
 export interface DevServer {
@@ -42,10 +51,13 @@ type State =
   | { type: "building" };
 
 export async function startDev(opts: DevOptions): Promise<DevServer> {
-  const entry = resolve(opts.file);
-  const root = dirname(entry);
-  const fromCwd = relative(process.cwd(), entry);
-  const fileLabel = fromCwd && !fromCwd.startsWith("..") ? fromCwd : basename(entry);
+  let entry = resolve(opts.file);
+  const root = resolve(opts.root ?? dirname(entry));
+  const labelOf = (f: string) => {
+    const fromRoot = opts.root ? relative(root, f) : relative(process.cwd(), f);
+    return fromRoot && !fromRoot.startsWith("..") ? fromRoot : basename(f);
+  };
+  let fileLabel = labelOf(entry);
 
   let [app, html] = await Promise.all([buildApp(), Bun.file(resolve(SRC, "viewer/index.html")).text()]);
   const evalMode = await chooseEvalMode(opts.evaluate ?? "auto");
@@ -62,8 +74,22 @@ export async function startDev(opts: DevOptions): Promise<DevServer> {
   let state: State = { type: "building" };
   let watched = new Set<string>();
 
+  let diagnostics: DiagnosticItem[] = [];
+  /** Bumped on every new set; `/__diagnostics?since=n` long-polls until it moves past n. */
+  let diagVersion = 0;
+  const diagWaiters = new Set<() => void>();
+  const publishDiagnostics = (items: DiagnosticItem[]) => {
+    diagnostics = items;
+    diagVersion++;
+    broadcast({ type: "diagnostics", file: entry, items, version: diagVersion });
+    for (const w of diagWaiters) w();
+    diagWaiters.clear();
+  };
+  const runner = opts.diagnostics ? new DiagnosticsRunner(publishDiagnostics) : undefined;
+  const bunNeeded = evalMode === "server" || !!runner;
+
   const sockets = new Set<ServerWebSocket<WsData>>();
-  const broadcast = (msg: State | { type: string }) => {
+  const broadcast = (msg: State | { type: string; [k: string]: unknown }) => {
     const text = JSON.stringify(msg);
     for (const ws of sockets) ws.send(text);
   };
@@ -71,7 +97,7 @@ export async function startDev(opts: DevOptions): Promise<DevServer> {
   async function rebuild() {
     broadcast({ type: "building" });
     try {
-      const [b, bb] = await Promise.all([buildUser(entry, root), evalMode === "server" ? bundleModel(entry) : undefined]);
+      const [b, bb] = await Promise.all([buildUser(entry, root), bunNeeded ? bundleModel(entry) : undefined]);
       bundle = b;
       if (bb) {
         bunBundles.push(bb);
@@ -81,10 +107,12 @@ export async function startDev(opts: DevOptions): Promise<DevServer> {
       version++;
       state = { type: "bundle", url: `/__user/bundle.js?v=${version}`, file: fileLabel, version, millis: b.millis };
       watched = new Set(b.inputs.filter((p) => !p.includes("/node_modules/")));
+      if (bb) runner?.update(bb, entry);
       opts.onBuild?.({ ok: true, millis: b.millis, version });
     } catch (e) {
       const errors: BuildMessage[] = e instanceof BundleError ? e.messages : [{ message: String((e as Error)?.message ?? e) }];
       state = { type: "bundle-error", errors };
+      if (runner) publishDiagnostics(DiagnosticsRunner.fromBuild(errors, root, entry));
       opts.onBuild?.({ ok: false, errors });
     }
     broadcast(state);
@@ -96,6 +124,8 @@ export async function startDev(opts: DevOptions): Promise<DevServer> {
     port: opts.port ?? 3333,
     hostname: opts.host ?? "localhost",
     development: false,
+    // Diagnostics long-polls hold a request for up to 25 s.
+    idleTimeout: 60,
     fetch(req, server) {
       const url = new URL(req.url);
       const path = decodeURIComponent(url.pathname);
@@ -119,7 +149,25 @@ export async function startDev(opts: DevOptions): Promise<DevServer> {
       if (path === "/__user/bundle.js.map") {
         return bundle?.map ? new Response(bundle.map, { headers: { "content-type": "application/json", "cache-control": "no-store" } }) : notFound();
       }
-      if (path === "/__status") return Response.json({ state, version });
+      if (path === "/__status") return Response.json({ state, version, file: entry, root, evalMode, pid: process.pid });
+      if (path === "/__diagnostics") {
+        const since = Number(url.searchParams.get("since") ?? -1);
+        const reply = () => Response.json({ file: entry, items: diagnostics, version: diagVersion, enabled: !!runner });
+        if (!runner || since < diagVersion) return reply();
+        // Long poll (editors without WebSocket): answer when the next set lands, or after 25 s.
+        return new Promise<Response>((res) => {
+          const done = () => {
+            clearTimeout(t);
+            diagWaiters.delete(done);
+            res(reply());
+          };
+          const t = setTimeout(done, 25_000);
+          diagWaiters.add(done);
+        });
+      }
+      // Editors: show another model in the same server (`{ "file": "/abs/or/relative.tsx" }`).
+      if (path === "/__model" && req.method === "POST") return switchModel(req);
+      if (path === "/__export" && req.method === "POST") return exportModel(req);
       if (path.startsWith("/wasm/")) {
         const name = path.slice("/wasm/".length);
         if (!/^[\w.-]+$/.test(name)) return notFound();
@@ -150,6 +198,41 @@ export async function startDev(opts: DevOptions): Promise<DevServer> {
     },
   });
 
+  async function switchModel(req: Request): Promise<Response> {
+    const body = (await req.json().catch(() => ({}))) as { file?: string };
+    if (!body.file) return Response.json({ error: "file is required" }, { status: 400 });
+    const next = resolve(root, body.file);
+    if (!(await Bun.file(next).exists())) return Response.json({ error: `no such file: ${body.file}` }, { status: 404 });
+    if (next !== entry) {
+      entry = next;
+      fileLabel = labelOf(entry);
+      await rebuild();
+      addWatchers();
+    }
+    return Response.json({ file: entry, state });
+  }
+
+  /** Build the current model to a file next to it (`{ format, out?, params? }`), in a subprocess. */
+  async function exportModel(req: Request): Promise<Response> {
+    const body = (await req.json().catch(() => ({}))) as { format?: string; out?: string; params?: Record<string, unknown>; file?: string };
+    const format = (body.format ?? "stl").toLowerCase();
+    if (!["step", "stl", "3mf", "glb", "obj", "dxf", "svg"].includes(format)) return Response.json({ error: `unknown format ${format}` }, { status: 400 });
+    const file = body.file ? resolve(root, body.file) : entry;
+    const out = body.out ? resolve(root, body.out) : file.replace(/\.[jt]sx?$/, "") + `.${format}`;
+    const args = ["bun", resolve(SRC, "cli/index.ts"), "build", file, "-o", out, "--json"];
+    for (const [k, v] of Object.entries(body.params ?? {})) args.push("-p", `${k}=${v}`);
+    const proc = Bun.spawn(args, { stdout: "pipe", stderr: "pipe", env: { ...process.env, NO_COLOR: "1" } });
+    const [stdout, stderr, code] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited]);
+    if (code !== 0) return Response.json({ error: stderr.trim() || `build exited with ${code}` }, { status: 422 });
+    let bytes = 0;
+    try {
+      bytes = JSON.parse(stdout).outputs?.[0]?.bytes ?? 0;
+    } catch {
+      /* fine */
+    }
+    return Response.json({ path: out, bytes });
+  }
+
   await rebuild();
 
   // Watch the model's directory; rebuild when a file the bundle used changes (debounced).
@@ -163,7 +246,7 @@ export async function startDev(opts: DevOptions): Promise<DevServer> {
   const dirs = () => new Set([root, ...[...watched].map(dirname)]);
   const watchedDirs = new Set<string>();
   const addWatchers = () => {
-    for (const d of dirs()) {
+    for (const d of [...dirs(), dirname(entry)]) {
       if (watchedDirs.has(d)) continue;
       watchedDirs.add(d);
       try {
@@ -205,8 +288,18 @@ export async function startDev(opts: DevOptions): Promise<DevServer> {
   };
 
   const port = server.port!;
+  const url = `http://${opts.host && opts.host !== "0.0.0.0" ? opts.host : "localhost"}:${port}`;
+
+  // Editors find a running server for a folder through this file (removed on stop).
+  const discovery = join(tmpdir(), `tscad-dev-${createHash("sha1").update(root).digest("hex").slice(0, 12)}.json`);
+  try {
+    writeFileSync(discovery, JSON.stringify({ pid: process.pid, url, root, file: entry }));
+  } catch {
+    /* read-only tmp: no discovery */
+  }
+
   return {
-    url: `http://${opts.host && opts.host !== "0.0.0.0" ? opts.host : "localhost"}:${port}`,
+    url,
     port,
     server,
     evalMode,
@@ -214,6 +307,8 @@ export async function startDev(opts: DevOptions): Promise<DevServer> {
     async stop() {
       clearTimeout(timer);
       for (const b of bunBundles) rmSync(b.path, { force: true });
+      runner?.dispose();
+      rmSync(discovery, { force: true });
       for (const w of watchers) w.close();
       for (const ws of sockets) ws.close();
       await server.stop(true);

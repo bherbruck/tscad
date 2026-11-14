@@ -36,7 +36,7 @@ export interface ViewerConfig {
    * A sketch chip or dimension label was clicked: reveal `loc` in the code. Default: show
    * file:line and copy it.
    */
-  onSourceClick?: (loc: Loc, target: { kind: "sketch"; sketch: SketchData } | { kind: "dimension"; sketch: SketchData; dimension: SketchDimensionData } | { kind: "mate"; mate: MateData }) => void;
+  onSourceClick?: (loc: Loc, target: { kind: "sketch"; sketch: SketchData } | { kind: "dimension"; sketch: SketchData; dimension: SketchDimensionData } | { kind: "mate"; mate: MateData } | { kind: "error"; message: string }) => void;
   /** Evaluate on the dev server instead of in a page worker: the socket path (e.g. `/__eval`). */
   remoteEval?: string;
   /** Max kernels evaluating parts in parallel (default cores − 1, ≤ 4; 1 = off). `?pool=n` in the URL overrides. */
@@ -679,7 +679,7 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
       "div",
       { class: "err-head" },
       icon("alert", 16),
-      h("div", { class: "err-text" }, h("div", { class: "err-title" }, title, loc ? h("span", { class: "err-loc" }, `${shortFile(loc.file)}:${loc.line}:${loc.column}`) : null), h("div", { class: "err-msg" }, message)),
+      h("div", { class: "err-text" }, h("div", { class: "err-title" }, title, loc ? h("button", { class: "err-loc", title: "Show in the code", onclick: () => sourceClick(loc, { kind: "error", message }) }, `${shortFile(loc.file)}:${loc.line}:${loc.column}`) : null), h("div", { class: "err-msg" }, message)),
       h("button", { class: "icon-btn sm", title: "Dismiss", onclick: () => errorBox.classList.add("hidden") }, icon("x", 14)),
     );
   }

@@ -1,0 +1,94 @@
+{
+  "tscad model": {
+    "prefix": "tscad-model",
+    "description": "A parametric tscad model: params + default export",
+    "body": [
+      "import { defineParams, edges, type ParamValues } from \"tscad\"",
+      "",
+      "export const params = defineParams({",
+      "  width: { type: \"number\", default: ${1:40}, min: ${2:10}, max: ${3:120}, step: 1, unit: \"mm\" },",
+      "})",
+      "",
+      "export default function ${4:Model}(p: ParamValues<typeof params>) {",
+      "  return (",
+      "    <part name=\"${5:part}\" material=\"${6|pla,petg,abs,aluminum,steel|}\">",
+      "      <box size={[p.width, ${7:20}, ${8:5}]} />",
+      "    </part>",
+      "  )",
+      "}",
+      ""
+    ]
+  },
+  "defineParams": {
+    "prefix": "params",
+    "description": "export const params = defineParams({...})",
+    "body": [
+      "export const params = defineParams({",
+      "  ${1:size}: { type: \"${2|number,int,boolean,choice,text,color|}\", default: ${3:10}, min: ${4:1}, max: ${5:100}, unit: \"mm\", label: \"${6:Size}\" },",
+      "})"
+    ]
+  },
+  "part": {
+    "prefix": "part",
+    "description": "<part name material>",
+    "body": ["<part name=\"${1:part}\" material=\"${2|pla,petg,abs,aluminum,steel|}\">", "  $0", "</part>"]
+  },
+  "extrude a sketch": {
+    "prefix": "extrude-sketch",
+    "description": "<extrude> of a constraint sketch",
+    "body": [
+      "<extrude height={${1:5}}>",
+      "  <sketch>",
+      "    <point id=\"o\" x={0} y={0} fixed />",
+      "    <line from=\"o\" to=\"a\" horizontal length={${2:40}} />",
+      "    <line from=\"a\" to=\"b\" vertical length={${3:20}} />",
+      "    <line from=\"b\" to=\"c\" horizontal />",
+      "    <line from=\"c\" to=\"o\" vertical />",
+      "    $0",
+      "  </sketch>",
+      "</extrude>"
+    ]
+  },
+  "extrude shapes": {
+    "prefix": "extrude",
+    "description": "<extrude> of plain shapes (inner loops become holes)",
+    "body": ["<extrude height={${1:5}}>", "  <roundedRect w={${2:40}} h={${3:30}} r={${4:3}} center />", "  <circle d={${5:6}} />", "</extrude>"]
+  },
+  "fillet with selector": {
+    "prefix": "fillet",
+    "description": "<fillet> some edges (click an edge in the preview to get a selector)",
+    "body": ["<fillet radius={${1:1}} edges={edges.${2|top(),bottom(),vertical(),circles()|}}>", "  $0", "</fillet>"]
+  },
+  "chamfer with selector": {
+    "prefix": "chamfer",
+    "description": "<chamfer> some edges",
+    "body": ["<chamfer distance={${1:0.5}} edges=\"${2|>Z,<Z,|Z,#Z|}\">", "  $0", "</chamfer>"]
+  },
+  "shell": {
+    "prefix": "shell",
+    "description": "<shell> hollow out, opening the selected faces",
+    "body": ["<shell thickness={${1:2}} open={faces.${2|top(),bottom()|}}>", "  $0", "</shell>"]
+  },
+  "assembly with a mate": {
+    "prefix": "assembly",
+    "description": "Two parts joined by a revolute mate driven by a param",
+    "body": [
+      "<assembly>",
+      "  <part name=\"${1:base}\" fixed>",
+      "    <box size={[40, 40, 10]} />",
+      "    <anchor id=\"${2:hinge}\" at={[0, 20, 10]} axis=\"x\" />",
+      "  </part>",
+      "  <part name=\"${3:arm}\">",
+      "    <box size={[40, 10, 4]} />",
+      "    <anchor id=\"${4:root}\" at={[0, 0, 0]} axis=\"x\" />",
+      "  </part>",
+      "  <mate a=\"$1.$2\" b=\"$3.$4\" type=\"${5|revolute,slider,cylindrical,fastened,planar,ball|}\" angle={${6:p.angle}} />",
+      "</assembly>"
+    ]
+  },
+  "difference": {
+    "prefix": "difference",
+    "description": "<difference>: the first child minus the rest",
+    "body": ["<difference>", "  ${1:<box size={20} />}", "  ${2:<cylinder d={6} h={30} z={-5} />}", "</difference>"]
+  }
+}

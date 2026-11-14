@@ -42,6 +42,8 @@ export const FLAGS: Record<string, FlagSpec> = {
   edges: {},
   "section-z": { value: true },
   "browser-eval": {},
+  root: { value: true },
+  diagnostics: {},
   "server-eval": {},
   name: { value: true },
 };

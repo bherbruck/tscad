@@ -1,0 +1,9 @@
+src/**
+build.ts
+tests/**
+tsconfig.json
+node_modules/**
+*.vsix
+dist/**/*.map
+.gitignore
+bun.lock

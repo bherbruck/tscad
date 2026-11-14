@@ -21,6 +21,8 @@ ${c.bold("dev")}
   --port <n>            port ${c.gray("(default 3333; next free one if taken)")}
   --host <h>            interface ${c.gray("(default localhost)")}
   --open                open the browser
+  --root <dir>          paths relative to this ${c.gray("(editors pass the workspace folder)")}
+  --diagnostics         evaluate after each change and publish problems at /__diagnostics
   --browser-eval        evaluate in the browser (wasm) instead of on the server ${c.gray("(default: server when the native kernel is built)")}
 
 ${c.bold("build")}
@@ -152,6 +154,8 @@ async function dev(file: string, f: Parsed["flags"]): Promise<number> {
         port,
         host: str(f.host),
         evaluate: f["browser-eval"] ? "browser" : f["server-eval"] ? "server" : "auto",
+        root: str(f.root),
+        diagnostics: !!f.diagnostics,
         onBuild: (e) => {
           const time = new Date().toLocaleTimeString([], { hour12: false });
           if (e.ok) console.log(`${c.gray(time)} ${sym.ok} bundled ${c.bold(file)} ${c.gray(`in ${fmtMs(e.millis)}`)}${e.version > 1 ? c.gray(` · reload #${e.version - 1}`) : ""}`);
@@ -176,6 +180,18 @@ async function dev(file: string, f: Parsed["flags"]): Promise<number> {
   console.log(`  ${c.gray("➜")}  ${c.gray("Kernel")}  ${server.evalMode === "server" ? `native, on the server ${c.gray("(--browser-eval for wasm in the page)")}` : "wasm, in the browser"}`);
   console.log(`  ${c.gray("➜")}  ${c.gray("Press")}   ${c.bold("Ctrl+C")} ${c.gray("to stop")}\n`);
   if (f.open) openBrowser(server.url);
+  // Editor integrations: a machine-readable ready line, and exit when the editor goes away.
+  if (process.env.TSCAD_EDITOR) console.log(`TSCAD_READY ${JSON.stringify({ url: server.url, pid: process.pid, evalMode: server.evalMode })}`);
+  const parent = Number(process.env.TSCAD_PARENT_PID);
+  if (parent > 0) {
+    setInterval(() => {
+      try {
+        process.kill(parent, 0);
+      } catch {
+        void server.stop().finally(() => process.exit(0));
+      }
+    }, 1000).unref();
+  }
   const stop = async () => {
     await server.stop();
     process.exit(0);

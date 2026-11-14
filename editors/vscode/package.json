@@ -1,0 +1,45 @@
+{
+  "name": "tscad-vscode",
+  "displayName": "tscad — CAD as TSX",
+  "description": "Live 3D preview, kernel diagnostics, click-to-source and exports for tscad models.",
+  "version": "0.1.0",
+  "publisher": "tscad",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/bherbruck/tscad.git", "directory": "editors/vscode" },
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Visualization", "Programming Languages", "Snippets"],
+  "keywords": ["cad", "3d", "tsx", "step", "stl", "parametric"],
+  "main": "./dist/extension.js",
+  "activationEvents": ["onLanguage:typescriptreact", "onCommand:tscad.openPreview"],
+  "contributes": {
+    "commands": [
+      { "command": "tscad.openPreview", "title": "Open Preview", "category": "tscad", "icon": "$(open-preview)" },
+      { "command": "tscad.export", "title": "Export…", "category": "tscad" },
+      { "command": "tscad.restartServer", "title": "Restart Dev Server", "category": "tscad" }
+    ],
+    "menus": {
+      "editor/title": [{ "command": "tscad.openPreview", "when": "resourceExtname == .tsx", "group": "navigation" }],
+      "commandPalette": [{ "command": "tscad.export", "when": "resourceExtname == .tsx" }]
+    },
+    "keybindings": [{ "command": "tscad.openPreview", "key": "ctrl+k v", "mac": "cmd+k v", "when": "resourceExtname == .tsx" }],
+    "configuration": {
+      "title": "tscad",
+      "properties": {
+        "tscad.autoOpenPreview": { "type": "boolean", "default": true, "description": "Open the preview beside the editor when a tscad model is opened." },
+        "tscad.followActiveEditor": { "type": "boolean", "default": true, "description": "Show the model in the active editor in the preview." },
+        "tscad.command": { "type": "string", "default": "", "description": "Command that runs the tscad CLI (e.g. \"bunx tscad\"). Empty: the workspace's node_modules/tscad, else bunx tscad." },
+        "tscad.diagnostics": { "type": "boolean", "default": true, "description": "Show compile, kernel and sketch problems as diagnostics." },
+        "tscad.codeLens": { "type": "boolean", "default": true, "description": "Show Preview / Export lenses above a model's default export." }
+      }
+    },
+    "snippets": [{ "language": "typescriptreact", "path": "./snippets/tscad.code-snippets" }]
+  },
+  "scripts": {
+    "build": "bun build.ts",
+    "package": "bun build.ts && bunx @vscode/vsce package --no-dependencies",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0"
+  }
+}
