@@ -1,5 +1,5 @@
 /**
- * tscad — CAD as TSX. Parametric solid models as JSX components, compiled to an IR and
+ * tscad: CAD as TSX. Parametric solid models as JSX components, compiled to an IR and
  * evaluated by the solidcore B-rep kernel.
  *
  * @example
@@ -27,7 +27,7 @@ export {
 export { TscadError, formatLoc, type SourceLoc } from "./core/errors";
 
 // compile
-export { compile, renderModule, type CompileOptions, type CompileResult, type Drawing, type Loop2, type PartInfo, type RenderResult, type Seg2, type TscadModule } from "./core/compile";
+export { compile, renderModule, type CompileOptions, type CompileResult, type Drawing, type DrawingNote, type Loop2, type PartInfo, type RenderResult, type Seg2, type TscadModule } from "./core/compile";
 
 // params
 export {

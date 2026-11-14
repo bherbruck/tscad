@@ -1,6 +1,6 @@
 /**
  * Electronics enclosure: a rounded tub with screw bosses in each corner, vent louvres and
- * countersunk screws in the lid, and a USB-C cut-out — an assembly of two parts (body + lid).
+ * countersunk screws in the lid, and a USB-C cut-out: an assembly of two parts (body + lid).
  * Set `exploded` to lift the lid off for printing / inspection.
  */
 import { defineParams, edges, type ParamValues } from "tscad"

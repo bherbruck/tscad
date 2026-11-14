@@ -1,6 +1,6 @@
 /**
  * Hinged box: a shelled base and a lid joined by a revolute mate along the back edge.
- * The `open` param drives the hinge angle — drag it and the lid swings.
+ * The `open` param drives the hinge angle: drag it and the lid swings.
  *
  *   tscad dev examples/assembly-hinge-box.tsx
  */

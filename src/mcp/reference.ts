@@ -132,7 +132,7 @@ function propsOf(name: string, ifaces: Map<string, Iface>, seen = new Set<string
 function memberLine(m: Member): string {
   if (m.name === "key" || m.name === "children") return "";
   const notes = Object.entries(TYPE_NOTES).filter(([t]) => new RegExp(`\\b${t}\\b`).test(m.type)).map(([t, n]) => `${t} = ${n}`);
-  return `- \`${m.name}${m.optional ? "?" : ""}: ${m.type}\`${m.doc ? ` — ${m.doc.replace(/\n/g, " ")}` : ""}${notes.length ? ` (${notes.join("; ")})` : ""}`;
+  return `- \`${m.name}${m.optional ? "?" : ""}: ${m.type}\`${m.doc ? `: ${m.doc.replace(/\n/g, " ")}` : ""}${notes.length ? ` (${notes.join("; ")})` : ""}`;
 }
 
 function sharedSection(ifaces: Map<string, Iface>): string {
@@ -197,7 +197,7 @@ function build() {
     "",
     "| pattern | holes (span) | screw | outline | outline offset | pilot |",
     "|---|---|---|---|---|---|",
-    ...Object.entries(mountPatternsData()).map(([k, v]) => `| \`${k}\` | ${span(v.points)} | ${v.size} | ${v.outline ? `${v.outline[0]} × ${v.outline[1]}` : "—"} | ${v.outlineOffset ? `[${v.outlineOffset.join(", ")}]` : "—"} | ${v.pilot ?? "—"} |`),
+    ...Object.entries(mountPatternsData()).map(([k, v]) => `| \`${k}\` | ${span(v.points)} | ${v.size} | ${v.outline ? `${v.outline[0]} × ${v.outline[1]}` : "-"} | ${v.outlineOffset ? `[${v.outlineOffset.join(", ")}]` : "-"} | ${v.pilot ?? "-"} |`),
     "",
     "- `boards.<name>` (for `<Board>` / `<BoardCase>`): PCB size, thickness, holes and every connector (`id`, `type`, plan `rect`, `z`, `height`, `facing`). Frame: x/y from the PCB's lower-left corner, z = 0 at its underside.",
     "",

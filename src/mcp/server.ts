@@ -1,6 +1,6 @@
 /**
  * A Model Context Protocol server (spec 2025-06-18) over stdio: newline-delimited JSON-RPC 2.0.
- * Hand-rolled — the protocol surface tscad needs (initialize, ping, tools/list, tools/call) is
+ * Hand-rolled: the protocol surface tscad needs (initialize, ping, tools/list, tools/call) is
  * small, and this keeps tscad free of the SDK's dependency tree.
  */
 import pkg from "../../package.json" with { type: "json" };
@@ -46,7 +46,7 @@ export function createMcpHandler(opts: { log?: (msg: string) => void } = {}) {
             result: {
               protocolVersion: SUPPORTED.includes(asked) ? asked : PROTOCOL_VERSION,
               capabilities: { tools: { listChanged: false } },
-              serverInfo: { name: "tscad", title: "tscad — CAD as TSX", version: pkg.version },
+              serverInfo: { name: "tscad", title: "tscad: CAD as TSX", version: pkg.version },
               instructions: INSTRUCTIONS,
             },
           };

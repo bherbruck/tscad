@@ -21,7 +21,7 @@ export default function Coaster(p: ParamValues<typeof params>) {
   const n = Math.ceil(inner / pitch) + 1
 
   // Honeycomb centres: rows `pitch` apart, every other column shifted by half a pitch.
-  // Keep only the cells that fit entirely inside the rim — it's just an array filter.
+  // Keep only the cells that fit entirely inside the rim; it's just an array filter.
   const centres: [number, number][] = []
   for (let i = -2 * n; i <= 2 * n; i++) {
     for (let j = -n; j <= n; j++) {

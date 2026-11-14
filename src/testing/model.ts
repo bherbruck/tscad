@@ -109,7 +109,7 @@ export class ModelResult {
       .filter((p) => !p.ok)
       .map((p) => {
         const loc = p.error ? this.compiled.sourceMap[p.error.path] : undefined;
-        return `${p.name}: ${p.error?.op} — ${p.error?.message}${loc ? ` (${loc.file}:${loc.line}:${loc.column} <${loc.tag}>)` : ""}`;
+        return `${p.name}: ${p.error?.op}: ${p.error?.message}${loc ? ` (${loc.file}:${loc.line}:${loc.column} <${loc.tag}>)` : ""}`;
       })
       .join("; ");
   }

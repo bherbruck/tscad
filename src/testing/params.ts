@@ -6,7 +6,7 @@ import { paramDefaults } from "../core/params";
 export interface ComboOptions {
   /**
    * Numeric sampling: `"lhs"` (latin hypercube, default), `"random"`, `"corners"` (min/max of
-   * every number), `"grid"` (`samples` levels per number — grows fast).
+   * every number), `"grid"` (`samples` levels per number; grows fast).
    */
   method?: "lhs" | "random" | "corners" | "grid";
   /** Numeric samples per discrete combination (lhs/random), or levels per number (grid). Default 4. */

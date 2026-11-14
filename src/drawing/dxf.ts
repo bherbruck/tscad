@@ -2,10 +2,13 @@
  * DXF R12 (AC1009) writer: millimetres, one layer per drawing.
  * - `entities: "primitives"` (default): LINE, ARC (real arcs, CCW degrees), CIRCLE; NURBS as a
  *   POLYLINE flattened to `tolerance`.
- * - `entities: "polyline"`: every loop as one closed POLYLINE, arcs as bulges (exact) — what
+ * - `entities: "polyline"`: every loop as one closed POLYLINE, arcs as bulges (exact); what
  *   many laser/CAM tools prefer (closed contours).
+ *
+ * Open paths (`Drawing.paths`) come out the same way but never closed (LINE/ARC, or an open
+ * POLYLINE); notes as TEXT (middle-centred, `°` as `%%d`).
  */
-import { TAU, type Arc2, type Loop2 } from "../core/sketch/seg";
+import { end, TAU, type Arc2, type Seg2 } from "../core/sketch/seg";
 import { bounds, flattenNurbs, fmt, layers, type DrawingInput } from "./common";
 import type { Vec2 } from "../core/math";
 
@@ -47,6 +50,9 @@ export function toDXF(input: DrawingInput, o: DxfOptions = {}): string {
   g(0, "TABLE"); g(2, "LTYPE"); g(70, 1);
   g(0, "LTYPE"); g(2, "CONTINUOUS"); g(70, 0); g(3, "Solid line"); g(72, 65); g(73, 0); g(40, 0);
   g(0, "ENDTAB");
+  g(0, "TABLE"); g(2, "STYLE"); g(70, 1);
+  g(0, "STYLE"); g(2, "STANDARD"); g(70, 0); g(40, 0); g(41, 1); g(50, 0); g(71, 0); g(42, 2.5); g(3, "txt"); g(4, "");
+  g(0, "ENDTAB");
   g(0, "TABLE"); g(2, "LAYER"); g(70, names.length);
   for (const n of names) {
     g(0, "LAYER"); g(2, n); g(70, 0); g(62, 7); g(6, "CONTINUOUS");
@@ -58,8 +64,21 @@ export function toDXF(input: DrawingInput, o: DxfOptions = {}): string {
   for (const l of ls) {
     const layer = layerName(l.layer ?? l.name);
     for (const loop of l.loops) {
-      if (o.entities === "polyline") polyline(loop, layer, g, tol);
+      if (o.entities === "polyline") polyline(loop, layer, g, tol, true);
       else primitives(loop, layer, g, tol);
+    }
+    for (const path of l.paths ?? []) {
+      if (o.entities === "polyline") polyline(path, layer, g, tol, false);
+      else primitives(path, layer, g, tol);
+    }
+    for (const n of l.notes ?? []) {
+      g(0, "TEXT"); g(8, layer);
+      g(10, n.at[0]); g(20, n.at[1]); g(30, 0);
+      g(40, n.size); g(1, n.text.replace(/°/g, "%%d").replace(/[\r\n]+/g, " "));
+      const rot = deg(((n.angle ?? 0) * Math.PI) / 180);
+      if (Math.abs(rot) > 1e-9 && Math.abs(rot - 360) > 1e-9) g(50, rot);
+      g(7, "STANDARD"); g(72, 4);
+      g(11, n.at[0]); g(21, n.at[1]); g(31, 0);
     }
   }
   g(0, "ENDSEC");
@@ -69,7 +88,7 @@ export function toDXF(input: DrawingInput, o: DxfOptions = {}): string {
 
 type G = (code: number, value: string | number) => void;
 
-function primitives(loop: Loop2, layer: string, g: G, tol: number) {
+function primitives(loop: readonly Seg2[], layer: string, g: G, tol: number) {
   for (const s of loop) {
     if (s.kind === "line") {
       g(0, "LINE"); g(8, layer);
@@ -93,7 +112,7 @@ function primitives(loop: Loop2, layer: string, g: G, tol: number) {
   }
 }
 
-function polyline(loop: Loop2, layer: string, g: G, tol: number) {
+function polyline(loop: readonly Seg2[], layer: string, g: G, tol: number, closed: boolean) {
   const verts: [Vec2, number][] = []; // point, bulge to the next vertex
   const arcPiece = (s: Arc2, a: number, b: number) => {
     verts.push([[s.c[0] + s.r * Math.cos(a), s.c[1] + s.r * Math.sin(a)], Math.tan((b - a) / 4)]);
@@ -109,7 +128,8 @@ function polyline(loop: Loop2, layer: string, g: G, tol: number) {
       for (const p of pts.slice(0, -1)) verts.push([p, 0]);
     }
   }
-  g(0, "POLYLINE"); g(8, layer); g(66, 1); g(70, 1); g(10, 0); g(20, 0); g(30, 0);
+  if (!closed && loop.length) verts.push([end(loop[loop.length - 1]!), 0]);
+  g(0, "POLYLINE"); g(8, layer); g(66, 1); g(70, closed ? 1 : 0); g(10, 0); g(20, 0); g(30, 0);
   for (const [p, bulge] of verts) {
     g(0, "VERTEX"); g(8, layer); g(10, p[0]); g(20, p[1]); g(30, 0);
     if (bulge) g(42, bulge);

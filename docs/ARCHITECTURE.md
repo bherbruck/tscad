@@ -2,7 +2,7 @@
 
 tscad is "CAD as TSX": you write parametric solid models as JSX components, tscad compiles the
 element tree into an IR ("cad-json"), and the **solidcore** B-rep kernel (Rust, compiled to
-WebAssembly) evaluates it into exact solids — meshes for the viewer, STEP/STL/3MF/GLB for export.
+WebAssembly) evaluates it into exact solids: meshes for the viewer, STEP/STL/3MF/GLB for export.
 
 ```
  your .tsx ──► JSX runtime ──► element tree ──► compile() ──► IR Document ──► KernelHost (wasm)
@@ -21,7 +21,7 @@ Bun is the default runtime. Source is shipped as TypeScript (bun runs it directl
 | Path | What | Owner |
 |---|---|---|
 | `crates/tscad-wasm/` | Rust: IR (`ir.rs`), evaluator (`eval.rs`), session (`engine.rs`), wasm-bindgen API (`lib.rs`) | lead |
-| `wasm/` | **generated** by `bun run build:wasm` (gitignored): `tscad_wasm.js`, `.d.ts`, `_bg.wasm` | — |
+| `wasm/` | **generated** by `bun run build:wasm` (gitignored): `tscad_wasm.js`, `.d.ts`, `_bg.wasm` | |
 | `src/ir.ts` | re-exports the tsify-generated IR types. Never hand-write IR types. | lead |
 | `src/kernel/` | `loadKernel()` → `KernelHost` (panic recovery, typed-array meshes) | lead |
 | `src/jsx-runtime.ts`, `src/jsx-dev-runtime.ts`, `src/core/`, `src/index.ts` | JSX runtime, intrinsic elements, sketch → curves, selectors, params, compile to IR | core agent |
@@ -46,7 +46,7 @@ on `type`:
 - `transform {matrix, children}`: 16 numbers, **row-major, column-vector** (`p' = M p`, translation
   at indices 3, 7, 11). Reflections (det < 0) are allowed (the kernel mirrors properly); uniform
   scale allowed; non-uniform scale/shear turn geometry into NURBS.
-- `extrude {profile: Curve[], direction, distance, draft?}` — profile is ONE closed planar loop of
+- `extrude {profile: Curve[], direction, distance, draft?}`: the profile is ONE closed planar loop of
   curves, end to end, in model space. `draft` radians.
 - `revolve {profile, origin, axis, angle}` (angle radians, ≤ 2π)
 - `loft {sections: Curve[][], ruled?}`, `sweep {profile, path: Curve[], frame?: "follow"|"translate"}`
@@ -66,7 +66,7 @@ each level (`children[i]`). Nodes without `children` are leaves. The core compil
 for every IR node it emits, the path it will have and the JSX source location (from
 `jsxDEV`'s `source` argument when available) so errors map back to TSX lines.
 
-## Kernel (`src/kernel/index.ts`) — available now
+## Kernel (`src/kernel/index.ts`): available now
 
 ```ts
 const k = await loadKernel()            // shared session; loadKernel(source) for a new one
@@ -81,7 +81,7 @@ The session caches subtrees by structural equality, so re-evaluating after a par
 recomputes what changed. A kernel panic throws `KernelPanic` and the session is rebuilt.
 `MeshArrays.faceIds[tri]` / `edgeIds[polyline]` are record indices usable with `pickFace`/`pickEdge`.
 
-## Core API (`tscad`) — owned by the core agent; others code against this
+## Core API (`tscad`): owned by the core agent; others code against this
 
 ```ts
 // JSX: lowercase intrinsic elements (like tscircuit). tsconfig: "jsx": "react-jsx", "jsxImportSource": "tscad"

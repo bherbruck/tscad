@@ -64,7 +64,7 @@ function walk(
       for (const c of node as Iterable<Children>) walk(c, out, state, fallback, component, depth);
       return;
     }
-    throw new TscadError(`can't render ${describe(node)} — expected a JSX element`, fallback ? { loc: fallback } : {});
+    throw new TscadError(`can't render ${describe(node)}: expected a JSX element`, fallback ? { loc: fallback } : {});
   }
   if (depth > MAX_DEPTH) throw new TscadError("component nesting is too deep (recursive component?)", fallback ? { loc: fallback } : {});
   const el = node as TscadElement;
@@ -88,7 +88,7 @@ function walk(
     const name = componentName(type);
     const result = type(el.props ?? {});
     if (result instanceof Promise) {
-      throw new TscadError(`component <${name}> returned a Promise — components must be synchronous`, loc ? { loc } : {});
+      throw new TscadError(`component <${name}> returned a Promise; components must be synchronous`, loc ? { loc } : {});
     }
     walk(result as Children, out, state, loc, name, depth + 1);
     return;

@@ -1,5 +1,5 @@
 /**
- * Involute spur gear — the tooth flanks are computed from the involute of the base circle,
+ * Involute spur gear: the tooth flanks are computed from the involute of the base circle,
  * so any two gears with the same module and pressure angle mesh correctly.
  *
  *   tscad dev examples/spur-gear.tsx

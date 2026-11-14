@@ -8,7 +8,7 @@ import { TscadError, type SourceLoc } from "./errors";
 import { materials, type Material } from "./materials";
 import {
   axisVector, chain, DEG, identity, isIdentity, mul, normalize, reflection, rotationAxis, rotationX, rotationXYZ,
-  scaling, tidy, translation, type Mat4, type Vec3,
+  scaling, tidy, translation, type Mat4, type Vec2, type Vec3,
 } from "./math";
 import { resolveParams, type ParamIssue, type ParamSchema, type ParamValues } from "./params";
 import type { Path3 } from "./paths";
@@ -27,7 +27,7 @@ import { AssemblyRecorder, ASSEMBLY_TAGS, type AssemblyInfo } from "./assembly";
 import { parsePath, PathSyntaxError } from "./sketch/path";
 import { ccw, frame, frameAcross, pathStart, PLANES, regions, toCurves, type Frame, type PlaneName } from "./sketch/place";
 export type { Loop2, Seg2 } from "./sketch/seg";
-import { reverseLoop, closureGap, ID2, loopSize, mul2, polyline, rot2, tr2, transformLoop, type Affine2, type Loop2 } from "./sketch/seg";
+import { reverseLoop, closureGap, ID2, loopSize, mul2, polyline, rot2, tr2, transformLoop, type Affine2, type Loop2, type Seg2 } from "./sketch/seg";
 import {
   circleLoop, ellipseLoop, polygonLoop, rectLoop, regularPolygonPoints, roundedRectLoop, slotLoop, starPoints,
 } from "./sketch/shapes";
@@ -72,12 +72,24 @@ export interface CompileResult {
 export interface Drawing {
   name: string;
   loops: Loop2[];
+  /** Open paths (chains of segments, not closed): bend lines, score lines, construction. */
+  paths?: Seg2[][];
+  /** Text notes: written as DXF TEXT / SVG `<text>` (not outlines). */
+  notes?: DrawingNote[];
   /** Sheet thickness when given (the drawing is then also a part, extruded on z = 0). */
   thickness?: number;
   /** Output layer for DXF/SVG (e.g. `"cut"`, `"engrave"`); default the name. */
   layer?: string;
   color?: string;
   loc?: SourceLoc;
+}
+
+/** A text note on a drawing: centred on `at`, `size` mm tall, rotated `angle` degrees CCW. */
+export interface DrawingNote {
+  at: Vec2;
+  text: string;
+  size: number;
+  angle?: number;
 }
 
 /** Options for {@link compile} and {@link renderModule}. */
@@ -120,7 +132,7 @@ export function renderModule<S extends ParamSchema = ParamSchema>(
   options: CompileOptions = {},
 ): RenderResult<S> {
   if (!mod || typeof mod.default !== "function") {
-    throw new TscadError("the model module has no default export — export default a component: `export default function Model() { return <box size={10} /> }`");
+    throw new TscadError("the model module has no default export. Export default a component: `export default function Model() { return <box size={10} /> }`");
   }
   const schema = (mod.params ?? {}) as S;
   const { values, issues } = resolveParams(schema, overrides);
@@ -222,7 +234,7 @@ class Compiler {
         name === "rotate" && typeof v === "number"
           ? `rotate takes three angles: rotate={[0, 0, ${v}]}, or use rotateZ={${v}} (also rotateX, rotateY)`
           : name === "at" && Array.isArray(v) && v.length === 2
-            ? `at={[${v.join(", ")}, 0]} — 3D positions need z (2D sketch shapes take at={[x, y]})`
+            ? `at={[${v.join(", ")}, 0]}: 3D positions need z (2D sketch shapes take at={[x, y]})`
             : name === "size" && Array.isArray(v) && v.length === 2
               ? `a box needs three sizes: size={[${v.join(", ")}, h]}; for a 2D rectangle use <rect w h> inside <extrude>`
               : undefined;
@@ -581,7 +593,7 @@ class Compiler {
         const ht = this.req(h, "h", this.alias(h, ["h", "height"], { positive: true }), "height (h or height)");
         const c = this.center(h, [true, true, false]);
         const R = Math.max(r1, r2);
-        // equal radii: the kernel's cone refuses them — it's a cylinder
+        // equal radii: the kernel's cone refuses them, so it's a cylinder
         const xy = translation(c[0] ? 0 : R, c[1] ? 0 : R, 0);
         if (r1 === r2) return [this.emit({ type: "cylinder", radius: r1, height: ht, ...(c[2] ? { center: true } : {}) }, h), xy];
         if (r1 === 0) {

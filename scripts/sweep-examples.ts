@@ -193,14 +193,14 @@ export function report(results: ExampleResult[], slowMs = 15_000): string {
     const fails = r.combos.filter((c) => c.status !== "ok");
     const kinds = [...new Set(fails.map((c) => c.status))].join(", ");
     const slow = Math.max(0, ...r.combos.map((c) => c.ms));
-    lines.push(`| ${label(r.file)} | ${r.error ? "—" : `${passed(r)}/${r.combos.length}`} | ${r.error ? `import: ${r.error}` : kinds || "—"} | ${(slow / 1000).toFixed(1)} s${slow > slowMs ? " ⚠" : ""} |`);
+    lines.push(`| ${label(r.file)} | ${r.error ? "-" : `${passed(r)}/${r.combos.length}`} | ${r.error ? `import: ${r.error}` : kinds || "-"} | ${(slow / 1000).toFixed(1)} s${slow > slowMs ? " ⚠" : ""} |`);
   }
   const detail: string[] = [];
   for (const r of results) {
     const fails = r.combos.filter((c) => c.status !== "ok");
     if (!fails.length) continue;
     detail.push(`\n### ${label(r.file)}\n`);
-    for (const c of fails.slice(0, 8)) detail.push(`- **${c.status}**${c.part ? ` (${c.part})` : ""}: ${c.message ?? ""} — \`${JSON.stringify(c.params)}\``);
+    for (const c of fails.slice(0, 8)) detail.push(`- **${c.status}**${c.part ? ` (${c.part})` : ""}: ${c.message ?? ""}, params \`${JSON.stringify(c.params)}\``);
     if (fails.length > 8) detail.push(`- … ${fails.length - 8} more`);
   }
   return [lines.join("\n"), ...detail].join("\n");

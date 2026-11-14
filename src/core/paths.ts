@@ -19,7 +19,7 @@ export interface HelixOptions {
   height?: number;
   /** Wind clockwise seen from above (a left-hand thread). Default false. */
   leftHanded?: boolean;
-  /** Cubic pieces per turn; more is more accurate (default 8 — radial error ≈ 4e-6·radius). */
+  /** Cubic pieces per turn; more is more accurate (default 8, a radial error of about 4e-6·radius). */
   segmentsPerTurn?: number;
   /** Z of the start, mm. Default 0. */
   z?: number;

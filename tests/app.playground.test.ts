@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { extractExports, extractIntrinsics, extractMaterials, extractSelectorMethods } from "../src/playground/extract";
 import { decodeSource, encodeSource } from "../src/playground/share";
+import { displayFile } from "../src/playground/file-name";
 import { joinPath, moduleImports, rewriteImports, textImports, transformModel } from "../src/playground/transform";
 import { DEFAULT_EXAMPLE, describeExample, EXAMPLE_GROUPS, exampleFiles } from "../scripts/build-playground";
 import { renderModule } from "../src";
@@ -68,6 +69,13 @@ describe("playground transform", () => {
     expect(out.code).toContain('from "blob:1"');
     expect(linked[0]).toContain('"https://x/tscad.js"');
     expect(linked[0]).toContain('const t = "hi";');
+  });
+
+  test("downloads are named after the open example, custom code is 'model'", () => {
+    expect(displayFile("cookbook/gear-pair")).toBe("gear-pair.tsx");
+    expect(displayFile("bracket")).toBe("bracket.tsx");
+    expect(displayFile(undefined)).toBe("model.tsx");
+    expect(displayFile("")).toBe("model.tsx");
   });
 
   test("text imports of known files are inlined on the same line", () => {

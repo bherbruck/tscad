@@ -52,7 +52,7 @@ describe("site build", () => {
     try {
       const { pages, broken } = await buildSite({ out, render: false, quiet: true });
       expect(broken).toEqual([]);
-      for (const p of ["index.html", "docs/getting-started.html", "docs/guide.html", "docs/mcp.html", "docs/selectors.html", "docs/kernel.html", "reference/elements.html", "reference/parts.html", "reference/api.html", "gallery/index.html", "gallery/bracket.html"]) {
+      for (const p of ["index.html", "docs/getting-started.html", "docs/guide.html", "docs/mcp.html", "docs/selectors.html", "docs/kernel.html", "reference/elements.html", "reference/parts.html", "reference/api.html", "gallery/index.html", "gallery/bracket.html", "docs/index.html", "reference/index.html", "404.html"]) {
         expect(pages).toContain(p);
       }
       expect(existsSync(join(out, "assets/style.css"))).toBe(true);
@@ -68,6 +68,13 @@ describe("site build", () => {
       expect(index).toMatch(/play\/#code=[\w-]+/);
       // relative URLs only (works under a GitHub Pages project path)
       expect(index).not.toMatch(/(href|src)="\/(?!\/)/);
+      // the 404 page is served at any depth: root-absolute links only
+      const notFound = readFileSync(join(out, "404.html"), "utf8");
+      expect(notFound).toContain('href="/assets/style.css"');
+      expect(notFound).not.toMatch(/(href|src)="\.\.?\//);
+      // house style: no em dashes in any page (titles, meta, prose, generated reference)
+      const dashed = pages.filter((p) => p.endsWith(".html") && readFileSync(join(out, p), "utf8").includes("\u2014"));
+      expect(dashed).toEqual([]);
     } finally {
       rmSync(out, { recursive: true, force: true });
     }

@@ -37,7 +37,7 @@ export default function Bracket(p: ParamValues<typeof params>) {
   functions, called at compile time; use \`.map\`, conditionals, helper functions freely.
 - Several \`<part>\`s (optionally inside \`<assembly>\`) make a multi-part model. Solids outside any
   part go into one part named "part".
-- \`radius={0}\` on fillet/chamfer skips it — handy for boolean params.
+- \`radius={0}\` on fillet/chamfer skips it, which is handy for boolean params.
 
 ## Placement conventions (important)
 
@@ -63,7 +63,7 @@ Several children of \`<part>\`/\`<group>\` are unioned.
 its children), \`<difference2d>\`/\`<union2d>\`/\`<intersection2d>\`, \`<sketch>\` group. Each takes 2D placement \`x y rotate mirror\`.
 
 - **2D booleans**: \`<difference2d>\` (first child minus the rest), \`<union2d>\`, \`<intersection2d>\` (long
-  names \`<sketchDifference>\` etc.) combine 2D shapes exactly (arcs stay arcs) — a D-shaft profile is
+  names \`<sketchDifference>\` etc.) combine 2D shapes exactly (arcs stay arcs): a D-shaft profile is
   \`<difference2d><circle d={6}/><rect w={7} h={3} y={3}/></difference2d>\`, a keyhole a \`<union2d>\` of a
   circle and a slot, a fluted rim a circle minus small circles. Much faster than 3D cuts: one extrude.
 - **Nested loops become holes automatically**: \`<extrude height={5}><rect w={40} h={30}/><circle r={5}/></extrude>\`
@@ -111,13 +111,13 @@ A simpler alternative for fixed layouts: place parts with \`x y z rotate\` direc
 
 ## Parts library (tscad/parts)
 
-ISO holes as cutting tools pointing −Z from z = 0 — put them at the top face (\`z={thickness}\`)
+ISO holes as cutting tools pointing −Z from z = 0: put them at the top face (\`z={thickness}\`)
 inside a \`<difference>\`: \`<Hole size="M3" depth={6} z={6}/>\`, \`<CounterboreHole>\`, \`<CountersinkHole>\`,
 \`<TapHole>\`, \`<NutTrap>\`, \`<HeatSetInsert>\`; solids \`<Standoff size height>\`, \`<HexPrism>\`, \`<Extrusion2020>\`;
 \`<BoltPattern pattern={mountPatterns.nema17}>{tool}</BoltPattern>\`; data \`metric\`, \`mountPatterns\`.
 Boards: \`boards.raspberryPi5 | raspberryPi4 | raspberryPiZero2W | pico | arduinoUno | esp32DevKitC\` with every
 connector as data; \`<Board board>\` (a 3D model with anchors per connector and hole) and
-\`<BoardCase board ports="auto" vents lid>\` — a complete enclosure: standoffs, port openings where
+\`<BoardCase board ports="auto" vents lid>\`: a complete enclosure: standoffs, port openings where
 connectors face the walls, a vented lid, the board mated in (check it with \`tscad_check\`).
 
 ## Flat parts (laser/CNC)
@@ -132,7 +132,7 @@ flat or \`assembled\`) and \`<LivingHinge>\` from tscad/parts. To preview the as
 
 - Sweeps along paths with sharp corners fail; helix sweeps are slow (10–20 s).
 - Fillet radius must be smaller than the adjacent faces allow (roughly < 0.5 × the shortest
-  adjacent edge); filleting hundreds of edges is slow — fillet before patterning when possible.
+  adjacent edge); filleting hundreds of edges is slow, so fillet before patterning when possible.
 - Inward shell of rounded-rect extrusions can fail; shell a box then fillet, or extrude walls.
 - Keep models simple and evaluate often: \`tscad_evaluate\` reports every failing node with its
   TSX line.

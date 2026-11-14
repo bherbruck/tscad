@@ -1,6 +1,6 @@
 /**
  * Plane sections of triangle meshes: slice a solid's mesh (e.g. from `kernel.meshAt`) into
- * closed polylines in the plane's 2D frame — "the outline of this part at z = 2".
+ * closed polylines in the plane's 2D frame, i.e. "the outline of this part at z = 2".
  */
 import type { MeshArrays } from "../kernel/index";
 import type { Vec2, Vec3 } from "../core/math";

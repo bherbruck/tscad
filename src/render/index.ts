@@ -36,7 +36,7 @@ export interface RenderOptions {
   /** Draw the B-rep edges and silhouettes. Default true. */
   edges?: boolean;
   /**
-   * Also draw smooth edges — seams and the tangent boundaries of fillets — which a product
+   * Also draw smooth edges (seams and the tangent boundaries of fillets), which a product
    * render usually hides. Default false.
    */
   smoothEdges?: boolean;

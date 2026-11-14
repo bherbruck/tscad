@@ -31,19 +31,21 @@ export interface PageOptions {
   toc?: Heading[];
   /** Full-width page (landing). */
   wide?: boolean;
+  /** Prefix for site links instead of the relative one (the 404 page is served at any depth: "/"). */
+  root?: string;
 }
 
-/** Relative prefix from `path` back to the site root. */
 /** The canonical origin (GitHub Pages custom domain); internal links stay relative. */
 export const SITE = "https://tscad.io/";
 
+/** Relative prefix from `path` back to the site root. */
 export function rootOf(path: string): string {
   const depth = path.split("/").length - 1;
   return depth ? "../".repeat(depth) : "./";
 }
 
 export function page(o: PageOptions): string {
-  const r = rootOf(o.path);
+  const r = o.root ?? rootOf(o.path);
   const u = (href: string) => (/^(https?:|#|mailto:)/.test(href) ? href : r + href);
   const navLink = (key: PageOptions["section"], href: string, label: string) => `<a href="${u(href)}"${o.section === key ? ' class="active"' : ""}>${label}</a>`;
   const header = `<header class="top">
@@ -86,11 +88,11 @@ export function page(o: PageOptions): string {
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>${escapeHtml(title)}</title>
-<meta name="description" content="${escapeHtml(o.description ?? "tscad — parametric CAD as TSX. Write solid models as JSX components, get exact B-rep STEP, STL and 3MF.")}" />
+<meta name="description" content="${escapeHtml(o.description ?? "tscad: parametric CAD as TSX. Write solid models as JSX components, get exact B-rep STEP, STL and 3MF.")}" />
 <meta property="og:title" content="${escapeHtml(title)}" />
 <meta property="og:image" content="${SITE}images/pi5-case-auto.png" />
-<meta property="og:url" content="${SITE}${o.path.replace(/(^|\/)index\.html$/, "$1")}" />
-<link rel="canonical" href="${SITE}${o.path.replace(/(^|\/)index\.html$/, "$1")}" />
+${o.path === "404.html" ? `<meta name="robots" content="noindex" />` : `<meta property="og:url" content="${SITE}${o.path.replace(/(^|\/)index\.html$/, "$1")}" />
+<link rel="canonical" href="${SITE}${o.path.replace(/(^|\/)index\.html$/, "$1")}" />`}
 <link rel="icon" href="data:image/svg+xml,${encodeURIComponent(LOGO.replace('aria-hidden="true"', 'xmlns="http://www.w3.org/2000/svg"'))}" />
 <script>try{var t=new URLSearchParams(location.search).get("theme")||localStorage.getItem("tscad.theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
 <link rel="stylesheet" href="${u("assets/style.css")}" />
@@ -98,7 +100,7 @@ export function page(o: PageOptions): string {
 <body>
 ${header}
 ${main}
-<footer><span>tscad — CAD as TSX · MIT / Apache-2.0</span><span><a href="${u("docs/getting-started.html")}">Docs</a> · <a href="${u("reference/elements.html")}">Reference</a> · <a href="${u("play/")}">Playground</a> · <a href="${REPO}" rel="noopener">GitHub</a></span></footer>
+<footer><span>tscad: CAD as TSX · MIT / Apache-2.0</span><span><a href="${u("docs/getting-started.html")}">Docs</a> · <a href="${u("reference/elements.html")}">Reference</a> · <a href="${u("play/")}">Playground</a> · <a href="${REPO}" rel="noopener">GitHub</a></span></footer>
 <script src="${u("assets/site.js")}" defer></script>
 </body>
 </html>

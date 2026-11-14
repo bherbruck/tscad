@@ -1,6 +1,6 @@
 # The tscad guide
 
-This guide builds a real part from scratch — a wall-mounted shelf bracket — and introduces one
+This guide builds a real part from scratch (a wall-mounted shelf bracket) and introduces one
 idea per step. By the end you will have used primitives, booleans, sketches, features,
 selectors, patterns, components, parameters and export. It assumes you know a little TypeScript
 and have seen JSX before; you do not need to know React.
@@ -52,7 +52,7 @@ export default function Shelf() {
 }
 ```
 
-`<box>` is **centred in X and Y with its base on z = 0** — ready to print. `center={false}` puts
+`<box>` is **centred in X and Y with its base on z = 0**, ready to print. `center={false}` puts
 its lower corner on the origin instead, `center` centres it in Z too, and `center={[true, false,
 false]}` picks per axis. `<cylinder r h>` (or `d`) and `<cone r1 r2 h>` stand on the XY plane
 about the Z axis; `<sphere r>` and `<torus R r>` are centred on the origin. A file whose root
@@ -75,7 +75,7 @@ translate, all about the origin. For an explicit transform of a whole group ther
 
 `<union>` joins its children, `<intersection>` keeps what they share, and `<difference>`
 subtracts every later child from the first one. Give cutting tools some extra length so they
-pass cleanly through the faces they cut — coplanar faces are legal, but clear cuts are easier to
+pass cleanly through the faces they cut. Coplanar faces are legal, but clear cuts are easier to
 read.
 
 ```tsx
@@ -117,7 +117,7 @@ inside another loop becomes a hole:
 
 `draft={5}` tapers the walls inward by 5° as they rise.
 
-`<path d="…">` takes SVG path data — `M L H V C S Q T A Z`, absolute and relative. Béziers become
+`<path d="…">` takes SVG path data (`M L H V C S Q T A Z`, absolute and relative). Béziers become
 exact NURBS curves and circular arcs exact arcs, so a curved sketch stays curved in STEP. Unlike
 SVG, y points up.
 
@@ -195,7 +195,7 @@ Patterns repeat their children:
 `center={false}`; `polarPattern` takes `angle` (total sweep, default 360), `axis` and
 `startAngle`.
 
-Because tscad is TypeScript, `Array.from` and `.map()` are patterns too — use them whenever the
+Because tscad is TypeScript, `Array.from` and `.map()` are patterns too: use them whenever the
 copies differ:
 
 ```tsx
@@ -205,7 +205,7 @@ copies differ:
 ## 8. Components
 
 A component is a function that takes props and returns JSX. Here is a countersunk screw hole
-that works anywhere — subtract it from any plate:
+that works anywhere. Subtract it from any plate:
 
 ```tsx
 function CountersunkHole({ d = 3.2, head = 6.5, depth = 20, x = 0, y = 0, z = 0 }) {
@@ -228,7 +228,7 @@ function CountersunkHole({ d = 3.2, head = 6.5, depth = 20, x = 0, y = 0, z = 0 
 
 Components compose like React: they can hold other components, take `children`, use defaults and
 destructuring, and share values through `createContext` / `useContext`. They run once, when the
-model compiles — there is no state, no effects and no re-rendering. A component is just a way to
+model compiles. There is no state, no effects and no re-rendering. A component is just a way to
 name and reuse geometry. See [`examples/component-library.tsx`](../examples/component-library.tsx).
 
 ## 9. Parameters
@@ -262,7 +262,7 @@ tscad build shelf.tsx -p length=120 -p holes=3 -o shelf.step
 
 ## 10. Revolve, shell, loft and sweep
 
-`<revolve>` spins a sketch around the Z axis — sketch the half-profile with x as the radius and
+`<revolve>` spins a sketch around the Z axis: sketch the half-profile with x as the radius and
 y as the height (`angle` defaults to 360):
 
 ```tsx
@@ -282,7 +282,7 @@ import { faces } from "tscad"
 </shell>
 ```
 
-`<loft>` skins through sketches stacked along Z — give each shape a `z`:
+`<loft>` skins through sketches stacked along Z. Give each shape a `z`:
 
 ```tsx
 <loft>
@@ -296,7 +296,7 @@ import { faces } from "tscad"
 
 ## 11. Assemblies
 
-A design with several parts uses `<assembly>`. Each `<part>` is its own solid in exports — its own
+A design with several parts uses `<assembly>`. Each `<part>` is its own solid in exports, with its own
 object in 3MF, its own mesh in GLB, its own body in STEP:
 
 ```tsx
@@ -358,16 +358,16 @@ it to a worker.
 ## 14. When something fails
 
 Evaluation errors carry the path of the IR node that failed, and the compiler's source map ties
-that path back to the JSX element that created it — so the viewer and `tscad build` report the
+that path back to the JSX element that created it, so the viewer and `tscad build` report the
 failing `<fillet>` with its file and line instead of pointing into the kernel. Common causes:
 
-- **A fillet that is too big** for the faces next to it — reduce the radius or select fewer edges.
-- **A selector that matches nothing** — fillets and chamfers fail when their selector is empty;
+- **A fillet that is too big** for the faces next to it: reduce the radius or select fewer edges.
+- **A selector that matches nothing**: fillets and chamfers fail when their selector is empty;
   click an edge in the viewer to get a selector that matches it.
-- **A profile that crosses itself** — `polygon` points must go around the shape once.
-- **A cut that doesn't reach** — a `difference` tool that only touches a face leaves it intact;
+- **A profile that crosses itself**: `polygon` points must go around the shape once.
+- **A cut that doesn't reach**: a `difference` tool that only touches a face leaves it intact;
   make it a little longer.
-- **An empty result** — an `intersection` of things that don't overlap is reported as empty.
+- **An empty result**: an `intersection` of things that don't overlap is reported as empty.
 
 If the kernel itself panics (a solidcore bug, not your model), the session is rebuilt
 automatically and the error says so. Please report it with the model that triggered it.

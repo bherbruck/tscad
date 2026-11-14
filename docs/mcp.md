@@ -1,7 +1,7 @@
 # tscad MCP server
 
 `tscad mcp` runs a [Model Context Protocol](https://modelcontextprotocol.io) server over stdio
-(spec 2025-06-18), so Claude — or any MCP client — can design parametric CAD with tscad: read
+(spec 2025-06-18), so Claude (or any MCP client) can design parametric CAD with tscad: read
 the element reference, write TSX, evaluate it with the B-rep kernel, look at a rendering, and
 export STEP/STL/3MF/GLB/OBJ/DXF/SVG.
 
@@ -54,13 +54,13 @@ Any other MCP client: run `bunx tscad mcp` as a stdio server (newline-delimited 
 | `tscad_export` | Write `step`, `stl`, `3mf`, `glb`, `obj`, `dxf` or `svg` to `path`; returns the path and size. DXF/SVG come from `<drawing>`s, or else a section of each part at `sectionZ` (default mid-height). |
 | `tscad_plate` | Print layout: orients each part for least overhang (or `orient: "keep"`) and packs parts and `copies` onto as many `bed`s as needed. Returns part, plate, bottom face, overhang % and height; with `path` writes a 3MF (orientation notes per object) or STL per plate. |
 | `tscad_check` | Design checks: 3D-printing overhangs (faces steeper than `maxOverhangDeg`, with their location and a selector), the thinnest wall and where it is, bed fit (`bed`), watertight meshes, and interference between parts (the volume and location of each overlap). |
-| `tscad_pick_selectors` | The edge (or face) nearest a `point` (or by `index`) and selectors that pick it — `">X and >Z"` / `edges.max("x").and(edges.top())` — with how many each selects. For `edges=` on `<fillet>`/`<chamfer>` and `open=` on `<shell>`. |
+| `tscad_pick_selectors` | The edge (or face) nearest a `point` (or by `index`) and selectors that pick it (`">X and >Z"` / `edges.max("x").and(edges.top())`), with how many each selects. For `edges=` on `<fillet>`/`<chamfer>` and `open=` on `<shell>`. |
 
 Every model tool takes:
 
-- `source` — the model's TSX (a module with a default-exported component), **or** `file` — a path.
-- `params` — overrides for the model's `defineParams` values.
-- `baseDir` — directory for relative paths. With `source`, the model is written there as a hidden
+- `source`: the model's TSX (a module with a default-exported component), **or** `file`: a path.
+- `params`: overrides for the model's `defineParams` values.
+- `baseDir`: the directory for relative paths. With `source`, the model is written there as a hidden
   temporary file so its relative imports (`./parts.tsx`, `./logo.step`) resolve; without it,
   `source` models run from a temp directory and can only import `tscad` and `tscad/*`.
 
@@ -72,6 +72,6 @@ evaluated one at a time on one kernel session, which caches unchanged subtrees b
 
 - The server writes nothing but JSON-RPC to stdout; `console.log` from models is captured and
   returned with the evaluate result, and diagnostics go to stderr.
-- Programmatic use: `import { runMcpServer, createMcpHandler } from "tscad/mcp"` —
+- Programmatic use: `import { runMcpServer, createMcpHandler } from "tscad/mcp"`.
   `runMcpServer({ stdin, stdout })` serves any byte stream; `createMcpHandler()` handles one
   parsed message at a time (handy for tests or other transports).

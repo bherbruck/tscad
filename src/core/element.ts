@@ -1,5 +1,5 @@
 /**
- * Elements, components and context — the React-shaped part of tscad, with no React.
+ * Elements, components and context: the React-shaped part of tscad, with no React.
  * Elements are plain objects; function components run at compile time.
  */
 import type { SourceLoc } from "./errors";

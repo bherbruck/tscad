@@ -1,7 +1,7 @@
 # Getting started
 
 tscad turns TypeScript + JSX into exact solid models. You describe a part as a function
-component made of lowercase elements — `<box>`, `<extrude>`, `<fillet>` — and tscad compiles it
+component made of lowercase elements (`<box>`, `<extrude>`, `<fillet>`), and tscad compiles it
 to an IR that the **solidcore** B-rep kernel (Rust, compiled to WebAssembly) turns into exact
 geometry: STEP for CAD, STL/3MF for printing, GLB/OBJ for the web, DXF/SVG for laser cutters.
 
@@ -9,7 +9,7 @@ All lengths are **millimetres**, all angles **degrees**, and **Z is up**.
 
 ## Try it without installing
 
-The [playground](../play/) runs everything in your browser — editor, kernel and viewer. Pick an
+The [playground](../play/) runs everything in your browser: editor, kernel and viewer. Pick an
 example, change a number, and the model rebuilds. Share links carry the source in the URL.
 
 ## Install
@@ -82,7 +82,7 @@ export default function Plate({ width, holes }: ParamValues<typeof params>) {
 }
 ```
 
-Circles drawn inside the rectangle become **holes** automatically — loops nested inside other
+Circles drawn inside the rectangle become **holes** automatically: loops nested inside other
 loops are subtracted.
 
 ## Build and export

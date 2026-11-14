@@ -1,6 +1,6 @@
 /**
  * Small affine-matrix toolkit. Matrices are 4x4, **row-major, column-vector** (`p' = M p`,
- * translation at indices 3, 7, 11) — exactly the IR's `transform.matrix` layout.
+ * translation at indices 3, 7, 11): exactly the IR's `transform.matrix` layout.
  */
 import type { Axis } from "../ir";
 
@@ -132,7 +132,7 @@ export function normalize(a: Vec3): Vec3 {
   const l = length(a);
   return l === 0 ? [0, 0, 0] : [a[0] / l, a[1] / l, a[2] / l];
 }
-/** Snap float dust to exact values (0, ±1, integers) — keeps emitted IR tidy. */
+/** Snap float dust to exact values (0, ±1, integers), to keep the emitted IR tidy. */
 export function snap(v: number): number {
   if (Math.abs(v) < 1e-12) return 0;
   const r = Math.round(v);

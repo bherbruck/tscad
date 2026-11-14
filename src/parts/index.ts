@@ -1,5 +1,5 @@
 /**
- * `tscad/parts`: a standard library of parametric components — fastener holes with ISO
+ * `tscad/parts`: a standard library of parametric components: fastener holes with ISO
  * metric data, hardware pockets, mounting patterns and stock profiles. Each is a plain
  * function component built from tscad's intrinsic elements, with placement props.
  *

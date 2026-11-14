@@ -1,5 +1,5 @@
 /**
- * `tscad/check`: design checks — printability (overhangs, wall thickness, bed fit), part
+ * `tscad/check`: design checks for printability (overhangs, wall thickness, bed fit), part
  * interference, watertightness. Browser-safe: meshes in, plain data out (typed arrays for
  * viewer heatmaps).
  */

@@ -3,7 +3,7 @@
  * quadratic/cubic Béziers kept as `Q`/`C`, other NURBS flattened. Units are mm
  * (`width="…mm"`); y is flipped so the drawing reads the right way up.
  */
-import { TAU, type Loop2 } from "../core/sketch/seg";
+import { TAU, type Seg2 } from "../core/sketch/seg";
 import { bounds, flattenNurbs, fmt, layers, type DrawingInput } from "./common";
 
 /** Options for {@link toSVG}. */
@@ -25,8 +25,8 @@ export interface SvgOptions {
   layerStrokes?: Record<string, string>;
 }
 
-/** SVG path data for loops (y flipped: pass the result through a viewBox with negated y). */
-export function svgPathData(loops: readonly Loop2[], tolerance = 0.01): string {
+/** SVG path data for loops (y flipped: pass the result through a viewBox with negated y); `closed: false` for open paths. */
+export function svgPathData(loops: readonly (readonly Seg2[])[], tolerance = 0.01, closed = true): string {
   const parts: string[] = [];
   const P = (x: number, y: number) => `${fmt(x, 4)} ${fmt(-y, 4)}`;
   for (const loop of loops) {
@@ -53,7 +53,7 @@ export function svgPathData(loops: readonly Loop2[], tolerance = 0.01): string {
         else for (const p of flattenNurbs(s, tolerance).slice(1)) d.push(`L${P(p[0], p[1])}`);
       }
     }
-    d.push("Z");
+    if (closed) d.push("Z");
     parts.push(d.join(""));
   }
   return parts.join(" ");
@@ -85,7 +85,15 @@ export function toSVG(input: DrawingInput, o: SvgOptions = {}): string {
   const groups = ls.map(
     (l) => {
       const stroke = l.layer ? strokes[l.layer] : undefined;
-      return `  <g id="${esc(l.name)}"${l.layer ? ` data-layer="${esc(l.layer)}"` : ""}${stroke ? ` stroke="${esc(stroke)}"` : ""}>\n    <path fill-rule="evenodd" d="${svgPathData(l.loops, o.tolerance)}"/>\n  </g>`;
+      const body: string[] = [];
+      if (l.loops.length) body.push(`    <path fill-rule="evenodd" d="${svgPathData(l.loops, o.tolerance)}"/>`);
+      if (l.paths?.length) body.push(`    <path fill="none" d="${svgPathData(l.paths, o.tolerance, false)}"/>`);
+      for (const n of l.notes ?? []) {
+        // y is flipped by the viewBox: place at (x, −y), rotate the other way
+        const rot = n.angle ? ` transform="rotate(${fmt(-n.angle, 4)} ${fmt(n.at[0], 4)} ${fmt(-n.at[1], 4)})"` : "";
+        body.push(`    <text x="${fmt(n.at[0], 4)}" y="${fmt(-n.at[1], 4)}" font-size="${fmt(n.size, 4)}" font-family="sans-serif" text-anchor="middle" dominant-baseline="central" fill="${esc(stroke ?? o.stroke ?? "#000")}" stroke="none"${rot}>${esc(n.text)}</text>`);
+      }
+      return `  <g id="${esc(l.name)}"${l.layer ? ` data-layer="${esc(l.layer)}"` : ""}${stroke ? ` stroke="${esc(stroke)}"` : ""}>\n${body.join("\n")}\n  </g>`;
     },
   );
   return [

@@ -14,9 +14,11 @@ const KNOWN: Record<string, string> = {
   enclosure: "#14 PointClassify",
   vase: "#18 shell mass::enclosure",
   "cookbook/name-tag": "#19 glyph t at 1–3 mm",
+  "sketch-link-arm": "#20 obround fillet no room",
+  "converted/grid-bin": "#21 union grouping",
 };
-/** Examples owned by the sketch agent whose fixes are in progress. */
-const PENDING = new Set(["sketch-on-face", "sketch-vase", "sketch-flange", "sketch-link-arm", "sketch-coat-hook", "sketch-pulley", "converted/enclosure", "converted/box-with-lid", "converted/grid-bin"]);
+/** Examples whose model fixes are in progress (sketch agent). */
+const PENDING = new Set(["sketch-on-face"]);
 
 const label = (f: string) => f.replace(/^.*\/examples\//, "").replace(/\.tsx$/, "");
 

@@ -28,9 +28,9 @@ IR selector object. Leave `edges` out to take every edge.
 | straight edges along Z | `"\|Z"` | `edges.vertical()` · `edges.parallel("z")` |
 | straight edges along X | `"\|X"` | `edges.parallel("x")` |
 | circles about Z | `"#Z"` | `edges.circles()` · `edges.circles("z")` |
-| circles of radius r | — | `edges.radius(3)` |
-| inside a box | — | `edges.within([x0, y0, z0], [x1, y1, z1])` |
-| by record index | — | `edges.index(4, 7)` |
+| circles of radius r | n/a | `edges.radius(3)` |
+| inside a box | n/a | `edges.within([x0, y0, z0], [x1, y1, z1])` |
+| by record index | n/a | `edges.index(4, 7)` |
 | both | `">Z and \|X"` | `edges.top().and(edges.parallel("x"))` · `edges.top().parallel("x")` |
 | either | `">Z or \|Z"` | `edges.top().or(edges.vertical())` |
 | not | `"not <Z"` | `edges.bottom().not()` |
@@ -46,13 +46,13 @@ use parentheses to group: `"(>Z or <Z) and #Z"`. Chaining builder filters ANDs t
 | `max` / `min` axis | edges lying wholly at the body's extreme along the axis | faces lying wholly there |
 | `parallel` axis | straight edges along the axis | planar faces whose normal is ±axis |
 | `perpendicular` axis | circles about the axis | planar faces whose normal is square to the axis |
-| `radius` r | circles of radius r | — |
+| `radius` r | circles of radius r | n/a |
 | `within` box | edges whose sample points are all inside | faces likewise |
 
 Things to know:
 
 - `">Z"` on a plate with a through-hole picks the hole's top circle as well as the outer top
-  edges — they are all at max Z. Use `">Z and not #Z"` for just the outline, or
+  edges, since they are all at max Z. Use `">Z and not #Z"` for just the outline, or
   `">Z and #Z"` for just the hole.
 - Broad selectors skip seam edges and smooth (tangent) joins automatically, so `edges.all()`
   on a rounded shape works.

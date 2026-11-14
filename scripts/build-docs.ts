@@ -189,6 +189,59 @@ function docPagesOut() {
   }
 }
 
+/** /docs/ and /reference/ landing lists, and the 404 page (served by Pages at any depth). */
+function indexPages() {
+  const card = (href: string, title: string, text: string) => `<a class="index-card" href="${href}"><strong>${escapeHtml(title)}</strong><span>${escapeHtml(text)}</span></a>`;
+  const docsBody = [
+    `<h1>Documentation</h1>`,
+    `<p class="lead">Start with Getting started, then the guide. The reference is generated from the types.</p>`,
+    ...sidebar
+      .filter((g) => g.title !== "Reference")
+      .map((g) => `<h2>${escapeHtml(g.title)}</h2><div class="index-grid">${g.items.map((it) => card(it.href.replace(/^docs\//, "").replace(/^gallery\//, "../gallery/"), it.title, DOC_BLURBS[it.href] ?? "")).join("")}</div>`),
+    `<h2>Reference</h2><div class="index-grid">${card("../reference/index.html", "Reference", "Elements, the parts library, selectors and the API.")}</div>`,
+  ].join("\n");
+  write("docs/index.html", page({ path: "docs/index.html", title: "Documentation", body: docsBody, section: "docs", sidebar }));
+  const refBody = [
+    `<h1>Reference</h1>`,
+    `<p class="lead">Generated from the type definitions: the same text your editor shows on hover.</p>`,
+    `<div class="index-grid">`,
+    card("elements.html", "Elements", "Every lowercase JSX element and its props: solids, sketch shapes, booleans, features, assemblies."),
+    card("parts.html", "Parts library", "tscad/parts: ISO holes, nut traps, inserts, standoffs, boards and laser-cut generators."),
+    card("../docs/selectors.html", "Selectors", "Picking edges and faces by what they are, as strings or builders."),
+    card("api.html", "API", "The TypeScript API: tscad, kernel, export, render, drawing, check, testing, mcp, convert."),
+    `</div>`,
+  ].join("\n");
+  write("reference/index.html", page({ path: "reference/index.html", title: "Reference", body: refBody, section: "reference", sidebar }));
+  const notFound = [
+    `<h1>Page not found</h1>`,
+    `<p class="lead">There's nothing at this address. It may have moved when the docs were reorganised.</p>`,
+    `<div class="index-grid">`,
+    card("/docs/index.html", "Documentation", "Getting started, the guide, cookbook and more."),
+    card("/reference/index.html", "Reference", "Elements, parts, selectors and the API."),
+    card("/gallery/index.html", "Gallery", "Complete parametric example models."),
+    card("/play/", "Playground", "Write and run tscad in your browser."),
+    `</div>`,
+  ].join("\n");
+  write("404.html", page({ path: "404.html", title: "Page not found", body: notFound, root: "/" }));
+}
+
+const DOC_BLURBS: Record<string, string> = {
+  "docs/getting-started.html": "Install, scaffold a project, run the live viewer and export.",
+  "docs/guide.html": "Build a real part step by step: primitives, booleans, sketches, features, params.",
+  "docs/cookbook.html": "Complete recipes: enclosures, brackets, bins, gears, laser-cut tags.",
+  "docs/sketch.html": "Constraint-solved sketches: dimensions, tangency, patterns.",
+  "docs/assembly.html": "Parts with anchors and mates, joints you can drive, gears.",
+  "docs/sheet-metal.html": "Bent sheet parts and their flat patterns.",
+  "docs/checks.html": "Printability, interference and model tests with bun:test.",
+  "docs/convert.html": "Convert OpenSCAD models to tscad.",
+  "docs/mcp.html": "Let Claude design with tscad through the MCP server.",
+  "docs/mcp-dogfood.html": "What an agent ran into designing real parts, and what changed.",
+  "docs/kernel.html": "Known kernel limits with repros and workarounds.",
+  "docs/sweep.html": "Every example evaluated across its parameter space.",
+  "docs/architecture.html": "How TSX becomes IR becomes exact B-rep.",
+  "gallery/index.html": "Example models with source and a playground link.",
+};
+
 function propsTable(e: Entry): string {
   if (!e.props.length) return "";
   const rows = e.props
@@ -233,7 +286,7 @@ function referencePages() {
     const toc: Heading[] = [{ level: 2, text: "Shared props", id: "shared-props" }];
     const parts: string[] = [
       `<h1>Element reference</h1>`,
-      `<p class="lead">Every lowercase JSX element tscad understands, generated from the type definitions — the same text your editor shows on hover. Lengths in mm, angles in degrees.</p>`,
+      `<p class="lead">Every lowercase JSX element tscad understands, generated from the type definitions: the same text your editor shows on hover. Lengths in mm, angles in degrees.</p>`,
       `<div class="chips">${allGroups.flatMap(([, , n]) => n).map((n) => `<a href="#${n}">&lt;${n}&gt;</a>`).join("")}</div>`,
       `<h2 id="shared-props"><a class="anchor" href="#shared-props">#</a>Shared props</h2>`,
     ];
@@ -262,7 +315,7 @@ function referencePages() {
     const intro = renderMarkdown(
       `# Parts library
 
-\`tscad/parts\` is a library of ordinary components built from the intrinsic elements — the
+\`tscad/parts\` is a library of ordinary components built from the intrinsic elements: the
 "parts are npm packages" idea. Holes and pockets are **cutting tools pointing −Z from z = 0**:
 drop them into a \`<difference>\` at the top face of a part.
 
@@ -342,7 +395,7 @@ function landing(sampleImage: string | undefined) {
   <div>
     <span class="eyebrow"><b>new</b> STEP · STL · 3MF · DXF · MCP for agents</span>
     <h1>CAD as <span class="grad">TSX</span>.</h1>
-    <p class="lead">Write solid models as typed JSX components. tscad compiles them to an exact B-rep with a real CAD kernel in WebAssembly — parametric, versionable, and as composable as any React app.</p>
+    <p class="lead">Write solid models as typed JSX components. tscad compiles them to an exact B-rep with a real CAD kernel in WebAssembly. Models are parametric, versionable, and as composable as any React app.</p>
     <div class="cta">
       <a class="btn primary lg" href="docs/getting-started.html">Get started</a>
       <a class="btn lg" href="play/#example=pi5-case-auto">Open the playground →</a>
@@ -356,7 +409,7 @@ function landing(sampleImage: string | undefined) {
 
 <section class="section">
   <h2>Parts are components.</h2>
-  <p class="lead">Parameters are typed props, holes are components from <code>tscad/parts</code>, and edges are picked by what they are — not by fragile indices.</p>
+  <p class="lead">Parameters are typed props, holes are components from <code>tscad/parts</code>, and edges are picked by what they are, not by fragile indices.</p>
   <div class="split">
     <pre class="code" data-lang="tsx"><code>${highlight(SAMPLE.trimEnd(), "tsx")}</code></pre>
     <div class="frame">
@@ -371,18 +424,18 @@ function landing(sampleImage: string | undefined) {
   <h2>Everything a part needs.</h2>
   <p class="lead">A real modelling toolkit with friendly defaults: lengths in millimetres, Z up, boxes sitting on the build plate.</p>
   <div class="features">
-    ${feature(ICONS.cube, "Exact B-rep kernel", "solidcore runs in WebAssembly (or natively, 2–3× faster): booleans, fillets, chamfers, shells, revolves, lofts and sweeps on exact geometry — and true STEP export.")}
+    ${feature(ICONS.cube, "Exact B-rep kernel", "solidcore runs in WebAssembly (or natively, 2–3× faster): booleans, fillets, chamfers, shells, revolves, lofts and sweeps on exact geometry, with true STEP export.")}
     ${feature(ICONS.code, "Just TypeScript", "Components, <code>.map</code>, conditionals, npm packages. Every element and prop is typed and documented in your editor.")}
     ${feature(ICONS.sliders, "Parametric by default", "<code>defineParams</code> gives typed props and live sliders; the kernel caches unchanged subtrees, so tweaks rebuild fast.")}
-    ${feature(ICONS.box, "Sketches that make sense", "Draw 2D shapes — nested loops become holes. Exact 2D booleans, hulls, offsets, text, SVG paths and constraint-solved sketches.")}
+    ${feature(ICONS.box, "Sketches that make sense", "Draw 2D shapes; nested loops become holes. Exact 2D booleans, hulls, offsets, text, SVG paths and constraint-solved sketches.")}
     ${feature(ICONS.bolt, "Instant feedback", "<code>tscad dev</code> hot-reloads a viewer; errors point at your TSX line; click an edge to get its selector.")}
-    ${feature(ICONS.spark, "Built for agents", "<code>tscad mcp</code> lets Claude write, evaluate, render and export models — the reference is generated from the types.")}
+    ${feature(ICONS.spark, "Built for agents", "<code>tscad mcp</code> lets Claude write, evaluate, render and export models, with a reference generated from the types.")}
   </div>
 </section>
 
 <section class="section">
   <h2>Gallery</h2>
-  <p class="lead">Complete parametric models — open any of them in the playground.</p>
+  <p class="lead">Complete parametric models. Open any of them in the playground.</p>
   <div class="gallery">${gallery.map((e) => galleryCard(e, r)).join("")}</div>
   <p style="margin-top:22px"><a class="btn" href="gallery/index.html">All examples →</a></p>
 </section>
@@ -397,7 +450,7 @@ function landing(sampleImage: string | undefined) {
     <pre class="code" data-lang="sh"><code>${highlight("claude mcp add tscad -- bunx tscad mcp", "sh")}</code></pre>
   </div>
 </section>`;
-  write(path, page({ path, title: "tscad — CAD as TSX", body, section: "home", wide: true }));
+  write(path, page({ path, title: "tscad: CAD as TSX", body, section: "home", wide: true }));
 }
 
 function galleryCard(e: (typeof examples)[number], r: string): string {
@@ -468,7 +521,7 @@ async function renderSample(): Promise<string | undefined> {
 function playground() {
   const src = join(ROOT, "dist/playground");
   if (!existsSync(join(src, "index.html"))) {
-    console.warn("! dist/playground not found — build it first (bun scripts/build-playground.ts); play/ links will 404");
+    console.warn("! dist/playground not found; build it first (bun scripts/build-playground.ts); play/ links will 404");
     return;
   }
   cpSync(src, join(OUT, "play"), { recursive: true });
@@ -484,7 +537,7 @@ function checkLinks(): string[] {
       if (/^([a-z]+:|#|data:)/i.test(u)) continue;
       const [file, hash] = u.split("#");
       if (file!.startsWith("play/") || /(^|\/)play\/$/.test(file!) || /\/play\//.test(file!)) continue;
-      const target = resolve(dirname(join(OUT, p)), file || p.split("/").pop()!);
+      const target = file!.startsWith("/") ? join(OUT, file!) : resolve(dirname(join(OUT, p)), file || p.split("/").pop()!);
       if (!existsSync(target)) {
         broken.push(`${p}: ${u}`);
         continue;
@@ -512,10 +565,11 @@ export async function buildSite(opts: { out?: string; render?: boolean; quiet?: 
   landing(sample);
   docPagesOut();
   referencePages();
+  indexPages();
   galleryPages();
   playground();
   const broken = checkLinks();
-  if (!opts.quiet) console.log(`✓ ${OUT} in ${(performance.now() - t0).toFixed(0)} ms — ${written.size} pages, ${examples.length} examples, ${ref.elements.length} elements`);
+  if (!opts.quiet) console.log(`✓ ${OUT} in ${(performance.now() - t0).toFixed(0)} ms: ${written.size} pages, ${examples.length} examples, ${ref.elements.length} elements`);
   for (const b of broken) console.warn(`! broken link ${b}`);
   return { out: OUT, pages: [...written], broken };
 }

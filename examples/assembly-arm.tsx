@@ -1,6 +1,6 @@
 /**
  * A two-link robot arm: a turntable on a base, an upper arm and a forearm, each a component
- * exposing joint anchors. Revolute mates driven by the angle params pose it — no transforms
+ * exposing joint anchors. Revolute mates driven by the angle params pose it, with no transforms
  * computed by hand.
  *
  *   tscad dev examples/assembly-arm.tsx

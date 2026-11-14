@@ -155,7 +155,7 @@ Typical slips went through `tscad_evaluate` to see how the errors read:
 
 **Open: needs other owners.**
 
-- ~~**Sketch:** 2D booleans~~ — **done since**: `<difference2d>` / `<union2d>` / `<intersection2d>`
+- ~~**Sketch:** 2D booleans~~ **Done since**: `<difference2d>` / `<union2d>` / `<intersection2d>`
   (exact, fuzzed). The knob now builds its fluted rim and D bore in 2D: 4.4 s → 2.4 s (0.8 s
   without the top chamfer).
 - **Kernel:**

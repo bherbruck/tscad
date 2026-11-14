@@ -1,6 +1,6 @@
 /**
- * "It's just React": a tiny library of reusable, typed function components — a standoff,
- * a countersunk hole, a rounded plate — composed into a Raspberry-Pi-style mounting plate.
+ * "It's just React": a tiny library of reusable, typed function components (a standoff,
+ * a countersunk hole, a rounded plate) composed into a Raspberry-Pi-style mounting plate.
  * Components take props, compute with plain TypeScript, map over arrays and return JSX.
  */
 import { defineParams, edges, type ParamValues } from "tscad"
@@ -10,7 +10,7 @@ import { defineParams, edges, type ParamValues } from "tscad"
 type XY = { x?: number; y?: number; z?: number }
 
 /**
- * A round standoff with a chamfered top and a pilot hole for a self-tapping screw — one revolved
+ * A round standoff with a chamfered top and a pilot hole for a self-tapping screw: one revolved
  * profile, so it costs no booleans. It sinks `embed` mm below z = 0 to fuse with what it sits on.
  */
 export function Standoff({ height, od = 6, pilot = 2.5, embed = 0.5, ...at }: { height: number; od?: number; pilot?: number; embed?: number } & XY) {

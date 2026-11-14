@@ -90,7 +90,7 @@ These have NOT been filed upstream.
 
 ## 14. Intersecting a nested lip with its rim: PointClassify unsupported
 - Board case base ∩ its lid (the lid's locating lip nested inside the rim, faces touching) →
-  "not supported yet: SmFace::PointClassify" — the same unsupported path as the fuzzer's
+  "not supported yet: SmFace::PointClassify", the same unsupported path as the fuzzer's
   PointClassify findings (docs/upstream/pointclassify-cut-rounded-prism.md). Interference
   checks of board-vs-base and board-vs-lid work.
 

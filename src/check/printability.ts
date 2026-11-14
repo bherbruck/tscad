@@ -187,7 +187,7 @@ export function checkPrintability(mesh: CheckMesh, o: PrintabilityOptions = {}):
     bed = { fits: straight || turned, rotated: !straight && turned };
     if (!bed.fits) warnings.push(`${size.map((s) => s.toFixed(1)).join(" × ")} mm does not fit the ${o.bed.join(" × ")} mm build volume`);
   }
-  if (overArea > 0) warnings.push(`${overArea.toFixed(1)} mm² overhangs steeper than ${maxDeg}° (${((overArea / (total || 1)) * 100).toFixed(1)} % of the surface) — needs supports or a different orientation`);
+  if (overArea > 0) warnings.push(`${overArea.toFixed(1)} mm² overhangs steeper than ${maxDeg}° (${((overArea / (total || 1)) * 100).toFixed(1)} % of the surface): needs supports or a different orientation`);
   const smallest = Math.min(...size);
   if (smallest < minWall) warnings.push(`the part is only ${smallest.toFixed(2)} mm thick along one axis (< ${minWall} mm)`);
 

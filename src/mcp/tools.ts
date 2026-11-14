@@ -223,11 +223,11 @@ function summarize(m: ModelCtx, r: ModelRun, logs: string[]) {
     ...(logs.length ? { logs } : {}),
   };
   const lines: string[] = [];
-  lines.push(`${result.ok ? "OK" : "FAILED"}: ${parts.length} part(s), ${structured.drawings.length} drawing(s) — import ${structured.timings_ms.import} ms, kernel ${structured.timings_ms.kernel} ms`);
+  lines.push(`${result.ok ? "OK" : "FAILED"}: ${parts.length} part(s), ${structured.drawings.length} drawing(s); import ${structured.timings_ms.import} ms, kernel ${structured.timings_ms.kernel} ms`);
   for (const p of parts as any[]) {
     if (p.ok) {
       lines.push(
-        `- ${p.name}: volume ${p.volume_mm3} mm³${p.mass_g !== undefined ? `, mass ${p.mass_g} g (${p.material ?? `${p.density} g/cm³`})` : ""}, size ${p.size?.join(" × ") ?? "—"} mm, bbox ${JSON.stringify(p.bbox)}, ${p.faces_edges_vertices ? `${p.faces_edges_vertices[0]} faces / ${p.faces_edges_vertices[1]} edges` : ""}${p.empty ? " (EMPTY)" : ""}`,
+        `- ${p.name}: volume ${p.volume_mm3} mm³${p.mass_g !== undefined ? `, mass ${p.mass_g} g (${p.material ?? `${p.density} g/cm³`})` : ""}, size ${p.size?.join(" × ") ?? "?"} mm, bbox ${JSON.stringify(p.bbox)}, ${p.faces_edges_vertices ? `${p.faces_edges_vertices[0]} faces / ${p.faces_edges_vertices[1]} edges` : ""}${p.empty ? " (EMPTY)" : ""}`,
       );
     } else {
       const e = p.error;
@@ -348,7 +348,7 @@ async function exportTool(args: Record<string, any>): Promise<ToolResult> {
     }
     const flat = fmt === "dxf" || fmt === "svg";
     const usedDrawings = flat ? rendered.drawings.filter((d) => !only || only.includes(d.name)).map((d) => d.name) : [];
-    const what = flat && usedDrawings.length ? `drawings: ${usedDrawings.join(", ")}` : `parts: ${docParts.map((p) => p.name).join(", ") || "—"}`;
+    const what = flat && usedDrawings.length ? `drawings: ${usedDrawings.join(", ")}` : `parts: ${docParts.map((p) => p.name).join(", ") || "none"}`;
     mkdirSync(dirname(out), { recursive: true });
     writeFileSync(out, data);
     const bytes = statSync(out).size;
@@ -632,7 +632,7 @@ async function checkTool(args: Record<string, any>): Promise<ToolResult> {
         watertight: wt.watertight,
         ...(wt.watertight ? {} : { mesh: { boundaryEdges: wt.boundaryEdges, nonManifoldEdges: wt.nonManifoldEdges, flippedEdges: wt.flippedEdges } }),
       });
-      lines.push(`${p.name}: ${ok ? "OK" : "ISSUES"} — size ${pr.size.map(r1).join(" × ")} mm`);
+      lines.push(`${p.name}: ${ok ? "OK" : "ISSUES"}, size ${pr.size.map(r1).join(" × ")} mm`);
       if (faces.length) {
         lines.push(`  - overhangs > ${maxDeg}°: ${pr.overhang.faces.length} face(s), ${r1(pr.overhang.area)} mm² (${r1(pr.overhang.fraction * 100)} % of the surface)`);
         for (const f of faces) lines.push(`      face ${f.faceId}: ${f.area} mm² at ${f.angle}° from vertical, ${fmtBox(f.bbox as B3)}${f.selector ? `, selector ${f.selector}` : ""}`);
@@ -697,7 +697,7 @@ async function readExampleTool(args: Record<string, any>): Promise<ToolResult> {
 async function docsTool(args: Record<string, any>): Promise<ToolResult> {
   if (args.element) {
     const list = Array.isArray(args.element) ? args.element : [args.element];
-    const found = list.map((e: unknown) => lookupReference(String(e)) ?? `### ${String(e)}\n(unknown — elements: ${referenceNames().elements.join(", ")}; parts: ${referenceNames().components.join(", ")})`);
+    const found = list.map((e: unknown) => lookupReference(String(e)) ?? `### ${String(e)}\n(unknown; elements: ${referenceNames().elements.join(", ")}; parts: ${referenceNames().components.join(", ")})`);
     return { content: [{ type: "text", text: found.join("\n\n") }] };
   }
   const topic = String(args.topic ?? "guide");
@@ -804,7 +804,7 @@ export const TOOLS: ToolDef[] = [
     name: "tscad_pick_selectors",
     title: "Selectors for an edge or face",
     description:
-      "Find the edge (or face) of a part nearest a point — or by index — and return selectors that pick it (string like \">Z and |X\" and builder code like edges.top().parallel(\"x\")), each with how many edges/faces it selects. Use it to write `edges=` for <fillet>/<chamfer> or `open=` for <shell>.",
+      "Find the edge (or face) of a part nearest a point (or by index) and return selectors that pick it (string like \">Z and |X\" and builder code like edges.top().parallel(\"x\")), each with how many edges/faces it selects. Use it to write `edges=` for <fillet>/<chamfer> or `open=` for <shell>.",
     inputSchema: {
       type: "object",
       properties: {
@@ -850,7 +850,7 @@ export const TOOLS: ToolDef[] = [
   {
     name: "tscad_read_example",
     title: "Read a tscad example",
-    description: "The full TSX source of a bundled example model (see tscad_list_examples) — good templates for params, components and parts.",
+    description: "The full TSX source of a bundled example model (see tscad_list_examples): good templates for params, components and parts.",
     inputSchema: { type: "object", properties: { name: { type: "string", description: "Example name, e.g. \"bracket\"." } }, required: ["name"] },
     annotations: RO,
     run: readExampleTool,

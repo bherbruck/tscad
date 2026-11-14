@@ -36,7 +36,7 @@ export class Sel {
   all(): Sel {
     return new Sel(this.kind, { type: "all" });
   }
-  /** Nothing — e.g. `shell` with no open faces. */
+  /** Nothing, e.g. `shell` with no open faces. */
   none(): Sel {
     return new Sel(this.kind, { type: "none" });
   }

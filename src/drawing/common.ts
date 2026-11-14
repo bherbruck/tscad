@@ -1,14 +1,18 @@
-import type { Drawing } from "../core/compile";
+import type { Drawing, DrawingNote } from "../core/compile";
 import type { Vec2 } from "../core/math";
-import { line, nurbsPoint, type Loop2, type Nurbs2 } from "../core/sketch/seg";
+import { line, nurbsPoint, type Loop2, type Nurbs2, type Seg2 } from "../core/sketch/seg";
 
 /** What the writers accept: drawings, loops, or closed polylines (e.g. from `section`). */
-export type DrawingInput = Drawing | readonly Drawing[] | readonly Loop2[] | { loops: readonly Loop2[]; name?: string; layer?: string };
+export type DrawingInput = Drawing | readonly Drawing[] | readonly Loop2[] | { loops: readonly Loop2[]; paths?: readonly (readonly Seg2[])[]; notes?: readonly DrawingNote[]; name?: string; layer?: string };
 
 /** A named set of loops (one layer / SVG group). */
 export interface Layer {
   name: string;
   loops: readonly Loop2[];
+  /** Open paths (not closed). */
+  paths?: readonly (readonly Seg2[])[];
+  /** Text notes. */
+  notes?: readonly DrawingNote[];
   /** Output layer (DXF layer, SVG `data-layer`); default the name. */
   layer?: string;
 }
@@ -16,11 +20,15 @@ export interface Layer {
 export function layers(input: DrawingInput, fallback = "0"): Layer[] {
   if (Array.isArray(input)) {
     if (input.length === 0) return [];
-    if (isDrawing(input[0])) return (input as Drawing[]).map((d) => ({ name: d.name, loops: d.loops, ...(d.layer ? { layer: d.layer } : {}) }));
+    if (isDrawing(input[0])) return (input as Drawing[]).map((d) => layerOf(d, d.name));
     return [{ name: fallback, loops: input as Loop2[] }];
   }
-  const d = input as { loops: readonly Loop2[]; name?: string; layer?: string };
-  return [{ name: d.name ?? fallback, loops: d.loops, ...(d.layer ? { layer: d.layer } : {}) }];
+  const d = input as Exclude<DrawingInput, readonly unknown[]>;
+  return [layerOf(d, d.name ?? fallback)];
+}
+
+function layerOf(d: Exclude<DrawingInput, readonly unknown[]>, name: string): Layer {
+  return { name, loops: d.loops, ...(d.paths?.length ? { paths: d.paths } : {}), ...(d.notes?.length ? { notes: d.notes } : {}), ...(d.layer ? { layer: d.layer } : {}) };
 }
 
 function isDrawing(x: unknown): x is Drawing {
@@ -69,8 +77,14 @@ export function bounds(ls: readonly Layer[]): [number, number, number, number] {
   const p = (x: number, y: number) => {
     x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
   };
-  for (const l of ls)
-    for (const loop of l.loops)
+  for (const l of ls) {
+    for (const n of l.notes ?? []) {
+      // roughly: the note's box (centred, ~0.6 em per character), rotated
+      const hw = (n.text.length * n.size * 0.6) / 2, hh = n.size / 2;
+      const a = ((n.angle ?? 0) * Math.PI) / 180, c = Math.cos(a), sn = Math.sin(a);
+      for (const [x, y] of [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]] as const) p(n.at[0] + c * x - sn * y, n.at[1] + sn * x + c * y);
+    }
+    for (const loop of [...l.loops, ...(l.paths ?? [])])
       for (const s of loop) {
         if (s.kind === "line") {
           p(...s.a);
@@ -86,6 +100,7 @@ export function bounds(ls: readonly Layer[]): [number, number, number, number] {
           }
         }
       }
+  }
   if (x0 === Infinity) return [0, 0, 0, 0];
   return [x0, y0, x1, y1];
 }

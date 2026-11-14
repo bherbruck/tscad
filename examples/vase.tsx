@@ -1,6 +1,6 @@
 /**
  * Lathe-turned vase: a smooth spline profile revolved about Z, then shelled from the top.
- * The silhouette is driven by four radii — tweak them and watch the curve follow.
+ * The silhouette is driven by four radii: tweak them and watch the curve follow.
  */
 import { defineParams, faces, type ParamValues } from "tscad"
 

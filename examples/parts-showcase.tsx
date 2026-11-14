@@ -1,7 +1,7 @@
 /**
  * The `tscad/parts` library in action: a NEMA 17 motor mount plate with counterbored M3
  * screws and a pilot bore, next to a Raspberry Pi 4 base with M2.5 standoffs, a nut trap
- * and an engraved label. Parts are just components — import them like any npm package.
+ * and an engraved label. Parts are just components: import them like any npm package.
  *
  *   tscad dev examples/parts-showcase.tsx
  */

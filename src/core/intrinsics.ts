@@ -1,5 +1,5 @@
 /**
- * Props of every intrinsic element — this file is what users see in their editor.
+ * Props of every intrinsic element. This file is what users see in their editor.
  *
  * Units: lengths in **millimetres**, angles in **degrees** (use `inch()` / `rad()` to convert).
  */
@@ -301,7 +301,7 @@ export interface DifferenceProps extends Placement, SolidChildren {}
 export interface IntersectionProps extends Placement, SolidChildren {}
 
 // ---------------------------------------------------------------------------------------------
-// Sketch (2D) shapes — children of <extrude>, <revolve>, <loft>, <sweep>
+// Sketch (2D) shapes: children of <extrude>, <revolve>, <loft>, <sweep>
 
 /**
  * Where a 2D shape goes in its sketch: mirror, then rotate, then translate.
@@ -384,7 +384,7 @@ export interface RegularPolygonProps extends Placement2D {
   r?: number;
   /** Circumradius, mm (alias of `r`). */
   radius?: number;
-  /** Inradius (centre to flat), mm — e.g. half a hex nut's across-flats size. */
+  /** Inradius (centre to flat), mm: e.g. half a hex nut's across-flats size. */
   apothem?: number;
   /** Across-flats width, mm (= 2 × apothem). */
   flats?: number;
@@ -531,14 +531,38 @@ interface SheetChild extends Placement2D {
   children?: Children;
 }
 
-/** A flange folded from an edge: `length` of flat beyond the bend. */
+/**
+ * A flange folded from an edge: `length` of flat beyond the bend. Where two 90° edge flanges
+ * meet at a corner of their parent, `corner` closes the gap between them and `cornerRelief`
+ * cuts a relief where their bends meet.
+ */
 export interface EdgeFlangeProps extends SheetChild {
-  /** Flat length beyond the bend, mm. */
-  length: number;
+  /** Flat length beyond the bend, mm. Optional with `profile` (the outline's height). */
+  length?: number;
   /** Bend angle, degrees (0, 180]. Default 90. */
   angle?: number;
   /** Inside bend radius, mm. Default: the sheet's. */
   bendRadius?: number;
+  /**
+   * The flange's 2D children are its **outline** (tapered tabs, holes inside it) instead of
+   * holes in a width × length rectangle. Drawn in flange coordinates (x along the edge from 0
+   * to its width, y away from the bend); it must stand on the bend line: a straight edge along
+   * y = 0 from x = 0 to the width.
+   */
+  profile?: boolean;
+  /**
+   * How it meets a neighbouring 90° edge flange at a corner: `"open"` (default, a gap of the
+   * bend's size), `"closed"` (both run on and meet on the corner's diagonal, mitred; the flat
+   * pattern cuts square at the inside of the mitre), `"overlap"` (this one runs past the corner
+   * flush with the neighbour's outside; the neighbour stops `cornerGap` short of it).
+   */
+  corner?: "open" | "closed" | "overlap";
+  /** Gap left at a closed / overlapped corner, mm. Default min(0.2, thickness / 4). */
+  cornerGap?: number;
+  /** Relief where the bends meet at a corner: `"rect"` / `"round"` cut `cornerReliefSize` into the parent and cut the bends back; `"tear"` none. */
+  cornerRelief?: "round" | "rect" | "tear";
+  /** Corner relief size (square side / radius), mm. Default bend radius + thickness. */
+  cornerReliefSize?: number;
 }
 
 /** A hem: folded right back (180°) over the sheet. */
@@ -563,9 +587,9 @@ export interface JogProps extends SheetChild {
 
 /**
  * Model on a face of another solid ("sketch on face"). The **first child is the base**; the
- * other children are tools modelled in the face's frame — origin at the centre of the face's
+ * other children are tools modelled in the face's frame (origin at the centre of the face's
  * bounding box, +Z pointing out of the material, +X along model X projected onto the face (Y
- * when the face is square to X) — then combined with the base by `op`.
+ * when the face is square to X), then combined with the base by `op`.
  * @example
  * <onFace face=">Z" op="cut">
  *   <box size={[40, 30, 10]} />
@@ -740,7 +764,7 @@ export interface LoftProps extends Placement, SketchChildren {
  * start), sketch x completes a right-handed frame with the path's direction.
  */
 /**
- * A `<sweep>`'s path drawn in 2D on a plane: a constraint `<sketch>` (lines, arcs, splines —
+ * A `<sweep>`'s path drawn in 2D on a plane: a constraint `<sketch>` (lines, arcs, splines;
  * open, or closed for a ring) or `<path d="M ...">` data. Keep it tangent-continuous (join
  * lines with tangent arcs): the sweep is exact along lines and arcs, and sharp corners warn.
  * @example
@@ -766,7 +790,7 @@ export interface SweepProps extends Placement, SketchChildren {
   path?: Path3 | readonly Vec3[];
   /**
    * `"follow"` (default) turns the profile with the path; `"translate"` keeps its
-   * orientation (no twist — for threads along a helix, follow is usually right).
+   * orientation (no twist; for threads along a helix, follow is usually right).
    */
   frame?: "follow" | "translate";
 }
@@ -898,7 +922,7 @@ export interface PushPullProps extends Placement, SolidChildren {
 }
 
 /**
- * Cut the children (unioned) with a plane and keep one side — section views, halves for
+ * Cut the children (unioned) with a plane and keep one side: section views, halves for
  * printing, flat bottoms.
  * @example <split plane="XY" offset={5}><sphere r={10} /></split> // the cap above z = 5
  */
@@ -917,7 +941,7 @@ export interface SplitProps extends Placement, SolidChildren {
 export interface IntrinsicElements extends ConstraintSketchElements, AssemblyElements {
   /** A collection of parts (may nest); placement props move every part in it. */
   assembly: AssemblyProps;
-  /** One named, coloured solid — the unit of export. Several children are unioned. */
+  /** One named, coloured solid: the unit of export. Several children are unioned. */
   part: PartProps;
   /** Groups solids (unioned) so they can be placed together. */
   group: GroupProps;

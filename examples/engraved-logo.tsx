@@ -7,7 +7,7 @@
  *   tscad dev examples/engraved-logo.tsx
  */
 import { defineParams, edges, type ParamValues } from "tscad"
-// @ts-ignore — a text import (Bun): the file's contents as a string
+// @ts-ignore: a text import (Bun): the file's contents as a string
 import logo from "./assets/logo.svg" with { type: "text" }
 
 export const params = defineParams({

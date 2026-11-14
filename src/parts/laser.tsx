@@ -215,7 +215,7 @@ export interface FingerJointBoxProps {
 /**
  * A finger-jointed box for laser cutting: bottom, four walls, optional lid and dividers, with
  * fingers that mate. Flat, it emits one `<drawing>` per panel (layer `"cut"`) plus engraved
- * labels (layer `"engrave"`) — `tscad build box.tsx -o box.dxf` gives the cutting file.
+ * labels (layer `"engrave"`): `tscad build box.tsx -o box.dxf` gives the cutting file.
  * Assembled, it folds the panels into the box so you can see it and check it.
  *
  * @example <FingerJointBox width={120} depth={80} height={60} thickness={3} kerf={0.15} lid />

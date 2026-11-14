@@ -9,6 +9,7 @@ import { copyText, h, icon } from "../viewer/dom";
 import { createEditor, type CompletionData, type EditorProblem } from "./editor";
 import { decodeSource, encodeSource } from "./share";
 import { transformModel } from "./transform";
+import { displayFile, MODEL_FILE } from "./file-name";
 import { convertScad, ScadSyntaxError } from "../convert";
 import { applyChanges } from "../index";
 import { scadImportDialog, withNotes, NOTES_HEAD } from "./scad-import";
@@ -25,7 +26,7 @@ interface Example {
   files?: Record<string, string>;
 }
 
-const FILE = "model.tsx";
+const FILE = MODEL_FILE;
 
 /** The props a sketch dimension may come from, by kind (for selecting it in the code). */
 const DIMENSION_PROPS: Record<string, string[]> = {
@@ -163,7 +164,7 @@ async function main() {
     wasmUrl: abs("wasm/tscad_wasm_bg.wasm"),
     glueUrl: abs("wasm/tscad_wasm.js"),
     workerUrl: abs("__tscad/viewer/worker.js"),
-    file: FILE,
+    file: displayFile(current),
     topbarExtras: [h("div", { class: "pg-extras" }, exampleWrap, importBtn, shareBtn, codeBtn)],
     sidePane: pane,
     hashKeep: ["code", "example", "files"],
@@ -241,6 +242,7 @@ async function main() {
         const out = withNotes(r.tsx, r.warnings, fileName ?? "pasted.scad");
         notes = out.notes;
         select.value = "";
+        viewer.setFile(displayFile(undefined));
         resetParams = true;
         files = {};
         editor!.setValue(out.text);
@@ -259,6 +261,7 @@ async function main() {
   select.addEventListener("change", () => {
     const ex = examples.find((e) => e.name === select.value);
     if (!ex) return;
+    viewer.setFile(displayFile(ex.name));
     resetParams = true;
     files = ex.files ?? {};
     editor!.setValue(ex.source);

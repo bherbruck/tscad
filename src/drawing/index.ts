@@ -14,4 +14,4 @@ export { toDXF, type DxfOptions } from "./dxf";
 export { svgPathData, toSVG, type SvgOptions } from "./svg";
 export { planeFrame, section, sectionToDXF, sectionToSVG, type SectionPlane, type SectionResult } from "./section";
 export { polylineLoops, type DrawingInput, type Layer } from "./common";
-export type { Drawing, Loop2, Seg2 } from "../core/compile";
+export type { Drawing, DrawingNote, Loop2, Seg2 } from "../core/compile";
