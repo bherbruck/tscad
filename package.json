@@ -82,5 +82,6 @@
     "codemirror": "^6.0.2",
     "sucrase": "^3.35.1",
     "typescript": "^7.0.2"
-  }
+  },
+  "homepage": "https://tscad.io"
 }
