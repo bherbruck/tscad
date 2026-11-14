@@ -88,6 +88,9 @@ pub struct PickInfo {
     /// A line's direction or a plane's normal.
     pub direction: Option<[f64; 3]>,
     pub radius: Option<f64>,
+    /// An edge where its faces meet tangentially (or a seam): broad selectors skip it, so only
+    /// its index names it, and there is nothing to fillet there.
+    pub smooth: bool,
     /// How many edges/faces each suggested selector matches, most specific first.
     pub suggestions: Vec<Suggestion>,
 }
@@ -254,13 +257,19 @@ impl Engine {
         if let Some((_, rad)) = it.circle {
             cands.push(Selector::Radius { radius: rad });
         }
-        let suggestions = suggest(r, &it, index, false, cands);
+        let smooth = eval::is_seam(e) || eval::is_smooth(r, e);
+        let suggestions = if smooth {
+            vec![Suggestion { selector: Selector::Index { indices: vec![index] }, count: 1 }]
+        } else {
+            suggest(r, &it, index, false, cands)
+        };
         Ok(PickInfo {
             index,
             kind: kind.into(),
             points: it.points,
             direction: it.dir,
             radius: it.circle.map(|c| c.1),
+            smooth,
             suggestions,
         })
     }
@@ -282,7 +291,7 @@ impl Engine {
             cands.push(Selector::Perpendicular { axis: a });
         }
         let suggestions = suggest(r, &it, index, true, cands);
-        Ok(PickInfo { index, kind: kind.into(), points: it.points, direction: it.dir, radius: None, suggestions })
+        Ok(PickInfo { index, kind: kind.into(), points: it.points, direction: it.dir, radius: None, smooth: false, suggestions })
     }
 
     fn record(&self, part: &str) -> Result<&Record, String> {
@@ -344,6 +353,7 @@ fn suggest(r: &Record, it: &eval::Item, index: usize, face: bool, cands: Vec<Sel
             }
         }
     }
+    hits.retain(|s| s.count > 0);
     hits.sort_by_key(|s| s.count);
     hits.dedup_by_key(|s| serde_json::to_string(&s.selector).unwrap_or_default());
     hits.truncate(6);

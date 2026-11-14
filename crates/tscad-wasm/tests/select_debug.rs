@@ -61,3 +61,18 @@ fn export_agent_fillet_cases() {
         assert!((v - e).abs() < 1e-3, "{v} {e}");
     }
 }
+
+#[test]
+fn pick_tangent_edge_is_smooth() {
+    let d: Document = serde_json::from_str(r#"{"parts":[{"name":"a","node":{"type":"fillet","radius":1,"edges":{"type":"max","axis":"z"},"children":[{"type":"difference","children":[
+        {"type":"box","size":[40,30,5],"center":true},{"type":"cylinder","radius":2.1,"height":20,"center":true}]}]}}]}"#).unwrap();
+    let mut e = Engine::new(None);
+    assert!(e.evaluate(&d, &EvalOptions::default()).ok);
+    let mut smooth = 0;
+    for i in 0..e.mesh("a").unwrap().edge_ids.len() + 40 {
+        let Ok(p) = e.pick_edge("a", i) else { break };
+        assert!(p.suggestions.iter().all(|s| s.count > 0), "edge {i}: {:?}", p.suggestions);
+        smooth += usize::from(p.smooth);
+    }
+    assert!(smooth > 0);
+}

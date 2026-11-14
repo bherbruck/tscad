@@ -401,7 +401,7 @@ pub(crate) fn matches(it: &Item, s: &Selector, lo: [f64; 3], hi: [f64; 3], index
 }
 
 /// A seam: an edge where a periodic face meets itself (a cylinder's side line).
-fn is_seam(e: &rec::Edge) -> bool {
+pub fn is_seam(e: &rec::Edge) -> bool {
     e.uses.len() == 2 && e.uses[0].face == e.uses[1].face
 }
 
@@ -415,7 +415,7 @@ fn normal_at(record: &Record, f: u32, p: [f64; 3]) -> Option<[f64; 3]> {
 
 /// A smooth edge: its two faces meet tangentially along it (a joint between a line wall and an
 /// arc wall of an extruded rounded rectangle). Nothing to round there.
-fn is_smooth(record: &Record, e: &rec::Edge) -> bool {
+pub fn is_smooth(record: &Record, e: &rec::Edge) -> bool {
     let [a, b] = match e.uses.as_slice() {
         [a, b] => [a.face, b.face],
         _ => return false,
