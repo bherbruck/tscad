@@ -3,12 +3,31 @@ import { flattenNurbs } from "../drawing/common";
 import type { Drawing, Seg2 } from "../drawing";
 import type { DrawingData } from "./protocol";
 
+/** Viewer colours for the usual laser / press-brake layers (a drawing's own `color` wins). */
+export const LAYER_COLORS: Record<string, string> = {
+  cut: "#ffb020",
+  bend: "#3ecf8e",
+  engrave: "#f471b5",
+  score: "#38bdf8",
+  mark: "#a78bfa",
+};
+
 /** The viewer's data for a flat drawing. */
 export function drawingData(d: Drawing): DrawingData {
   const paths = d.paths ?? [];
-  const segments = drawingSegments([...d.loops, ...paths]);
+  const segments = drawingSegments(d.loops);
+  const pathSegments = paths.length ? drawingSegments(paths) : undefined;
   const notes = (d.notes ?? []).map((n) => ({ at: [n.at[0], n.at[1]] as [number, number], text: n.text, size: n.size, ...(n.angle !== undefined ? { angle: n.angle } : {}) }));
-  return { name: d.name, color: d.color, loops: d.loops.length, paths: paths.length, segments, ...(notes.length ? { notes } : {}) };
+  return {
+    name: d.name,
+    color: d.color ?? (d.layer ? LAYER_COLORS[d.layer] : undefined),
+    loops: d.loops.length,
+    paths: paths.length,
+    ...(d.layer ? { layer: d.layer } : {}),
+    segments,
+    ...(pathSegments ? { pathSegments } : {}),
+    ...(notes.length ? { notes } : {}),
+  };
 }
 
 /** 2D chains, closed loops or open paths (lines, arcs, NURBS) → line segments on z = 0. */

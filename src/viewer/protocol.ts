@@ -71,8 +71,12 @@ export interface DrawingData {
   loops: number;
   /** Open paths (bend lines...). */
   paths: number;
-  /** xyz xyz per segment: the loops and the open paths. */
+  /** DXF/SVG layer (`cut`, `bend`, `engrave`...), when set. */
+  layer?: string;
+  /** xyz xyz per segment: the closed loops. */
   segments: Float32Array;
+  /** xyz xyz per segment: the open paths (drawn dashed). */
+  pathSegments?: Float32Array;
   /** Text notes: centred at `at`, `size` mm tall, `angle` degrees CCW. */
   notes?: DrawingNoteData[];
 }

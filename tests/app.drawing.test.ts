@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { renderModule } from "../src";
-import { drawingData } from "../src/viewer/drawing-data";
+import { drawingData, LAYER_COLORS } from "../src/viewer/drawing-data";
 import { drawingMeta } from "../src/viewer/fmt";
 import * as bracket from "../examples/sheet-l-bracket";
 
@@ -14,8 +14,11 @@ describe("viewer drawing data", () => {
     const data = drawingData(bends);
     expect(data.loops).toBe(0);
     expect(data.paths).toBe(bends.paths!.length);
-    // one straight bend line each: 6 floats per segment
-    expect(data.segments.length).toBe(bends.paths!.length * 6);
+    // Paths are kept apart from the loops (drawn dashed): one straight bend line each, 6 floats per segment.
+    expect(data.segments.length).toBe(0);
+    expect(data.pathSegments?.length).toBe(bends.paths!.length * 6);
+    // Coloured by layer unless the drawing sets a colour.
+    if (!bends.color && bends.layer === "bend") expect(data.color).toBe(LAYER_COLORS.bend!);
     if (bends.notes?.length) {
       expect(data.notes?.length).toBe(bends.notes.length);
       for (const n of data.notes!) {
@@ -31,6 +34,7 @@ describe("viewer drawing data", () => {
     expect(data.loops).toBe(flat.loops.length);
     expect(data.segments.length).toBeGreaterThan(0);
     expect(data.segments.length % 6).toBe(0);
+    expect(data.pathSegments).toBeUndefined();
   });
 
   test("the parts-list / CLI summary counts loops, lines and notes", () => {

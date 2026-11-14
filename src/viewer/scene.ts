@@ -463,48 +463,68 @@ export class Viewport {
   }
 
   /** Flat `<drawing>` outlines, drawn as lines on z = 0. */
-  readonly drawings = new Map<string, { line: LineSegments2; notes?: THREE.Group; box: THREE.Box3; visible: boolean; color: string }>();
+  readonly drawings = new Map<string, { group: THREE.Group; box: THREE.Box3; visible: boolean; color: string }>();
 
-  setDrawings(list: { name: string; color?: string; segments: Float32Array; notes?: DrawingNoteData[] }[]) {
+  setDrawings(list: { name: string; color?: string; segments: Float32Array; pathSegments?: Float32Array; notes?: DrawingNoteData[] }[]) {
     const old = this.drawings;
-    for (const d of old.values()) {
-      d.line.removeFromParent();
-      d.line.geometry.dispose();
-      this.#dropLineMat(d.line.material);
-      if (d.notes) disposeNotes(d.notes);
-    }
+    for (const d of old.values()) this.#disposeDrawing(d.group);
     const visible = new Map([...old].map(([k, v]) => [k, v.visible]));
     old.clear();
     list.forEach((d, i) => {
-      if (!d.segments.length && !d.notes?.length) return;
-      const g = new LineSegmentsGeometry();
-      g.setPositions(d.segments);
+      if (!d.segments.length && !d.pathSegments?.length && !d.notes?.length) return;
       const color = d.color ?? ["#ffb020", "#3ecf8e", "#f471b5", "#38bdf8"][i % 4]!;
-      const line = new LineSegments2(g, this.#lineMat(new THREE.Color(color), 2.2, true));
-      line.renderOrder = 15;
-      line.userData.drawing = d.name;
+      const group = new THREE.Group();
+      group.userData.drawing = d.name;
       const box = new THREE.Box3();
-      if (d.segments.length) box.setFromBufferAttribute(new THREE.BufferAttribute(d.segments, 3));
-      const vis = visible.get(d.name) ?? true;
-      line.visible = vis;
-      this.model.add(line);
-      const notes = d.notes?.length ? noteGroup(d.notes, color) : undefined;
-      if (notes) {
-        notes.visible = vis;
-        this.model.add(notes);
-        box.union(new THREE.Box3().setFromObject(notes));
+      for (const seg of [d.segments, d.pathSegments]) if (seg?.length) box.union(new THREE.Box3().setFromBufferAttribute(new THREE.BufferAttribute(seg, 3)));
+      // Closed loops: solid.
+      if (d.segments.length) {
+        const g = new LineSegmentsGeometry();
+        g.setPositions(d.segments);
+        const line = new LineSegments2(g, this.#lineMat(new THREE.Color(color), 2.2, true));
+        line.renderOrder = 15;
+        group.add(line);
       }
-      this.drawings.set(d.name, { line, notes, box, visible: vis, color });
+      // Open paths (bend lines): dashed, dash length relative to the drawing's size.
+      if (d.pathSegments?.length) {
+        const g = new LineSegmentsGeometry();
+        g.setPositions(d.pathSegments);
+        const m = this.#lineMat(new THREE.Color(color), 2, true);
+        const dash = Math.max(0.5, box.getSize(tmpV).length() / 60);
+        m.dashed = true;
+        m.dashSize = dash;
+        m.gapSize = dash * 0.6;
+        const line = new LineSegments2(g, m);
+        line.computeLineDistances();
+        line.renderOrder = 15;
+        group.add(line);
+      }
+      // Notes: labels that face the screen, `size` mm tall.
+      if (d.notes?.length) group.add(noteGroup(d.notes, color));
+      const vis = visible.get(d.name) ?? true;
+      group.visible = vis;
+      this.model.add(group);
+      this.drawings.set(d.name, { group, box, visible: vis, color });
     });
     this.#needsRender = true;
   }
+
+  #disposeDrawing(group: THREE.Group) {
+    group.removeFromParent();
+    for (const c of [...group.children]) {
+      if (c instanceof LineSegments2) {
+        c.geometry.dispose();
+        this.#dropLineMat(c.material);
+      } else if (c instanceof THREE.Group) disposeNotes(c);
+    }
+  }
+
 
   setDrawingVisible(name: string, visible: boolean) {
     const d = this.drawings.get(name);
     if (!d) return;
     d.visible = visible;
-    d.line.visible = visible;
-    if (d.notes) d.notes.visible = visible;
+    d.group.visible = visible;
     this.#needsRender = true;
   }
 

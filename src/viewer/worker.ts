@@ -404,6 +404,7 @@ async function run() {
     const data = drawingData(d);
     drawings.push(data);
     transfer.push(data.segments.buffer as ArrayBuffer);
+    if (data.pathSegments) transfer.push(data.pathSegments.buffer as ArrayBuffer);
   }
   const t3 = performance.now();
   lastSchema = rendered.params ?? {};
