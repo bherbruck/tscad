@@ -136,6 +136,8 @@ function rewrite(href: string, srcFile: string, pagePath: string, kind: "link" |
   if (/^([a-z]+:|#|\/\/)/i.test(href)) return href;
   const r = rootOf(pagePath);
   const [pathPart, hash = ""] = href.split("#");
+  // the playground is mounted at play/: leave links into it as they are
+  if (/(^|\/)play(\/|$)/.test(pathPart!)) return href;
   // links written for the site (`../reference/elements.html`) are relative to the page
   if (/\.html$/.test(pathPart!)) return href;
   const abs = resolve(dirname(srcFile), pathPart!);

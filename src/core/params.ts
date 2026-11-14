@@ -149,7 +149,8 @@ export function resolveParams<S extends ParamSchema>(schema: S, overrides: Recor
     if (given === undefined) continue;
     const spec = schema[key];
     if (!spec) {
-      issues.push({ key, message: `unknown param "${key}"`, given, used: undefined });
+      const known = Object.keys(schema);
+      issues.push({ key, message: `unknown param "${key}" (${known.length ? `params: ${known.join(", ")}` : "the model has no params"})`, given, used: undefined });
       continue;
     }
     const { value, message } = coerceParam(spec, given);

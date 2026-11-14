@@ -605,6 +605,11 @@ export interface LinearPatternProps extends Placement, SolidChildren {
   dz?: number;
   /** Centre the pattern on the original position. Default false. */
   center?: boolean;
+  /**
+   * Inside a constraint `<sketch>`: the entities to copy (ids or handles); the copies stay tied
+   * by translation constraints. Without `of` it is the usual solid pattern.
+   */
+  of?: string | readonly unknown[];
 }
 
 /** An `nx` × `ny` grid of copies in XY. */
