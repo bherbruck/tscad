@@ -1,6 +1,6 @@
 //! Upstream-ready reproductions of solidcore bugs found by tscad's fuzzer (docs/FUZZ.md),
-//! written against `solidcore_ops` (and `solidcore_record` for edge picking) only — no tscad
-//! code — so they can be pasted into solidcore's own tests. One section per issue draft in
+//! written against `solidcore_ops` (and `solidcore_record` for edge picking) only, with no tscad
+//! code, so they can be pasted into solidcore's own tests. One section per issue draft in
 //! `docs/upstream/<slug>.md`.
 //!
 //! `cargo test -p tscad-wasm --test upstream_repros -- --nocapture` prints a status table and
@@ -28,7 +28,7 @@ fn moved(b: Body, x: f64, y: f64, z: f64) -> Body {
 }
 
 /// Apply a column-vector matrix written row by row (`p' = M p`, translation in the last
-/// column) — the transpose is what `Body::transform` takes.
+/// column); the transpose is what `Body::transform` takes.
 fn mapped(b: Body, m: [f64; 12]) -> Body {
     let k = [[m[0], m[4], m[8], 0.0], [m[1], m[5], m[9], 0.0], [m[2], m[6], m[10], 0.0], [m[3], m[7], m[11], 1.0]];
     b.transform(&k).unwrap();
