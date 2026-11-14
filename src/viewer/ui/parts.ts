@@ -1,5 +1,6 @@
 /** Viewer UI: parts (split out of app.ts; shares the viewer's state through `ctx`). */
 import { h, icon } from "../dom";
+import { drawingMeta } from "../fmt";
 import { fmtMs, fmtVol, fmtMass, shortFile, toHexColor } from "./format";
 import { fmtNum, PALETTE } from "../scene";
 import type { ViewerContext } from "./context";
@@ -105,7 +106,7 @@ export function installParts(ctx: ViewerContext) {
           "div",
           { class: `part${visible ? "" : " hidden-part"}`, title: `${dr.name}: a flat drawing. Export it with tscad build -o ${dr.name}.dxf` },
           h("span", { class: "swatch drawing-swatch", style: { "--c": v?.color ?? dr.color ?? "#ffb020" } }),
-          h("div", { class: "part-main" }, h("div", { class: "part-name" }, dr.name, h("span", { class: "chip" }, "2D")), h("div", { class: "part-meta" }, `drawing · ${dr.loops} loop${dr.loops === 1 ? "" : "s"}`)),
+          h("div", { class: "part-main" }, h("div", { class: "part-name" }, dr.name, h("span", { class: "chip" }, "2D")), h("div", { class: "part-meta" }, drawingMeta(dr))),
           h("div", { class: "part-actions" }, eye),
         ),
       );

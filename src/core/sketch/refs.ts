@@ -77,10 +77,10 @@ export function sketchRef<K extends RefKind = any>(label?: string): SketchRef<K>
 /**
  * A bag of handles created on first access: `s.o`, `s.base`...
  *
- * - `sketchRefs<{ o: "point"; base: "line" }>()` — kinds checked by TypeScript.
- * - `sketchRefs("o", "a", "base")` — names checked, kinds open (handy with
+ * - `sketchRefs<{ o: "point"; base: "line" }>()`: kinds checked by TypeScript.
+ * - `sketchRefs("o", "a", "base")`: names checked, kinds open (handy with
  *   `noUncheckedIndexedAccess`, where an open-ended bag's members read as possibly undefined).
- * - `sketchRefs()` — anything goes.
+ * - `sketchRefs()`: anything goes.
  */
 export function sketchRefs<T extends Record<string, RefKind> = Record<string, any>>(): { readonly [P in keyof T]: SketchRef<T[P]> };
 export function sketchRefs<K extends string>(...names: K[]): { readonly [P in K]: SketchRef };

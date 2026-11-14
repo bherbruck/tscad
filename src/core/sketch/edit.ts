@@ -1,6 +1,6 @@
 /**
  * Minimal source edits for interactive editing: find a JSX element by its source location and
- * replace (or insert) one numeric prop. Pure text functions — no TypeScript parser — that
+ * replace (or insert) one numeric prop. Pure text functions (no TypeScript parser) that
  * refuse anything that isn't a plain number literal.
  */
 import type { SourceLoc } from "../errors";

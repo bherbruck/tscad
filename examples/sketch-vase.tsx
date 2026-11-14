@@ -1,6 +1,6 @@
 /**
- * Lofted vase: three constraint-sketched sections — a rounded square at the foot, a wider
- * belly, a narrow neck — skinned smoothly and hollowed out from the top.
+ * Lofted vase: three constraint-sketched sections (a rounded square at the foot, a wider
+ * belly, a narrow neck) skinned smoothly and hollowed out from the top.
  *
  *   tscad dev examples/sketch-vase.tsx
  */

@@ -271,7 +271,7 @@ export function buildSheet(h: Host, ctx: SheetContext): SheetResult {
       const length = num(ctx, c, "length", cp.length, { positive: true }) ?? ctx.fail(c, "missing length", `<hem edge="end" length={6} />`);
       steps = [{ angle: 180, up, radius: gap / 2, length, host: c }];
     } else {
-      // jog: up by `angle`, a web, back down by `angle`, then `length` — the web sized so the
+      // jog: up by `angle`, a web, back down by `angle`, then `length`; the web sized so the
       // last panel's bottom face sits `offset` from the parent's
       const angle = num(ctx, c, "angle", cp.angle) ?? 90;
       if (!(angle > 0 && angle < 180)) ctx.fail(c, `angle must be in (0, 180) degrees (got ${angle})`);
@@ -495,8 +495,8 @@ function findEdge(pnl: Panel, key: unknown, h: Host, ctx: SheetContext): [Vec2, 
 }
 
 /**
- * A panel with mitred ends, as one prism: its (edge × thickness) cross-section — the ends cut
- * on the corner's diagonal — swept along the panel's length; holes and reliefs cut through.
+ * A panel with mitred ends, as one prism: its (edge × thickness) cross-section (the ends cut
+ * on the corner's diagonal) swept along the panel's length; holes and reliefs cut through.
  */
 function mitredPanel(pnl: Panel, T: number, ctx: SheetContext): Node {
   const { width, len, ext } = pnl.mitres!;

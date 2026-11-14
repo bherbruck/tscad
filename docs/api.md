@@ -139,9 +139,13 @@ named view (`iso`, `front`, `top`, …) or `{ azimuth, elevation }` in degrees.
 | `toSVG(drawings, { stroke, strokeWidth = 0.1, fill = "none", margin = 1, tolerance })` | Sized in mm, true arcs, an even-odd path per drawing. |
 | `section(mesh, { origin, normal })` | → `{ loops, open }`: a plane cut of a mesh, in the plane's 2D frame (`planeFrame(normal)`). |
 | `sectionToDXF`, `sectionToSVG` | a section written straight out |
-| `svgPathData(loops)`, `polylineLoops(polylines)` | building blocks |
+| `svgPathData(loops, tolerance, closed = true)`, `polylineLoops(polylines)` | building blocks |
 
 The inputs are `compile(...).drawings` (from `<drawing>` elements), loops, or `{ name, loops }`.
+A `Drawing` can also carry open `paths` (chains that are never closed, such as sheet-metal bend
+lines: LINE/ARC or an open POLYLINE in DXF, an unfilled `<path>` in SVG) and `notes`
+(`DrawingNote { at, text, size, angle? }`: real TEXT entities in DXF, `<text>` in SVG), both
+included in the bounds.
 
 ## `tscad/check`
 

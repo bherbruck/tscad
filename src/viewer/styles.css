@@ -2183,3 +2183,9 @@ button.err-loc:hover {
   color: #93b4ff;
   pointer-events: none;
 }
+
+.help-mouse {
+  border-top: 1px solid var(--line);
+  margin-top: 4px;
+  padding-top: 10px;
+}

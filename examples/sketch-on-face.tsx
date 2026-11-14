@@ -1,6 +1,6 @@
 /**
  * Sketch on face: a bearing block built feature by feature, each one drawn on a face of the
- * solid so far — no coordinates computed for where the faces end up.
+ * solid so far: no coordinates computed for where the faces end up.
  * - a boss raised on the top face, with the bearing pocket and a through bore in it;
  * - four counterbored mounting holes, a constraint sketch with a circular pattern;
  * - a wire slot pocketed into the front face.
@@ -35,6 +35,15 @@ function HoleCircle({ diameter, hole }: { diameter: number; hole: number }) {
 }
 
 export default function BearingBlock(p: ParamValues<typeof params>) {
+  // keep every feature on the block: the hole circle between the boss and the corners, the
+  // boss inside the base, the bearing inside the boss, the bore inside the bearing
+  const m = Math.min(p.width, p.depth)
+  const rMax = (m / 2 - 6) * Math.SQRT2
+  const boss = Math.min(p.boss, m - 4, 2 * (rMax - 6))
+  const holeR = Math.min(Math.max(p.holeSpacing / 2, boss / 2 + 6), rMax)
+  const bearing = Math.min(p.bearing, boss - 4)
+  const bore = Math.min(p.bore, bearing - 3)
+  const bearingWidth = Math.min(p.bearingWidth, p.bossHeight + p.thickness - 3)
   // the base's top face (the boss stands on it, so it isn't the topmost face any more)
   const baseTop = faces.within([-p.width, -p.depth, p.thickness - 0.01], [p.width, p.depth, p.thickness + 0.01])
   return (
@@ -46,19 +55,19 @@ export default function BearingBlock(p: ParamValues<typeof params>) {
           <cutThrough face="<Z">
             {/* bearing pocket and shaft bore in the boss */}
             <cutThrough face=">Z">
-              <pocket face=">Z" depth={p.bearingWidth}>
+              <pocket face=">Z" depth={bearingWidth}>
                 <boss face=">Z" height={p.bossHeight}>
                   <box size={[p.width, p.depth, p.thickness]} />
-                  <circle d={p.boss} />
+                  <circle d={boss} />
                 </boss>
-                <circle d={p.bearing} />
+                <circle d={bearing} />
               </pocket>
-              <circle d={p.bore} />
+              <circle d={bore} />
             </cutThrough>
             {/* through holes, drawn on the bottom face (its x is mirrored: the pattern is symmetric) */}
-            <HoleCircle diameter={p.holeSpacing} hole={4.5} />
+            <HoleCircle diameter={2 * holeR} hole={4.5} />
           </cutThrough>
-          <HoleCircle diameter={p.holeSpacing} hole={8} />
+          <HoleCircle diameter={2 * holeR} hole={8} />
         </pocket>
         <slot length={16} width={4} />
       </pocket>

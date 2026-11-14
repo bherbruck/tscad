@@ -2,7 +2,7 @@
  * Constraint sketches: `<sketch>` containing `<point>`, `<line>`, `<arc>`, `<circle center=…>`,
  * `<spline>` and constraints (as props or as `<dimension>`, `<coincident>`, `<tangent>`...
  * elements). The sketch is turned into a constraint system, solved (./solver), checked
- * (degrees of freedom, conflicts, redundancy — with JSX source locations), and its
+ * (degrees of freedom, conflicts, redundancy, with JSX source locations), and its
  * non-construction curves are chained into closed loops for extrude / revolve / loft / sweep.
  */
 import type { Node } from "../../ir";
@@ -1873,7 +1873,7 @@ function solve(sketch: Host, hooks: SolveHooks): Solved {
         {
           ...((culprit.host.loc ?? sketch.loc) ? { loc: culprit.host.loc ?? sketch.loc! } : {}),
           hint: list.length
-            ? "remove one of these constraints or change a value so they agree (if the values are right, the drawn guess may be on the wrong side — move points closer to the intended shape)"
+            ? "remove one of these constraints or change a value so they agree (if the values are right, the drawn guess may be on the wrong side: move points closer to the intended shape)"
             : "check the values (impossible geometry?) or start the points closer to the intended shape",
         },
       );

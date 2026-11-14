@@ -1,6 +1,6 @@
 /**
  * Coat hook: a rounded wall plate with two countersunk screw holes, and a round rod swept
- * along a constraint-sketched path — straight out from the wall, a tangent bend upwards, a
+ * along a constraint-sketched path: straight out from the wall, a tangent bend upwards, a
  * straight tip. The path is drawn in the YZ plane; the rod's profile is placed square to the
  * path's start automatically.
  *

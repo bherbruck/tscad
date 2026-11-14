@@ -163,7 +163,7 @@ export class Gen {
       }
     };
     collect(body);
-    for (const s of body) if (s.t === "use") this.warn(s.line, `${s.kind} <${s.path}>: not converted — convert that file too and import what you need`);
+    for (const s of body) if (s.t === "use") this.warn(s.line, `${s.kind} <${s.path}>: not converted: convert that file too and import what you need`);
     this.classifyModules();
 
     // globals: params (Customizer) and derived constants
@@ -200,7 +200,7 @@ export class Gen {
     const imports = ["defineParams", ...(this.usesChildrenType || this.helpers.has("$leaf1") ? ["type Children"] : []), "type ParamValues"];
     out.push(`import { ${imports.join(", ")} } from "tscad"`);
     if (this.fileImports.size) {
-      out[out.length - 1] += "\n" + [...this.fileImports].map(([f, id]) => `// @ts-ignore — the file's text (Bun text import)\nimport ${id} from ${JSON.stringify(f.startsWith(".") || f.startsWith("/") ? f : `./${f}`)} with { type: "text" }`).join("\n");
+      out[out.length - 1] += "\n" + [...this.fileImports].map(([f, id]) => `// @ts-ignore: the file's text (Bun text import)\nimport ${id} from ${JSON.stringify(f.startsWith(".") || f.startsWith("/") ? f : `./${f}`)} with { type: "text" }`).join("\n");
     }
     out.push(`export const params = defineParams({${params.length ? "\n" + indent(params.map((p) => p.code).join("\n")) + "\n" : ""}})`);
     out.push(...defs);
@@ -621,7 +621,7 @@ export class Gen {
       }
       case "polyhedron":
         this.warn(s.line, "polyhedron() isn't supported (tscad builds exact B-reps, not meshes): left out");
-        return [`{/* polyhedron(...) — not converted */}`];
+        return [`{/* polyhedron(...): not converted */}`];
       case "import": {
         const file = importFile(s);
         const ext = /\.(svg|dxf)$/i.exec(file ?? "")?.[1]?.toLowerCase();
@@ -640,12 +640,12 @@ export class Gen {
           return leaf(el(ext, props, []));
         }
         this.warn(s.line, `import(${file ? JSON.stringify(file) : "..."}) isn't supported${file ? " (only .svg and .dxf)" : " (the file name must be a literal)"}: left out`);
-        return [`{/* import(...) — not converted */}`];
+        return [`{/* import(...): not converted */}`];
       }
       case "surface":
       case "projection":
         this.warn(s.line, `${s.name}() isn't supported: left out`);
-        return [`{/* ${s.name}(...) — not converted */}`];
+        return [`{/* ${s.name}(...): not converted */}`];
 
       // ---- booleans
       case "union":
@@ -813,7 +813,7 @@ export class Gen {
     const m = this.modules.get(s.name);
     if (!m) {
       this.warn(s.line, `unknown module ${s.name}()${PASS.has(s.name) ? "" : " (from a use/include?)"}: left out`);
-      return [`{/* ${s.name}(...) — unknown module */}`];
+      return [`{/* ${s.name}(...): unknown module */}`];
     }
     const props: string[] = [];
     const passed = new Set<string>();
@@ -846,8 +846,8 @@ export class Gen {
   }
 
   /**
-   * 3D hull() of straight prisms on a common base — cylinders and cubes of one height, moved
-   * in XY (translate with z = 0, rotate about Z, for loops) — is the extrusion of the 2D hull
+   * 3D hull() of straight prisms on a common base (cylinders and cubes of one height, moved
+   * in XY: translate with z = 0, rotate about Z, for loops) is the extrusion of the 2D hull
    * of their footprints. Returns undefined for anything else.
    */
   private hullPrism(stmts: Stmt[], env: Env): { h: string; center: string; kids: string[] } | undefined {

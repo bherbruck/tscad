@@ -44,7 +44,7 @@ that its anchor frame lands on `a`'s frame, shifted by `offset` along `a`'s axis
 
 | `type` | constrains | free (driven by) |
 |---|---|---|
-| `fastened` (default) | origin, axis, x direction | — |
+| `fastened` (default) | origin, axis, x direction | none |
 | `revolute` | origin, axis | rotation about the axis (`angle`) |
 | `slider` | axis, x direction, origin on `a`'s axis line | travel along the axis (`offset`) |
 | `cylindrical` | axis, origin on the axis line | rotation (`angle`) and travel (`offset`) |

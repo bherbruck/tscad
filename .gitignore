@@ -11,3 +11,4 @@ native/
 # agent scratch
 .tmp/
 tests/_tmp/
+tests/.convert-tmp/

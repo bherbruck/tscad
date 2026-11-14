@@ -47,3 +47,9 @@ export function parseValue(raw: string): unknown {
   if (raw !== "" && !isNaN(Number(raw))) return Number(raw);
   return raw.replace(/^(["'])(.*)\1$/, "$2");
 }
+
+/** "2 loops · 3 lines · 3 notes": what a drawing holds (empty kinds left out). */
+export function drawingMeta(d: { loops: number; paths?: number; notes?: unknown[] }): string {
+  const n = (count: number, one: string, many: string) => (count ? `${count} ${count === 1 ? one : many}` : "");
+  return ["drawing", n(d.loops, "loop", "loops"), n(d.paths ?? 0, "line", "lines"), n(d.notes?.length ?? 0, "note", "notes")].filter(Boolean).join(" · ");
+}

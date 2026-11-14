@@ -14,10 +14,10 @@ import type { Document, PartResult } from "../ir";
 import type { EvalData, FromWorker, Loc, ParamSchemaData, ParamValuesData, PartData, StageError, ToWorker } from "./protocol";
 import { codeFrame, parseStack, SourceMap, stripQuery } from "./sourcemap";
 import type { AssemblyData, DiffData, DrawingData, MateData, SketchData } from "./protocol";
+import { drawingData } from "./drawing-data";
 import { diffDocument, summarize, type PartStats } from "./diff";
 import { mul4, orientationNote, plate3MF, plateParts, transformMesh } from "../plate";
 import type { PlateData } from "./protocol";
-import { flattenNurbs } from "../drawing/common";
 import { polylineLoops, section, toDXF, toSVG } from "../drawing";
 
 declare const self: DedicatedWorkerGlobalScope;
@@ -401,9 +401,9 @@ async function run() {
   const drawings: DrawingData[] = [];
   for (const d of (rendered.drawings as any[] | undefined) ?? []) {
     if (d.thickness) continue; // already a part
-    const segments = drawingSegments(d.loops);
-    drawings.push({ name: d.name, color: d.color, loops: d.loops.length, segments });
-    transfer.push(segments.buffer as ArrayBuffer);
+    const data = drawingData(d);
+    drawings.push(data);
+    transfer.push(data.segments.buffer as ArrayBuffer);
   }
   const t3 = performance.now();
   lastSchema = rendered.params ?? {};
@@ -434,26 +434,6 @@ async function run() {
   if (diffOn) await runDiff();
 }
 
-/** 2D loops (lines, arcs, NURBS) → line segments on z = 0. */
-function drawingSegments(loops: any[][]): Float32Array {
-  const out: number[] = [];
-  const push = (pts: [number, number][]) => {
-    for (let i = 0; i + 1 < pts.length; i++) out.push(pts[i]![0], pts[i]![1], 0, pts[i + 1]![0], pts[i + 1]![1], 0);
-  };
-  for (const loop of loops) {
-    for (const s of loop) {
-      if (s.kind === "line") push([s.a, s.b]);
-      else if (s.kind === "arc") {
-        const n = Math.max(8, Math.ceil((Math.abs(s.a1 - s.a0) / (Math.PI * 2)) * 96));
-        push(Array.from({ length: n + 1 }, (_, i) => {
-          const t = s.a0 + ((s.a1 - s.a0) * i) / n;
-          return [s.c[0] + s.r * Math.cos(t), s.c[1] + s.r * Math.sin(t)] as [number, number];
-        }));
-      } else if (s.kind === "nurbs") push(flattenNurbs(s, 0.02) as [number, number][]);
-    }
-  }
-  return new Float32Array(out);
-}
 
 /** Mate drives are found once per module (they're structural), keyed by module URL + schema. */
 let driveCache: { key: string; drives: MateData["drive"][] } | undefined;

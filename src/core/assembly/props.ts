@@ -41,12 +41,12 @@ export type MateType = "fastened" | "revolute" | "slider" | "cylindrical" | "pla
  *
  * | type | free motion | driven by |
  * |---|---|---|
- * | `fastened` (default) | none | — |
+ * | `fastened` (default) | none | none |
  * | `revolute` | rotation about the axis | `angle` |
  * | `slider` | travel along the axis | `offset` |
  * | `cylindrical` | rotation about + travel along the axis | `angle`, `offset` |
  * | `planar` | travel in the plane, rotation about the normal | `angle` |
- * | `ball` | any rotation about the origin | — |
+ * | `ball` | any rotation about the origin | none |
  */
 export interface MateProps {
   /** The first anchor: `"part.anchor"` or a handle (`A.motor.shaft`). */

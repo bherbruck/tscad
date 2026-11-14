@@ -2,7 +2,7 @@
  * SVG path-data subset → loops: M/m L/l H/h V/v C/c S/s Q/q T/t A/a Z/z, absolute and relative.
  * Cubic and quadratic Béziers become NURBS (weights 1); circular arcs become exact arcs and
  * elliptical arcs exact rational quadratic NURBS pieces. Coordinates are taken as given
- * (y up — tscad does not flip SVG's y-down convention).
+ * (y up; tscad does not flip SVG's y-down convention).
  */
 import type { Vec2 } from "../math";
 import { arc, end, line, start, type Loop2, type Nurbs2, type Seg2 } from "./seg";

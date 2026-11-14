@@ -11,8 +11,11 @@ import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import type { MeshArrays } from "../kernel";
 import { fmtNum } from "./fmt";
 import { GroundGrid } from "./grid";
+import { loadMouseScheme, mouseButtonsFor, TOUCH_MAP, type MouseScheme } from "./controls";
 import { MeasureTool } from "./measure";
 import { Highlighter } from "./highlight";
+import { disposeNotes, noteGroup } from "./notes";
+import type { DrawingNoteData } from "./protocol";
 
 export { fmtNum };
 
@@ -92,6 +95,7 @@ export class Viewport {
 
   #clipPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
   #ground = new GroundGrid();
+  #mouseScheme: MouseScheme = "cad";
   #key: THREE.DirectionalLight;
   #needsRender = true;
   #anim?: { from: CamState; to: CamState; start: number; dur: number };
@@ -147,6 +151,11 @@ export class Viewport {
     this.controls.dampingFactor = 0.12;
     this.controls.screenSpacePanning = true;
     this.controls.zoomToCursor = true;
+    this.setMouseScheme(loadMouseScheme());
+    this.controls.touches = { ...TOUCH_MAP };
+    // Right-drag orbits: no context menu on the canvas; middle-drag pans: no autoscroll.
+    this.canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+    this.canvas.addEventListener("mousedown", (e) => e.button === 1 && e.preventDefault());
     this.controls.addEventListener("change", () => {
       this.#needsRender = true;
       this.onViewChange();
@@ -161,6 +170,17 @@ export class Viewport {
     ro.observe(host);
     this.resize();
     this.#loop();
+  }
+
+  /** The camera's mouse scheme (see src/viewer/controls.ts). */
+  get mouseScheme(): MouseScheme {
+    return this.#mouseScheme;
+  }
+
+  /** Switch the camera's mouse scheme (not remembered: see saveMouseScheme). */
+  setMouseScheme(scheme: MouseScheme) {
+    this.#mouseScheme = scheme;
+    this.controls.mouseButtons = mouseButtonsFor(scheme);
   }
 
   // ───────────────────────── rendering ─────────────────────────
@@ -443,30 +463,38 @@ export class Viewport {
   }
 
   /** Flat `<drawing>` outlines, drawn as lines on z = 0. */
-  readonly drawings = new Map<string, { line: LineSegments2; box: THREE.Box3; visible: boolean; color: string }>();
+  readonly drawings = new Map<string, { line: LineSegments2; notes?: THREE.Group; box: THREE.Box3; visible: boolean; color: string }>();
 
-  setDrawings(list: { name: string; color?: string; segments: Float32Array }[]) {
+  setDrawings(list: { name: string; color?: string; segments: Float32Array; notes?: DrawingNoteData[] }[]) {
     const old = this.drawings;
     for (const d of old.values()) {
       d.line.removeFromParent();
       d.line.geometry.dispose();
       this.#dropLineMat(d.line.material);
+      if (d.notes) disposeNotes(d.notes);
     }
     const visible = new Map([...old].map(([k, v]) => [k, v.visible]));
     old.clear();
     list.forEach((d, i) => {
-      if (!d.segments.length) return;
+      if (!d.segments.length && !d.notes?.length) return;
       const g = new LineSegmentsGeometry();
       g.setPositions(d.segments);
       const color = d.color ?? ["#ffb020", "#3ecf8e", "#f471b5", "#38bdf8"][i % 4]!;
       const line = new LineSegments2(g, this.#lineMat(new THREE.Color(color), 2.2, true));
       line.renderOrder = 15;
       line.userData.drawing = d.name;
-      const box = new THREE.Box3().setFromBufferAttribute(new THREE.BufferAttribute(d.segments, 3));
+      const box = new THREE.Box3();
+      if (d.segments.length) box.setFromBufferAttribute(new THREE.BufferAttribute(d.segments, 3));
       const vis = visible.get(d.name) ?? true;
       line.visible = vis;
       this.model.add(line);
-      this.drawings.set(d.name, { line, box, visible: vis, color });
+      const notes = d.notes?.length ? noteGroup(d.notes, color) : undefined;
+      if (notes) {
+        notes.visible = vis;
+        this.model.add(notes);
+        box.union(new THREE.Box3().setFromObject(notes));
+      }
+      this.drawings.set(d.name, { line, notes, box, visible: vis, color });
     });
     this.#needsRender = true;
   }
@@ -476,6 +504,7 @@ export class Viewport {
     if (!d) return;
     d.visible = visible;
     d.line.visible = visible;
+    if (d.notes) d.notes.visible = visible;
     this.#needsRender = true;
   }
 

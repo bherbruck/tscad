@@ -1,7 +1,7 @@
 /**
  * The sketch solver: damped Gauss–Newton (Levenberg–Marquardt in its minimum-norm, "dual"
  * form) on the residual vector of a constraint system, with an exact Jacobian from forward-mode
- * AD, plus the diagnostics that make a sketch tool pleasant — degrees of freedom, which
+ * AD, plus the diagnostics that make a sketch tool pleasant: degrees of freedom, which
  * variables are still free, redundant constraints and minimal conflicting sets.
  *
  * Everything is dense: sketches are small (tens to a few hundred variables).
@@ -16,7 +16,7 @@ export interface Constraint {
   vars: number[];
   /** Residuals (mm-like units) of the local variables, in `vars` order. */
   eval(x: D[]): D[];
-  /** Structural equations (an arc's ends on its circle) — never blamed alone. */
+  /** Structural equations (an arc's ends on its circle), never blamed alone. */
   structural?: boolean;
   /** Anything the caller wants back (source location, element...). */
   data?: unknown;

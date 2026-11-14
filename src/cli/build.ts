@@ -6,6 +6,7 @@ import { section, polylineLoops, toDXF, toSVG } from "../drawing";
 import type { PartResult } from "../ir";
 import { describeError, describePartError, rel, runModel, type ModelRun } from "./model";
 import { c, fmtBytes, fmtMs, fmtNum, fmtVolume, sym, table } from "./ui";
+import { drawingMeta } from "../viewer/fmt";
 
 /** What `tscad build -o` can write. */
 export type ExportFormat = MeshFormat | "dxf" | "svg";
@@ -71,7 +72,7 @@ export async function build(opts: BuildOptions): Promise<number> {
   const drawings = (rendered.drawings ?? []).filter((d) => !opts.parts?.length || opts.parts.includes(d.name));
   const onlyDrawings = formats.every(is2D) && drawings.length > 0;
   if (!opts.quiet && !opts.json && parts.length) printParts(parts, rendered.parts, run);
-  if (!opts.quiet && !opts.json && drawings.length) console.log(`\n  ${c.bold("drawings")} ${drawings.map((d) => `${d.name} ${c.gray(`(${d.loops.length} loop${d.loops.length === 1 ? "" : "s"})`)}`).join(", ")}`);
+  if (!opts.quiet && !opts.json && drawings.length) console.log(`\n  ${c.bold("drawings")} ${drawings.map((d) => `${d.name} ${c.gray(`(${drawingMeta({ loops: d.loops.length, paths: d.paths?.length, notes: d.notes }).replace(/^drawing · /, "")})`)}`).join(", ")}`);
 
   const failed = parts.filter((p) => !p.ok);
   for (const p of failed) console.error(`\n${sym.err} ${describePartError(p, rendered.sourceMap as any)}`);
@@ -92,7 +93,7 @@ export async function build(opts: BuildOptions): Promise<number> {
       const fmt = formats[i]!;
       if (is2D(fmt)) {
         const layers = drawings.length ? drawings : await sectionLayers(run, good, opts.sectionZ, opts.tolerance);
-        if (!layers.some((l) => l.loops.length)) throw new Error(drawings.length ? "the drawings are empty" : `the section at z = ${fmtNum(sectionZOf(good, opts.sectionZ))} cuts nothing (try --section-z)`);
+        if (!layers.some((l: { loops: unknown[]; paths?: unknown[]; notes?: unknown[] }) => l.loops.length || l.paths?.length || l.notes?.length)) throw new Error(drawings.length ? "the drawings are empty" : `the section at z = ${fmtNum(sectionZOf(good, opts.sectionZ))} cuts nothing (try --section-z)`);
         data = fmt === "dxf" ? toDXF(layers) : toSVG(layers);
       } else {
         if (!good.length) throw new Error("no solid parts (this model only has drawings: export .dxf or .svg)");

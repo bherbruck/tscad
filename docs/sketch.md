@@ -1,7 +1,7 @@
 # Constraint sketches
 
 Draw rough 2D geometry, say how it relates (horizontal, tangent, 40 mm long...), and let the
-solver place it exactly — the Fusion / Onshape / SolveSpace workflow, as JSX. Dimensions are
+solver place it exactly: the Fusion / Onshape / SolveSpace workflow, as JSX. Dimensions are
 ordinary expressions, so they bind straight to params.
 
 The same sketch in the two reference styles. They mix freely, even in one sketch.
@@ -296,7 +296,7 @@ patterns: {
 }[]
 ```
 
-## `sketchPath()` — unconstrained fluent paths
+## `sketchPath()`: unconstrained fluent paths
 
 For quick outlines that need no solving, `sketchPath()` builds SVG path data with turtle moves
 and tangent arcs:
@@ -312,8 +312,8 @@ turns left), `tangentArcTo(x, y)`, `close()`; `.d` (or `String(path)`) is the pa
 
 ## Examples
 
-- `examples/sketch-link-arm.tsx` — two bosses joined by tangent lines, bores and a slot component, written with typed handles.
-- `examples/sketch-pulley.tsx` — V-belt pulley half-section mirrored with `symmetric`, revolved.
+- `examples/sketch-link-arm.tsx`: two bosses joined by tangent lines, bores and a slot component, written with typed handles.
+- `examples/sketch-pulley.tsx`: V-belt pulley half-section mirrored with `symmetric`, revolved.
 
 ## `<hull>`: exact convex hulls
 
@@ -388,7 +388,7 @@ Both are 2D shapes, so they work anywhere a `<rect>` does: in extrude, revolve, 
 drawings, 2D booleans, offset and hull. Read the file as text with Bun's import attribute:
 
 ```tsx
-// @ts-ignore — a text import
+// @ts-ignore: a text import
 import logo from "./logo.svg" with { type: "text" }
 // @ts-ignore
 import plate from "./plate.dxf" with { type: "text" }

@@ -1,6 +1,6 @@
 /**
  * Link arm drawn as a constraint sketch: two bosses joined by lines tangent to both, a bore
- * in each boss and an adjustment slot between them. Nothing is computed by hand — the
+ * in each boss and an adjustment slot between them. Nothing is computed by hand: the
  * outline's tangent points come out of the solver, and every dimension is a param.
  * Written with typed handles (`sketchRefs`) instead of string ids.
  *

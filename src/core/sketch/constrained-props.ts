@@ -10,7 +10,7 @@ type Vec2 = [number, number];
 
 /**
  * A point: an id (`"o"`), an entity's point (`"base.start"`, `"base.end"`, `"top.center"`),
- * a handle (`s.o`, `s.base.end`), or — where a point is being created — `[x, y]` (a new
+ * a handle (`s.o`, `s.base.end`), or (where a point is being created) `[x, y]` (a new
  * anonymous point with that rough position).
  */
 export type PointLike = string | PointHandle | Vec2;

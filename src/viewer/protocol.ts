@@ -64,13 +64,25 @@ export interface PartData {
   mesh?: MeshArrays;
 }
 
-/** A flat `<drawing>` (no thickness): its loops as line segments on z = 0. */
+/** A flat `<drawing>` (no thickness): its loops and open paths as line segments on z = 0, and its text notes. */
 export interface DrawingData {
   name: string;
   color?: string;
   loops: number;
-  /** xyz xyz per segment. */
+  /** Open paths (bend lines...). */
+  paths: number;
+  /** xyz xyz per segment: the loops and the open paths. */
   segments: Float32Array;
+  /** Text notes: centred at `at`, `size` mm tall, `angle` degrees CCW. */
+  notes?: DrawingNoteData[];
+}
+
+/** A text note on a drawing. */
+export interface DrawingNoteData {
+  at: [number, number];
+  text: string;
+  size: number;
+  angle?: number;
 }
 
 /** A sketch dimension with where to draw it. */

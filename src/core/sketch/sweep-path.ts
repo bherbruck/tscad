@@ -1,6 +1,6 @@
 /**
- * `<sweepPath>`: a sweep's path drawn in 2D on a plane — a constraint `<sketch>` (lines, arcs,
- * splines; open or closed) or SVG `<path d>` data — turned into exact 3D IR curves, checked for
+ * `<sweepPath>`: a sweep's path drawn in 2D on a plane: a constraint `<sketch>` (lines, arcs,
+ * splines; open or closed) or SVG `<path d>` data, turned into exact 3D IR curves, checked for
  * gaps and for sharp corners (the kernel sweeps exactly piece by piece along lines and arcs, so
  * the path must be tangent-continuous).
  */
