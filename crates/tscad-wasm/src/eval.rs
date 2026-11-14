@@ -1,0 +1,386 @@
+//! IR nodes to solidcore bodies.
+
+use std::collections::{HashMap, HashSet};
+use std::hash::{Hash, Hasher};
+
+use solidcore_ops as ops;
+use solidcore_ops::{Blend, BooleanOp, Body, Corners};
+use solidcore_record::brep::{self as rec, Brep as Record};
+
+use crate::ir::{Axis, Curve, Node, Selector, SweepFrame};
+
+/// An evaluation failure: what failed, at which node path.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, tsify::Tsify)]
+pub struct EvalError {
+    pub path: String,
+    pub op: String,
+    pub message: String,
+}
+
+pub type R<T> = std::result::Result<T, EvalError>;
+
+fn fail(path: &str, op: &str, message: impl Into<String>) -> EvalError {
+    EvalError { path: path.to_string(), op: op.to_string(), message: message.into() }
+}
+
+fn kernel<T>(path: &str, op: &str, r: ops::Result<T>) -> R<T> {
+    r.map_err(|e| fail(path, op, format!("{e}")))
+}
+
+/// What a node evaluates to: a body, or nothing (an empty boolean result).
+pub type Solid = Option<Body>;
+
+/// Bodies of subtrees already evaluated, keyed by the subtree's canonical JSON hash: a
+/// hot reload re-evaluates only the subtrees whose props changed.
+#[derive(Default)]
+pub struct Cache {
+    map: HashMap<u64, Option<Body>>,
+    used: HashSet<u64>,
+    pub hits: usize,
+    pub misses: usize,
+}
+
+impl Cache {
+    /// Forget every entry the last evaluation did not use.
+    pub fn sweep(&mut self) {
+        let used = std::mem::take(&mut self.used);
+        self.map.retain(|k, _| used.contains(k));
+        self.hits = 0;
+        self.misses = 0;
+    }
+    pub fn clear(&mut self) {
+        self.map.clear();
+        self.used.clear();
+    }
+    pub fn len(&self) -> usize {
+        self.map.len()
+    }
+}
+
+fn key(node: &Node) -> u64 {
+    let mut h = std::hash::DefaultHasher::new();
+    serde_json::to_string(node).unwrap_or_default().hash(&mut h);
+    h.finish()
+}
+
+fn copied(b: &Option<Body>, path: &str) -> R<Solid> {
+    match b {
+        None => Ok(None),
+        Some(b) => kernel(path, "copy", b.copy()).map(Some),
+    }
+}
+
+/// `node` as a body, from the cache when an equal subtree was evaluated before.
+pub fn eval(node: &Node, path: &str, cache: &mut Cache) -> R<Solid> {
+    let k = key(node);
+    cache.used.insert(k);
+    if let Some(b) = cache.map.get(&k) {
+        cache.hits += 1;
+        return copied(b, path);
+    }
+    cache.misses += 1;
+    let made = eval_uncached(node, path, cache)?;
+    let kept = copied(&made, path)?;
+    cache.map.insert(k, kept);
+    Ok(made)
+}
+
+fn eval_uncached(node: &Node, path: &str, cache: &mut Cache) -> R<Solid> {
+    match node {
+        Node::Box { size, center } => {
+            let origin = if *center { size.map(|s| -s / 2.0) } else { [0.0; 3] };
+            kernel(path, "box", ops::make_box(origin, *size)).map(Some)
+        }
+        Node::Cylinder { radius, height, center } => {
+            let z = if *center { -height / 2.0 } else { 0.0 };
+            kernel(path, "cylinder", ops::make_cylinder([0.0, 0.0, z], *radius, *height)).map(Some)
+        }
+        Node::Sphere { radius } => kernel(path, "sphere", ops::make_sphere([0.0; 3], *radius)).map(Some),
+        Node::Cone { bottom_radius, top_radius, height, center } => {
+            let z = if *center { -height / 2.0 } else { 0.0 };
+            kernel(path, "cone", ops::make_cone([0.0, 0.0, z], *bottom_radius, *top_radius, *height)).map(Some)
+        }
+        Node::Torus { major_radius, minor_radius } => {
+            kernel(path, "torus", ops::make_torus([0.0; 3], *major_radius, *minor_radius)).map(Some)
+        }
+        Node::Union { children } => union(children, path, cache),
+        Node::Difference { children } => {
+            let Some((first, rest)) = children.split_first() else { return Ok(None) };
+            let mut acc = eval(first, &format!("{path}/0"), cache)?;
+            for (i, c) in rest.iter().enumerate() {
+                let Some(a) = acc else { return Ok(None) };
+                let Some(b) = eval(c, &format!("{path}/{}", i + 1), cache)? else {
+                    acc = Some(a);
+                    continue;
+                };
+                acc = kernel(path, "difference", ops::boolean::boolean(a, b, BooleanOp::Subtract))?;
+            }
+            Ok(acc)
+        }
+        Node::Intersection { children } => {
+            let mut acc: Option<Body> = None;
+            for (i, c) in children.iter().enumerate() {
+                let Some(b) = eval(c, &format!("{path}/{i}"), cache)? else { return Ok(None) };
+                acc = match acc {
+                    None => Some(b),
+                    Some(a) => match kernel(path, "intersection", ops::boolean::boolean(a, b, BooleanOp::Intersect))? {
+                        None => return Ok(None),
+                        some => some,
+                    },
+                };
+            }
+            Ok(acc)
+        }
+        Node::Transform { matrix, children } => {
+            let Some(b) = union(children, path, cache)? else { return Ok(None) };
+            // The IR is column-vector (p' = M p, translation in the last column); the kernel
+            // is row-vector (p' = p A + t, translation in row 3): its matrix is the transpose.
+            let mut m = [[0.0; 4]; 4];
+            for (i, row) in m.iter_mut().enumerate() {
+                for (j, x) in row.iter_mut().enumerate() {
+                    *x = matrix[j * 4 + i];
+                }
+            }
+            kernel(path, "transform", b.transform(&m))?;
+            Ok(Some(b))
+        }
+        Node::Extrude { profile, direction, distance, draft } => {
+            let curves = curves(profile);
+            kernel(
+                path,
+                "extrude",
+                ops::sweep::extrude(&curves, *direction, *distance, *draft, ops::sweep::DraftCorner::default(), true),
+            )
+            .map(Some)
+        }
+        Node::Revolve { profile, origin, axis, angle } => {
+            let curves = curves(profile);
+            kernel(path, "revolve", ops::sweep::revolve(&curves, *origin, *axis, *angle, true)).map(Some)
+        }
+        Node::Loft { sections, ruled } => {
+            let s: Vec<Vec<ops::sweep::Curve>> = sections.iter().map(|c| curves(c)).collect();
+            let degree = if *ruled { 1 } else { s.len().saturating_sub(1).clamp(1, 3) as u32 };
+            kernel(path, "loft", ops::sweep::loft(&s, degree, true)).map(Some)
+        }
+        Node::Sweep { profile, path: route, frame } => {
+            let frame = match frame {
+                SweepFrame::Follow => ops::sweep::SweepFrame::Follow,
+                SweepFrame::Translate => ops::sweep::SweepFrame::Translate,
+            };
+            kernel(path, "sweep", ops::sweep::sweep_placed(&curves(profile), &curves(route), frame, true))
+                .map(|(b, _, _)| Some(b))
+        }
+        Node::Fillet { radius, edges, children } => blend(children, path, cache, "fillet", Blend::Round, *radius, edges),
+        Node::Chamfer { distance, edges, children } => {
+            blend(children, path, cache, "chamfer", Blend::Chamfer, *distance, edges)
+        }
+        Node::Shell { thickness, faces, children } => {
+            let Some(b) = union(children, path, cache)? else { return Ok(None) };
+            let (record, order) = kernel(path, "shell", b.to_record())?;
+            let open = select_faces(&record, faces);
+            kernel(path, "shell", ops::offset::shell(&b, &order, &open, *thickness))?;
+            Ok(Some(b))
+        }
+    }
+}
+
+fn union(children: &[Node], path: &str, cache: &mut Cache) -> R<Solid> {
+    let mut bodies = Vec::new();
+    for (i, c) in children.iter().enumerate() {
+        if let Some(b) = eval(c, &format!("{path}/{i}"), cache)? {
+            bodies.push(b);
+        }
+    }
+    match bodies.len() {
+        0 => Ok(None),
+        1 => Ok(bodies.pop()),
+        _ => kernel(path, "union", ops::boolean::union_all(bodies)).map(Some),
+    }
+}
+
+fn blend(children: &[Node], path: &str, cache: &mut Cache, op: &str, kind: Blend, size: f64, edges: &Selector) -> R<Solid> {
+    let Some(b) = union(children, path, cache)? else { return Ok(None) };
+    let (record, _) = kernel(path, op, b.to_record())?;
+    let picked = select_edges(&record, edges);
+    if picked.is_empty() {
+        return Err(fail(path, op, "the edge selector matched no edges"));
+    }
+    kernel(path, op, ops::blend(&b, kind, &picked, &[size], &[], Corners::Filled))?;
+    Ok(Some(b))
+}
+
+fn curves(c: &[Curve]) -> Vec<ops::sweep::Curve> {
+    c.iter()
+        .map(|c| match c {
+            Curve::Line { start, end } => ops::sweep::Curve::Line { start: *start, end: *end },
+            Curve::Arc { center, axis, reference, radius, start, end } => ops::sweep::Curve::Arc {
+                center: *center,
+                axis: *axis,
+                reference: *reference,
+                radius: *radius,
+                start: *start,
+                end: *end,
+            },
+            Curve::Nurbs { degree, points, knots } => {
+                ops::sweep::Curve::Nurbs { degree: *degree, points: points.clone(), knots: knots.clone() }
+            }
+        })
+        .collect()
+}
+
+// ---------------------------------------------------------------------------------------------
+// Selection
+
+const TOL: f64 = 1e-6;
+
+fn dot(a: [f64; 3], b: [f64; 3]) -> f64 {
+    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+}
+fn cross(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+    [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+}
+fn sub(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+}
+fn norm(a: [f64; 3]) -> [f64; 3] {
+    let l = dot(a, a).sqrt();
+    if l > 0.0 { [a[0] / l, a[1] / l, a[2] / l] } else { a }
+}
+fn unit(axis: Axis) -> [f64; 3] {
+    let mut u = [0.0; 3];
+    u[axis.index()] = 1.0;
+    u
+}
+
+/// The geometric facts a selector asks of an edge or face.
+pub(crate) struct Item {
+    pub points: Vec<[f64; 3]>,
+    /// Edge: direction of a line. Face: a plane's normal.
+    pub dir: Option<[f64; 3]>,
+    /// Edge: a circle's axis and radius.
+    pub circle: Option<([f64; 3], f64)>,
+}
+
+fn circle_points(frame: &rec::Frame, r: f64) -> Vec<[f64; 3]> {
+    let o = frame.origin;
+    let (x, y) = (frame.x_axis, frame.y_axis);
+    (0..8)
+        .map(|i| {
+            let t = std::f64::consts::PI * f64::from(i) / 4.0;
+            let (s, c) = t.sin_cos();
+            [o[0] + r * (c * x[0] + s * y[0]), o[1] + r * (c * x[1] + s * y[1]), o[2] + r * (c * x[2] + s * y[2])]
+        })
+        .collect()
+}
+
+pub(crate) fn edge_item(record: &Record, e: &rec::Edge) -> Item {
+    let mut points: Vec<[f64; 3]> =
+        e.vertices.iter().filter_map(|v| record.vertices.get(*v as usize)).map(|v| v.point).collect();
+    let mut dir = None;
+    let mut circle = None;
+    match &e.curve {
+        rec::Curve::Line { start, end } => dir = Some(norm(sub(*end, *start))),
+        rec::Curve::Circle { frame, radius } => {
+            circle = Some((norm(cross(frame.x_axis, frame.y_axis)), *radius));
+            // a closed circle's only vertex says nothing of where it runs: sample it whole
+            if e.vertices[0] == e.vertices[1] {
+                points = circle_points(frame, *radius);
+            }
+        }
+        _ => {}
+    }
+    Item { points, dir, circle }
+}
+
+pub(crate) fn face_item(record: &Record, f: &rec::Face) -> Item {
+    let mut points = Vec::new();
+    for l in &f.loops {
+        if let rec::Loop::Edges { edges } = l {
+            for oe in edges {
+                if let Some(e) = record.edges.get(oe.edge as usize) {
+                    points.extend(edge_item(record, e).points);
+                }
+            }
+        }
+    }
+    let dir = match &f.surface {
+        rec::Surface::Plane { u_axis, v_axis, .. } => Some(norm(cross(*u_axis, *v_axis))),
+        _ => None,
+    };
+    Item { points, dir, circle: None }
+}
+
+pub(crate) fn bounds(record: &Record) -> ([f64; 3], [f64; 3]) {
+    let mut lo = [f64::INFINITY; 3];
+    let mut hi = [f64::NEG_INFINITY; 3];
+    let mut add = |p: [f64; 3]| {
+        for i in 0..3 {
+            lo[i] = lo[i].min(p[i]);
+            hi[i] = hi[i].max(p[i]);
+        }
+    };
+    for e in &record.edges {
+        for p in edge_item(record, e).points {
+            add(p);
+        }
+    }
+    (lo, hi)
+}
+
+pub(crate) fn matches(it: &Item, s: &Selector, lo: [f64; 3], hi: [f64; 3], index: usize, is_face: bool) -> bool {
+    let scale = (0..3).map(|i| hi[i] - lo[i]).fold(1.0_f64, f64::max);
+    let tol = TOL * scale;
+    match s {
+        Selector::All => true,
+        Selector::None => false,
+        Selector::Parallel { axis } => {
+            it.dir.is_some_and(|d| (dot(d, unit(*axis)).abs() - 1.0).abs() < TOL)
+        }
+        Selector::Perpendicular { axis } => {
+            if is_face {
+                it.dir.is_some_and(|d| dot(d, unit(*axis)).abs() < TOL)
+            } else {
+                it.circle.is_some_and(|(n, _)| (dot(n, unit(*axis)).abs() - 1.0).abs() < TOL)
+            }
+        }
+        Selector::Max { axis } => {
+            let i = axis.index();
+            !it.points.is_empty() && it.points.iter().all(|p| (p[i] - hi[i]).abs() < tol)
+        }
+        Selector::Min { axis } => {
+            let i = axis.index();
+            !it.points.is_empty() && it.points.iter().all(|p| (p[i] - lo[i]).abs() < tol)
+        }
+        Selector::Radius { radius } => it.circle.is_some_and(|(_, r)| (r - radius).abs() <= TOL * radius.abs().max(1.0)),
+        Selector::Within { min, max } => {
+            !it.points.is_empty()
+                && it.points.iter().all(|p| (0..3).all(|i| p[i] >= min[i] - tol && p[i] <= max[i] + tol))
+        }
+        Selector::And { of } => of.iter().all(|s| matches(it, s, lo, hi, index, is_face)),
+        Selector::Or { of } => of.iter().any(|s| matches(it, s, lo, hi, index, is_face)),
+        Selector::Not { of } => !matches(it, of, lo, hi, index, is_face),
+        Selector::Index { indices } => indices.contains(&index),
+    }
+}
+
+pub fn select_edges(record: &Record, s: &Selector) -> Vec<usize> {
+    let (lo, hi) = bounds(record);
+    record
+        .edges
+        .iter()
+        .enumerate()
+        .filter(|(i, e)| matches(&edge_item(record, e), s, lo, hi, *i, false))
+        .map(|(i, _)| i)
+        .collect()
+}
+
+pub fn select_faces(record: &Record, s: &Selector) -> Vec<usize> {
+    let (lo, hi) = bounds(record);
+    record
+        .faces
+        .iter()
+        .enumerate()
+        .filter(|(i, f)| matches(&face_item(record, f), s, lo, hi, *i, true))
+        .map(|(i, _)| i)
+        .collect()
+}

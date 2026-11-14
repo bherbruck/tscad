@@ -1,0 +1,43 @@
+{
+  "name": "tscad",
+  "version": "0.1.0",
+  "description": "CAD as TSX: parametric solid models in React-style JSX, built on the solidcore B-rep kernel (WebAssembly)",
+  "type": "module",
+  "license": "MIT OR Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bherbruck/tscad.git"
+  },
+  "keywords": ["cad", "jsx", "tsx", "brep", "step", "stl", "3d-printing", "parametric", "solid-modeling", "wasm"],
+  "bin": {
+    "tscad": "./src/cli/index.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./jsx-runtime": "./src/jsx-runtime.ts",
+    "./jsx-dev-runtime": "./src/jsx-dev-runtime.ts",
+    "./kernel": "./src/kernel/index.ts",
+    "./export": "./src/export/index.ts",
+    "./ir": "./src/ir.ts"
+  },
+  "files": ["src", "wasm", "README.md", "LICENSE-MIT", "LICENSE-APACHE"],
+  "scripts": {
+    "build:wasm": "bun scripts/build-wasm.ts",
+    "build:wasm:dev": "bun scripts/build-wasm.ts --dev",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "dev": "bun src/cli/index.ts dev examples/bracket.tsx"
+  },
+  "engines": {
+    "bun": ">=1.2"
+  },
+  "dependencies": {
+    "fflate": "^0.8.3",
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.187.0",
+    "bun-types": "^1.4.4",
+    "typescript": "^7.0.2"
+  }
+}
