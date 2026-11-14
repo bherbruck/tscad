@@ -150,6 +150,47 @@ describe("sketch booleans: fuzz", () => {
   });
 });
 
+describe("overlapping shapes union; nested ones are holes", () => {
+  const areaOf = (el: any) => area(compile(el).drawings[0]!.loops);
+  test("a <sketch> operand is the union of its shapes (repro from the converter)", () => {
+    const a = areaOf(
+      <drawing>
+        <difference2d>
+          <rect size={[40, 10]} center={false} />
+          <sketch>
+            <circle r={2} x={10} y={5} />
+            <rect size={[2, 10]} x={9} y={5} center={false} />
+          </sketch>
+        </difference2d>
+      </drawing>,
+    );
+    const b = areaOf(
+      <drawing>
+        <difference2d>
+          <rect size={[40, 10]} center={false} />
+          <union2d>
+            <circle r={2} x={10} y={5} />
+            <rect size={[2, 10]} x={9} y={5} center={false} />
+          </union2d>
+        </difference2d>
+      </drawing>,
+    );
+    expect(a).toBeCloseTo(b, 9);
+    expect(a).toBeCloseTo(381.26, 2);
+  });
+  test("overlapping siblings in an extrude / drawing union instead of cancelling", async () => {
+    const u = areaOf(<drawing><circle r={2} x={10} y={5} /><rect size={[2, 10]} x={9} y={5} center={false} /></drawing>);
+    expect(u).toBeCloseTo(20 + 4 * Math.PI - area(booleanLoops("intersection", [[transformLoop(circleLoop(2), tr2(10, 5))], [transformLoop(rectLoop(2, 10), tr2(10, 10))]])), 9);
+    // a hole inside the overlap of two outlines is still a hole
+    expect(areaOf(<drawing><rect w={20} h={10} /><rect w={20} h={10} x={10} /><circle r={2} x={5} /></drawing>)).toBeCloseTo(300 - 4 * Math.PI, 9);
+    // nested loops keep even-odd: an island in a hole is solid
+    expect(areaOf(<drawing><circle r={10} /><circle r={6} /><circle r={3} /></drawing>)).toBeCloseTo(Math.PI * (100 - 36 + 9), 9);
+    const k = await loadKernel();
+    const r = await k.evaluate(compile(<extrude height={1}><rect w={20} h={10} /><rect w={20} h={10} x={10} /><circle r={2} x={5} /></extrude>).document, { noMesh: true });
+    expect(r.parts[0]!.volume!).toBeCloseTo(300 - 4 * Math.PI, 3);
+  }, 30_000);
+});
+
 describe("sketch boolean elements", () => {
   test("in extrudes, drawings and offsets; the kernel agrees", async () => {
     const k = await loadKernel();

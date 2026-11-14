@@ -257,10 +257,13 @@ function linesAndArcs(loop: Loop2, tol: number): S[] {
   return out;
 }
 
-/** An operand's loops oriented with its material on the left (outer CCW, holes CW). */
+/**
+ * An operand's loops oriented with its material on the left (outer CCW, holes CW). Overlapping
+ * loops are unioned first (nested ones stay holes).
+ */
 function orient(loops: Loop2[]): Loop2[] {
   const out: Loop2[] = [];
-  for (const r of regions(loops, (l) => l)) {
+  for (const r of regions(normalizeLoops(loops), (l) => l)) {
     out.push(signedArea(polyline(r.outer)) < 0 ? reverseLoop(r.outer) : r.outer);
     for (const h of r.holes) out.push(signedArea(polyline(h)) > 0 ? reverseLoop(h) : h);
   }
@@ -469,4 +472,103 @@ export function loopArea(loop: readonly Seg2[]): number {
 /** Is `p` inside the region of `loops` (oriented with material on the left)? (For tests.) */
 export function insideLoops(p: Vec2, loops: Loop2[]): boolean {
   return winding(p, orient(loops).flatMap((l) => linesAndArcs(l, 1e-6))) > 0;
+}
+
+// ---------------------------------------------------------------------------------------------
+// loop sets with overlaps: union semantics, nested loops are holes
+
+/** Do any two of these loops cross or touch? (exact, on lines and arcs) */
+export function loopsOverlap(loops: Loop2[]): boolean {
+  return overlapPairs(loops).length > 0;
+}
+
+function overlapPairs(loops: Loop2[]): [number, number][] {
+  if (loops.length < 2) return [];
+  const segs = loops.map((l) => linesAndArcs(l, 1e-4));
+  let size = 0;
+  for (const l of loops) for (const p of polyline(l)) size = Math.max(size, Math.abs(p[0]), Math.abs(p[1]));
+  const tol = Math.max(size, 1) * 1e-9;
+  const boxes = segs.map((ss) => ss.map((s) => bbox(s, tol)));
+  const loopBox = boxes.map((bs) => bs.reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[2], b[2]), Math.max(a[3], b[3])], [Infinity, Infinity, -Infinity, -Infinity] as [number, number, number, number]));
+  const out: [number, number][] = [];
+  for (let i = 0; i < loops.length; i++)
+    for (let j = i + 1; j < loops.length; j++) {
+      if (!overlaps(loopBox[i]!, loopBox[j]!)) continue;
+      let hit = false;
+      for (let a = 0; a < segs[i]!.length && !hit; a++)
+        for (let b = 0; b < segs[j]!.length && !hit; b++)
+          if (overlaps(boxes[i]![a]!, boxes[j]![b]!) && intersect(segs[i]![a]!, segs[j]![b]!, tol).length) hit = true;
+      if (hit) out.push([i, j]);
+    }
+  return out;
+}
+
+/**
+ * The region of a set of loops where overlapping loops **union** and fully nested loops are
+ * holes (islands inside holes are solid again, and so on). Without any crossing loops the
+ * loops are returned unchanged (the plain even-odd nesting already means this).
+ *
+ * Depth: a loop's depth is 1 + the deepest loop that fully contains it (contains its interior
+ * and doesn't cross it). The region is L0 − (L1 − (L2 − …)), with Ld the union of depth-d loops.
+ */
+export function normalizeLoops(loops: Loop2[]): Loop2[] {
+  const pairs = overlapPairs(loops);
+  if (!pairs.length) return loops;
+  const crossing = new Set(pairs.map(([i, j]) => `${i},${j}`));
+  const crosses = (i: number, j: number) => crossing.has(i < j ? `${i},${j}` : `${j},${i}`);
+  const polys = loops.map((l) => polyline(l));
+  const areas = loops.map((l) => Math.abs(loopArea(l)));
+  const probe = loops.map((l) => interior(l));
+  // j fully contains i
+  const contains = (j: number, i: number) => j !== i && !crosses(i, j) && areas[j]! > areas[i]! && insidePoly(probe[i]!, polys[j]!);
+  const depth = new Array<number>(loops.length).fill(-1);
+  const depthOf = (i: number, guard = 0): number => {
+    if (depth[i]! >= 0) return depth[i]!;
+    let d = 0;
+    if (guard < loops.length) for (let j = 0; j < loops.length; j++) if (contains(j, i)) d = Math.max(d, depthOf(j, guard + 1) + 1);
+    depth[i] = d;
+    return d;
+  };
+  loops.forEach((_, i) => depthOf(i));
+  const max = Math.max(...depth);
+  const level = (d: number) => booleanLoops("union", loops.filter((_, i) => depth[i] === d).map((l) => [l]));
+  let acc = level(max);
+  for (let d = max - 1; d >= 0; d--) acc = booleanLoops("difference", [level(d), acc]);
+  return acc;
+}
+
+/** A point inside a loop (by its own winding). */
+function interior(l: Loop2): Vec2 {
+  const poly = polyline(l);
+  let ymin = Infinity, ymax = -Infinity;
+  for (const [, y] of poly) {
+    ymin = Math.min(ymin, y);
+    ymax = Math.max(ymax, y);
+  }
+  for (const f of [0.5, 0.37, 0.61, 0.23, 0.77]) {
+    const y = ymin + (ymax - ymin) * f;
+    const xs: number[] = [];
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const a = poly[i]!, b = poly[j]!;
+      if (a[1] > y !== b[1] > y) xs.push(((b[0] - a[0]) * (y - a[1])) / (b[1] - a[1]) + a[0]);
+    }
+    xs.sort((a, b) => a - b);
+    let best: Vec2 | undefined, w = 0;
+    for (let k = 0; k + 1 < xs.length; k += 2)
+      if (xs[k + 1]! - xs[k]! > w) {
+        w = xs[k + 1]! - xs[k]!;
+        best = [(xs[k]! + xs[k + 1]!) / 2, y];
+      }
+    if (best) return best;
+  }
+  return poly[0] ?? [0, 0];
+}
+
+function insidePoly(p: Vec2, poly: Vec2[]): boolean {
+  let c = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[i]!, b = poly[j]!;
+    if (a[1] > p[1] !== b[1] > p[1] && p[0] < ((b[0] - a[0]) * (p[1] - a[1])) / (b[1] - a[1]) + a[0]) c = !c;
+  }
+  return c;
 }

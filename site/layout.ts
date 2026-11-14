@@ -85,7 +85,7 @@ export function page(o: PageOptions): string {
 <title>${escapeHtml(title)}</title>
 <meta name="description" content="${escapeHtml(o.description ?? "tscad — parametric CAD as TSX. Write solid models as JSX components, get exact B-rep STEP, STL and 3MF.")}" />
 <meta property="og:title" content="${escapeHtml(title)}" />
-<meta property="og:image" content="${u("images/enclosure.png")}" />
+<meta property="og:image" content="${u("images/pi5-case-auto.png")}" />
 <link rel="icon" href="data:image/svg+xml,${encodeURIComponent(LOGO.replace('aria-hidden="true"', 'xmlns="http://www.w3.org/2000/svg"'))}" />
 <script>try{var t=new URLSearchParams(location.search).get("theme")||localStorage.getItem("tscad.theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
 <link rel="stylesheet" href="${u("assets/style.css")}" />

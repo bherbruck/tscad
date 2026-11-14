@@ -64,7 +64,7 @@ describe("site build", () => {
       expect(partsPage).toContain('id="CounterboreHole"');
       // playground links: an example by name and the landing sample by encoded source
       const index = readFileSync(join(out, "index.html"), "utf8");
-      expect(index).toContain("play/#example=enclosure");
+      expect(index).toContain("play/#example=pi5-case-auto");
       expect(index).toMatch(/play\/#code=[\w-]+/);
       // relative URLs only (works under a GitHub Pages project path)
       expect(index).not.toMatch(/(href|src)="\/(?!\/)/);
