@@ -22,6 +22,8 @@ export interface Host {
   instance?: ComponentInstance;
   /** Component calls this host is a returned root of (outermost first). */
   rootOf?: ComponentInstance[];
+  /** The nearest named ancestor (element or component call), for messages. */
+  within?: RefNode;
 }
 
 /** What render passes down: the current component call, nearest named ancestor, and open roots. */
@@ -124,6 +126,7 @@ function walk(
   const host: Host = { tag: type, props, children: [], key: el.key };
   if (loc) host.loc = { ...loc, tag: type, ...(component ? { component } : {}) };
   if (ctx.instance) host.instance = ctx.instance;
+  if (ctx.ref) host.within = ctx.ref;
   if (ctx.rootOf.length) {
     host.rootOf = ctx.rootOf;
     for (const i of ctx.rootOf) i.roots.push(host);

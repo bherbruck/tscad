@@ -719,7 +719,7 @@ class Compiler {
       this.ops[this.ops.length - 1]!.push(h);
       node = null;
     } else node = this.build(h);
-    if (node && h.props.ghost === true) this.ghosts.set(node, { host: h, label: h.ref ? refPath(h.ref) : h.instance?.ref ? refPath(h.instance.ref) : `<${h.tag}>` });
+    if (node && h.props.ghost === true) this.ghosts.set(node, { host: h, label: ghostLabel(h) });
     if (node && h.ref) {
       this.named.set(h.ref, node);
       // a named group stays one node (a transform must not dissolve it into its children)
@@ -730,7 +730,7 @@ class Compiler {
         const inst = h.rootOf[k]!;
         const st = this.instState(inst);
         if (node) st.nodes.push(node);
-        if (node && inst.ghost && !this.ghosts.has(node)) this.ghosts.set(node, { host: h, label: inst.ref ? refPath(inst.ref) : `<${inst.component}>` });
+        if (node && inst.ghost && !this.ghosts.has(node)) this.ghosts.set(node, { host: h, label: inst.ref ? `<${inst.component}> ${refPath(inst.ref)}` : `<${inst.component}>` });
         if (++st.built === inst.roots.length) this.flushInstance(inst);
       }
     }
@@ -1600,6 +1600,13 @@ class Compiler {
 }
 
 // ---------------------------------------------------------------------------------------------
+
+/** How a ghost is named in messages: its own ref, else the nearest named ancestor or call. */
+function ghostLabel(h: Host): string {
+  const ref = h.ref ?? h.within;
+  if (!ref) return `<${h.tag}>`;
+  return ref.kind === "component" ? `<${ref.tag}> ${refPath(ref)}` : refPath(ref);
+}
 
 function halve(v: number | undefined): number | undefined {
   return v === undefined ? undefined : v / 2;
