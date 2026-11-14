@@ -155,8 +155,9 @@ Typical slips went through `tscad_evaluate` to see how the errors read:
 
 **Open: needs other owners.**
 
-- **Sketch:** 2D booleans (`<sketchDifference>` / `<sketchUnion>` / `<sketchIntersection>`)
-  would make D profiles, fluted rims and keyholes one cheap extrude instead of 3D boolean cuts.
+- ~~**Sketch:** 2D booleans~~ — **done since**: `<difference2d>` / `<union2d>` / `<intersection2d>`
+  (exact, fuzzed). The knob now builds its fluted rim and D bore in 2D: 4.4 s → 2.4 s (0.8 s
+  without the top chamfer).
 - **Kernel:**
   - `<fillet radius={8}>` on a 10 mm cube returns `ok` (962 mm³) instead of refusing a radius
     larger than the faces allow.

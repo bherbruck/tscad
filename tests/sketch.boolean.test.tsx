@@ -22,10 +22,21 @@ function rng(seed: number) {
 }
 
 /** A random shape (loops: an outer and sometimes a hole); sizes/positions snapped so edges coincide. */
-function shape(r: () => number): { loops: Loop2[]; area: number; kind: string } {
-  const snap = (v: number) => (r() < 0.6 ? Math.round(v) : v);
-  const x = snap((r() - 0.5) * 16), y = snap((r() - 0.5) * 16);
-  const rot = r() < 0.5 ? 0 : r() < 0.5 ? 90 : r() * 360;
+interface Mix {
+  /** Chance of snapping a size/position to an integer (coincidences, tangencies). */
+  snap: number;
+  /** Positions in ±spread/2. */
+  spread: number;
+  /** Chance of no rotation. */
+  straight: number;
+}
+const LOOSE: Mix = { snap: 0.6, spread: 16, straight: 0.5 };
+const TIGHT: Mix = { snap: 1, spread: 6, straight: 0.8 }; // everything on a grid: lots of shared edges
+
+function shape(r: () => number, mix: Mix = LOOSE): { loops: Loop2[]; area: number; kind: string } {
+  const snap = (v: number) => (r() < mix.snap ? Math.round(v) : v);
+  const x = snap((r() - 0.5) * mix.spread), y = snap((r() - 0.5) * mix.spread);
+  const rot = r() < mix.straight ? 0 : r() < 0.5 ? 90 : r() * 360;
   const m = mul2(tr2(x, y), rot2(rot));
   const k = Math.floor(r() * 7);
   const w = snap(2 + r() * 12), h = snap(2 + r() * 12);
@@ -64,11 +75,12 @@ function shape(r: () => number): { loops: Loop2[]; area: number; kind: string } 
 const area = (ls: Loop2[]) => ls.reduce((s, l) => s + loopArea(l), 0);
 
 describe("sketch booleans: fuzz", () => {
-  test("area identities and membership on 3000 seeded cases", () => {
+  for (const [name, mix, seed] of [["loose", LOOSE, 20261114], ["grid-snapped", TIGHT, 7]] as const)
+  test(`area identities and membership on 3000 seeded cases (${name})`, () => {
     const failures: string[] = [];
-    const r = rng(20261114);
+    const r = rng(seed);
     for (let n = 0; n < 3000 && failures.length < 10; n++) {
-      const A = shape(r), B = shape(r);
+      const A = shape(r, mix), B = shape(r, mix);
       let U: Loop2[], I: Loop2[], D: Loop2[], E: Loop2[];
       try {
         U = booleanLoops("union", [A.loops, B.loops]);
@@ -118,6 +130,10 @@ describe("sketch booleans: fuzz", () => {
     expect(booleanLoops("difference", [sq(0, 0), sq(0, 0)])).toEqual([]);
     // corner touch: two loops meeting at one vertex stay two loops
     expect(booleanLoops("union", [sq(0, 0), sq(10, 10)]).length).toBe(2);
+    // the same circle drawn from different start angles; internally tangent circles
+    const rotc = [transformLoop(circleLoop(5), rot2(37))];
+    expect(area(booleanLoops("union", [[circleLoop(5)], rotc]))).toBeCloseTo(25 * Math.PI, 9);
+    expect(area(booleanLoops("difference", [[transformLoop(circleLoop(6), tr2(-1, 0))], [circleLoop(5)]]))).toBeCloseTo(11 * Math.PI, 9);
     // externally tangent circles
     const c1 = [circleLoop(5)], c2 = [transformLoop(circleLoop(5), tr2(10, 0))];
     expect(area(booleanLoops("union", [c1, c2]))).toBeCloseTo(50 * Math.PI, 9);

@@ -483,6 +483,18 @@ export interface OffsetProps extends Placement2D, SketchChildren {
  */
 export interface HullProps extends Placement2D, SketchChildren {}
 
+/**
+ * An exact 2D boolean of its child shapes: each child is one operand (a `<sketch>` groups
+ * several shapes into one; nested loops in an operand are holes). Lines and arcs stay exact;
+ * NURBS (ellipses, text, Béziers) are flattened first. The result is a 2D shape like any other:
+ * use it in `<extrude>`, `<revolve>`, `<drawing>`, `<offset>`...
+ * - `<sketchUnion>` (`<union2d>`): everything in any child.
+ * - `<sketchDifference>` (`<difference2d>`): the first child minus the others.
+ * - `<sketchIntersection>` (`<intersection2d>`): only what every child shares.
+ * @example <extrude height={8}><difference2d><circle d={6} /><rect w={6} h={3} y={3} /></difference2d></extrude> // a D-shaft profile
+ */
+export interface SketchBooleanProps extends Placement2D, SketchChildren {}
+
 export interface SketchProps extends Placement2D, SketchChildren, ConstraintSketchOptions {}
 
 /** A loft section: one 2D shape at height `z`. */
@@ -785,6 +797,18 @@ export interface IntrinsicElements extends ConstraintSketchElements, AssemblyEle
   offset: OffsetProps;
   /** 2D: the convex hull of the children (exact arcs and tangents). */
   hull: HullProps;
+  /** 2D: union of the child shapes (exact; arcs stay arcs). */
+  sketchUnion: SketchBooleanProps;
+  /** 2D: the first child shape minus the others (exact). */
+  sketchDifference: SketchBooleanProps;
+  /** 2D: what every child shape shares (exact). */
+  sketchIntersection: SketchBooleanProps;
+  /** 2D: alias of `<sketchUnion>`. */
+  union2d: SketchBooleanProps;
+  /** 2D: alias of `<sketchDifference>`. */
+  difference2d: SketchBooleanProps;
+  /** 2D: alias of `<sketchIntersection>`. */
+  intersection2d: SketchBooleanProps;
   /** 2D: one loft section at height `z`. */
   section: SectionProps;
 

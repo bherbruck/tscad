@@ -18,6 +18,7 @@ import { layoutText, loadFont } from "./text/font";
 import { toSelector, type SelectorLike } from "./select";
 import { offsetLoops, OffsetError } from "./sketch/offset";
 import { hullLoops, HullError } from "./sketch/hull";
+import { booleanLoops, BooleanError, type BooleanOp } from "./sketch/boolean";
 import { sweepPathOf } from "./sketch/sweep-path";
 import { CONSTRAINT_TAGS, isConstrainedSketch, SketchRecorder, type SketchInfo } from "./sketch/constrained";
 import { AssemblyRecorder, ASSEMBLY_TAGS, type AssemblyInfo } from "./assembly";
@@ -139,7 +140,16 @@ const SOLID_TAGS = new Set([
   "linearPattern", "gridPattern", "polarPattern", "fillet", "chamfer", "shell", "draft", "pushPull", "offsetFaces", "split",
 ]);
 const SHAPE_TAGS = new Set(["text", "rect", "roundedRect", "circle", "ellipse", "polygon", "regularPolygon", "slot", "path", "star"]);
-const SKETCH_TAGS = new Set([...SHAPE_TAGS, "sketch", "section", "offset", "hull", "sweepPath"]);
+/** 2D booleans (and their short aliases) → the operation. */
+const SKETCH_BOOLEANS: Record<string, BooleanOp> = {
+  sketchUnion: "union",
+  sketchDifference: "difference",
+  sketchIntersection: "intersection",
+  union2d: "union",
+  difference2d: "difference",
+  intersection2d: "intersection",
+};
+const SKETCH_TAGS = new Set([...SHAPE_TAGS, "sketch", "section", "offset", "hull", "sweepPath", ...Object.keys(SKETCH_BOOLEANS)]);
 const CONTAINER_TAGS = new Set(["part", "assembly", "drawing"]);
 const ALL_TAGS = [...SOLID_TAGS, ...SKETCH_TAGS, ...CONTAINER_TAGS, ...CONSTRAINT_TAGS, ...ASSEMBLY_TAGS];
 /** Tags whose x/y/z mean something else (no universal placement). */
@@ -416,7 +426,7 @@ class Compiler {
   }
 
   solid(h: Host): Node | null {
-    if (SHAPE_TAGS.has(h.tag) || h.tag === "sketch" || h.tag === "section" || h.tag === "offset" || h.tag === "hull" || h.tag === "sweepPath") {
+    if (SHAPE_TAGS.has(h.tag) || h.tag === "sketch" || h.tag === "section" || h.tag === "offset" || h.tag === "hull" || h.tag === "sweepPath" || h.tag in SKETCH_BOOLEANS) {
       this.fail(h, `<${h.tag}> is a 2D sketch shape and can't stand alone as a solid`, `put it inside <extrude height={...}>, <revolve>, <loft> or <sweep>`);
     }
     if (h.tag === "anchor") return null;
@@ -823,6 +833,29 @@ class Compiler {
       if (c.tag === "sweepPath") {
         // a sweep's path, not part of its profile
         if (parent.tag !== "sweep") this.fail(c, "<sweepPath> only goes inside <sweep>", "<sweep><sweepPath plane=\"XZ\">...path...</sweepPath><circle r={2} /></sweep>");
+        continue;
+      }
+      if (c.tag in SKETCH_BOOLEANS) {
+        // an exact 2D boolean: each child is one operand (its nested loops are holes)
+        const mm = mul2(m, this.place2(c));
+        const operands = c.children.map((child) => {
+          const ls = this.sketch([child], mm, parent);
+          for (const l of ls) this.checkClosed(l);
+          return ls.map((l) => l.loop);
+        });
+        if (!operands.length) {
+          this.warn(c, "is empty");
+          continue;
+        }
+        let loops: Loop2[];
+        try {
+          loops = booleanLoops(SKETCH_BOOLEANS[c.tag]!, operands);
+        } catch (e) {
+          if (e instanceof BooleanError) this.fail(c, e.message, undefined, e);
+          throw e;
+        }
+        if (!loops.length) this.warn(c, "leaves nothing");
+        out.push(...loops.map((loop) => ({ loop, host: c })));
         continue;
       }
       if (c.tag === "hull") {

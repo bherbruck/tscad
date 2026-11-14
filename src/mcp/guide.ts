@@ -60,11 +60,12 @@ Several children of \`<part>\`/\`<group>\` are unioned.
 \`<rect w h>\` (centred), \`<roundedRect w h r>\`, \`<circle r|d>\`, \`<ellipse rx ry>\`, \`<polygon points>\`,
 \`<regularPolygon sides r|flats>\`, \`<slot length width>\`, \`<path d="M.. Z">\` (SVG subset, y up),
 \`<star>\`, \`<text size align valign>label</text>\`, \`<offset distance>\` (grow/shrink), \`<hull>\` (convex hull of
-its children), \`<sketch>\` group. Each takes 2D placement \`x y rotate mirror\`.
+its children), \`<difference2d>\`/\`<union2d>\`/\`<intersection2d>\`, \`<sketch>\` group. Each takes 2D placement \`x y rotate mirror\`.
 
-- **There are no 2D booleans**: loops inside loops are holes, other loops are unioned. To cut a shape
-  that *crosses* an outline (a D-shaft bore, flutes around a rim), use 3D: \`<difference>\` with
-  \`<intersection><cylinder/><box/></intersection>\` for a D, or a \`<polarPattern>\` of cylinders.
+- **2D booleans**: \`<difference2d>\` (first child minus the rest), \`<union2d>\`, \`<intersection2d>\` (long
+  names \`<sketchDifference>\` etc.) combine 2D shapes exactly (arcs stay arcs) — a D-shaft profile is
+  \`<difference2d><circle d={6}/><rect w={7} h={3} y={3}/></difference2d>\`, a keyhole a \`<union2d>\` of a
+  circle and a slot, a fluted rim a circle minus small circles. Much faster than 3D cuts: one extrude.
 - **Nested loops become holes automatically**: \`<extrude height={5}><rect w={40} h={30}/><circle r={5}/></extrude>\`
   is a plate with a hole. Disjoint loops are unioned.
 - \`<extrude height plane="XY"|"XZ"|"YZ" offset center draft>\`: XY extrudes +Z from z = offset.

@@ -346,7 +346,9 @@ export function booleanLoops(op: BooleanOp, operands: Loop2[][]): Loop2[] {
     if (L === R) continue;
     const piece: Piece = L ? pc : { seg: reverseS(s), from: pc.to, to: pc.from };
     // coincident pieces (shared edges): keep one
-    const key = `${piece.from}>${piece.to}:${piece.seg.kind === "line" ? "l" : `a${Math.round(((piece.seg.a0 + piece.seg.a1) / 2) * 1e6)}`}`;
+    const g = piece.seg;
+    const q = (v: number) => Math.round(v / (tol * 100));
+    const key = `${piece.from}>${piece.to}:${g.kind === "line" ? "l" : `a${q(g.c[0])},${q(g.c[1])},${q(g.r)},${q(pointAt(g, (g.a0 + g.a1) / 2)[0])},${q(pointAt(g, (g.a0 + g.a1) / 2)[1])}`}`;
     if (seen.has(key)) continue;
     seen.add(key);
     kept.push(piece);

@@ -64,7 +64,7 @@ describe("tool outputs", () => {
 describe("docs", () => {
   test("the guide covers assemblies, printing and common mistakes; the index is grouped", async () => {
     const g = text(await call("tscad_docs", {}));
-    for (const s of ["## Assemblies: anchors and mates", "## Printing", "## Common mistakes", "There are no 2D booleans", "Constraint sketch (inside <sketch>)"]) expect(g).toContain(s);
+    for (const s of ["## Assemblies: anchors and mates", "## Printing", "## Common mistakes", "**2D booleans**", "Constraint sketch (inside <sketch>)"]) expect(g).toContain(s);
   });
   test("type names are explained; mount patterns are tabulated (with the Pi 5)", async () => {
     expect(text(await call("tscad_docs", { element: "split" }))).toContain('PlaneSpec = `"XY"` (normal +Z)');
