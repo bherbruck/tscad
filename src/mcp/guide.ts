@@ -62,7 +62,7 @@ Any solid or component call takes \`name\`; ops then point at names instead of w
 Selectors: \`.name\`, \`.a > .b\` (nearest named ancestor), \`.a .b\` (descendant), \`.a, .b\`. Refs resolve within the
 \`<part>\` (inside a component: within that call), in written order. The result keeps \`from\`/\`target\`'s name and
 place; tools are used up (removed). \`from\`/\`target\` must match one solid. Library parts name their sub-solids
-(\`<Bolt name="b">\` → \`.b > .head\`, \`.b > .shank\`; \`<Bolt cutter>\` is a clearance tool). Ref ops take no x/y/rotate.
+(\`<Bolt name="b">\` → \`.b > .head\`, \`.b > .shank\`; \`<Bolt cutter>\` is a clearance tool). Ref ops take no x/y/rotate. Mark tool-only solids \`ghost\` (also on component calls): left out unless a ref op uses them, with a warning when unused.
 
 ## Sketches → solids
 

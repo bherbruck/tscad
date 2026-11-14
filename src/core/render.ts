@@ -110,6 +110,7 @@ function walk(
     }
     // every call is an instance (refs inside it resolve within it); a `name` makes it a ref
     const inst: ComponentInstance = { component: name, roots: [], ...(ctx.instance ? { parent: ctx.instance } : {}), ...(loc ? { loc } : {}) };
+    if (el.props?.ghost === true) inst.ghost = true;
     const given = el.props?.name;
     if (typeof given === "string" && given) {
       inst.name = given;

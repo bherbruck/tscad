@@ -29,6 +29,8 @@ export declare namespace JSX {
     key?: Key;
     /** A ref name for this element or component call (`".bolt > .shank"` picks inside it). */
     name?: string;
+    /** A tool for refs only: left out of the output unless a ref op uses it. */
+    ghost?: boolean;
   }
   /** `children` is the prop that receives JSX children. */
   interface ElementChildrenAttribute {

@@ -15,6 +15,8 @@ export interface ComponentInstance {
   parent?: ComponentInstance;
   /** The instance's ref when named. */
   ref?: RefNode;
+  /** Called with `ghost`: its solids are tools for refs, left out unless used. */
+  ghost?: boolean;
   /** Host elements the component returned (directly or through nested components). */
   roots: unknown[];
   loc?: SourceLoc;

@@ -79,6 +79,25 @@ What happens to the solids:
   match several; all of them are cut.
 - A ref op has no placement of its own: `x`, `rotate` and friends on it are an error.
 
+## Ghosts: tools that are only tools
+
+A cutter is a solid you never want in the output on its own. Mark it `ghost` and it is left
+out unless a ref op uses it up; if nothing does, it is dropped with a warning (not an error):
+
+```tsx
+<part name="plate">
+  <box name="plate" size={[40, 20, 4]} />
+  <cylinder name="hole" ghost r={2} h={10} z={-3} />
+  <subtract from=".plate" tool=".hole" />
+</part>
+```
+
+- `ghost` works on any solid and on a component call (`<Cutter name="c" ghost />`), where it
+  covers everything the call builds. `<Bolt cutter>` from `tscad/parts` is a ghost by default.
+- A ghost that sits inside a nested boolean or feature (`<difference>...<cylinder ghost />
+  </difference>`) is already in use there and is kept.
+- The viewer doesn't show dropped ghosts.
+
 ## Scope
 
 Refs resolve after the solids around them are built, in the order the ops are written, so an op

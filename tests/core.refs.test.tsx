@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, test } from "bun:test";
 import { compile, edges, TscadError } from "../src/index";
 import type { Node } from "../src/ir";
 import { loadKernel, type KernelHost } from "../src/kernel/index.ts";
+import { Bolt as LibBolt } from "../src/parts";
 
 /** A bolt-like component: named sub-solids, no name of its own. */
 function Bolt({ length = 12, x = 0 }: { length?: number; x?: number }) {
@@ -169,6 +170,80 @@ describe("ref ops", () => {
     );
     expect(r.document.parts!.length).toBe(1);
     expect(r.document.parts![0]!.node.type).toBe("difference");
+  });
+});
+
+describe("ghosts", () => {
+  test("a used ghost tool cuts; an unused one is left out with a warning", () => {
+    const r = compile(
+      <part>
+        <box name="plate" size={[40, 20, 4]} />
+        <cylinder name="hole" ghost r={2} h={10} z={-3} />
+        <cylinder name="spare" ghost r={3} h={10} z={-3} x={10} />
+        <subtract from=".plate" tool=".hole" />
+      </part>,
+    );
+    const root = r.document.parts![0]!.node;
+    expect(root.type).toBe("difference");
+    expect(radii(root)).toEqual([2]);
+    expect(r.warnings.some((w) => w.includes(".spare is a ghost") && w.includes("left out"))).toBe(true);
+  });
+
+  test("a ghost component call", () => {
+    function Cutter() {
+      return <cylinder name="bore" r={1} h={10} z={-3} />;
+    }
+    const r = compile(
+      <part>
+        <box name="plate" size={10} />
+        <Cutter name="c" ghost />
+        <Cutter name="unused" ghost />
+        <subtract from=".plate" tool=".c" />
+      </part>,
+    );
+    expect(r.document.parts![0]!.node.type).toBe("difference");
+    expect(radii(r.document.parts![0]!.node)).toEqual([1]);
+    expect(r.warnings.some((w) => w.includes(".unused is a ghost"))).toBe(true);
+  });
+
+  test("a ghost nested in a boolean is kept (it is in use)", () => {
+    const root = nodeOf(
+      <part>
+        <difference>
+          <box size={10} />
+          <cylinder ghost r={1} h={20} z={-5} />
+        </difference>
+      </part>,
+    );
+    expect(root.type).toBe("difference");
+    expect(radii(root)).toEqual([1]);
+  });
+
+  test("<Bolt cutter> from tscad/parts is a ghost: cuts by ref, left out when unused", () => {
+    const r = compile(
+      <part>
+        <box name="plate" size={[40, 20, 6]} />
+        <LibBolt name="used" cutter thread="M3" length={10} z={6} x={-10} />
+        <LibBolt name="unused" cutter thread="M3" length={10} z={6} x={10} />
+        <subtract from=".plate" tool=".used" />
+      </part>,
+    );
+    expect(r.document.parts![0]!.node.type).toBe("difference");
+    expect(r.warnings.some((w) => w.includes(".unused is a ghost"))).toBe(true);
+  });
+
+  test("a part of only unused ghosts is empty", () => {
+    const r = compile(
+      <>
+        <part name="p">
+          <box ghost size={1} />
+        </part>
+        <part name="q">
+          <box size={1} />
+        </part>
+      </>,
+    );
+    expect(r.document.parts!.map((p) => p.name)).toEqual(["q"]);
   });
 });
 

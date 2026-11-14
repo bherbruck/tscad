@@ -61,6 +61,11 @@ export interface Placement {
    * `<draft target>`. Refs resolve within the enclosing `<part>`. Component calls take `name` too.
    */
   name?: string;
+  /**
+   * A tool for refs only: left out of the output unless a ref op uses it up
+   * (`<subtract tool>`, `<union of>`), with a warning when nothing does. Component calls take it too.
+   */
+  ghost?: boolean;
 }
 
 /**

@@ -22,6 +22,7 @@ The first release: CAD as TSX.
   `<fillet>`, `<chamfer>`, `<shell>` and `<draft>`. Selectors `.name`, `.a > .b`, `.a .b`,
   `.a, .b`; resolved per part (or per component call), with "did you mean" and ambiguity
   errors at the op's line. Tools are used up; the result keeps the target's name and place.
+  `ghost` marks a tool-only solid or component call: left out unless a ref op uses it.
 - **Patterns:** `<linearPattern>`, `<gridPattern>`, `<polarPattern>`.
 - **Features:**
   - `<fillet>`, `<chamfer>`, `<shell>`

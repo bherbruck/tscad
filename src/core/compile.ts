@@ -205,6 +205,8 @@ class Compiler {
   readonly ops: Host[][] = [[]];
   /** Nodes consumed as tools (pruned when their part is finished), and by which op. */
   readonly consumed = new Map<Node, Host>();
+  /** Ghost solids (`ghost`): tools for refs, left out of the output unless something uses them. */
+  readonly ghosts = new Map<Node, { host: Host; label: string }>();
   /** Refs consumed with them. */
   readonly consumedRefs = new Map<RefNode, Host>();
   /** Anchors and mates, solved once every part is built. */
@@ -450,15 +452,23 @@ class Compiler {
     const list = this.ops.length > 1 ? this.ops.pop()! : this.ops[0]!.splice(0);
     const label = part ? `part ${JSON.stringify(part.props.name ?? "part")}` : "the model";
     for (const op of list) this.applyOp(op, roots, label);
-    if (!this.consumed.size) return roots;
-    const prune = (n: Node): Node | null => {
+    if (!this.consumed.size && !this.ghosts.size) return roots;
+    // `free`: only unions and transforms above, so leaving it out changes nothing else
+    const prune = (n: Node, free = true): Node | null => {
       if (this.consumed.has(n)) return null;
+      const ghost = this.ghosts.get(n);
+      if (ghost && free) {
+        this.ghosts.delete(n);
+        this.warn(ghost.host, `${ghost.label} is a ghost (a tool for refs) that nothing used; left out`);
+        return null;
+      }
       if (n.type === "onFace") {
-        const base = prune(n.base);
+        const base = prune(n.base, false);
         if (base !== n.base) this.fail(this.consumed.get(n.base) ?? part, "consumed the base of an <onFace>");
       }
       if (!("children" in n)) return n;
-      const kids = n.children.map(prune);
+      const passes = free && (n.type === "union" || n.type === "transform");
+      const kids = n.children.map((c) => prune(c, passes));
       if (kids.every((k, i) => k === n.children[i])) return n;
       const left = kids.filter((k): k is Node => k !== null);
       if (!left.length && (n.type === "union" || n.type === "transform")) return null;
@@ -466,7 +476,7 @@ class Compiler {
       (n as { children: Node[] }).children = left;
       return n;
     };
-    return roots.map(prune).filter((n): n is Node => n !== null);
+    return roots.map((r) => prune(r)).filter((n): n is Node => n !== null);
   }
 
   /** Every place `roots` hold a node (patterns can repeat one), with the frame it sits in. */
@@ -709,6 +719,7 @@ class Compiler {
       this.ops[this.ops.length - 1]!.push(h);
       node = null;
     } else node = this.build(h);
+    if (node && h.props.ghost === true) this.ghosts.set(node, { host: h, label: h.ref ? refPath(h.ref) : `<${h.tag}>` });
     if (node && h.ref) {
       this.named.set(h.ref, node);
       // a named group stays one node (a transform must not dissolve it into its children)
@@ -719,6 +730,7 @@ class Compiler {
         const inst = h.rootOf[k]!;
         const st = this.instState(inst);
         if (node) st.nodes.push(node);
+        if (node && inst.ghost && !this.ghosts.has(node)) this.ghosts.set(node, { host: h, label: inst.ref ? refPath(inst.ref) : `<${inst.component}>` });
         if (++st.built === inst.roots.length) this.flushInstance(inst);
       }
     }
