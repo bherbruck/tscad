@@ -136,7 +136,7 @@ export async function evaluateModel(input: ModelInput, params: Record<string, un
     else if (typeof input === "function") compiled = renderModule({ default: input as Component<any> }, params);
     else compiled = compile(input as Children);
   } catch (e) {
-    const empty: EvalResult = { ok: false, parts: [], cacheHits: 0, cacheMisses: 0, cacheSize: 0, millis: 0 };
+    const empty: EvalResult = { ok: false, parts: [], cacheHits: 0, cacheMisses: 0, cacheSize: 0, millis: 0, frames: {} };
     return new ModelResult({ document: { parts: [] }, sourceMap: {}, warnings: [], parts: [], drawings: [] } as unknown as CompileResult, empty, kernel, new Map(), e);
   }
   const result = await kernel.evaluate(compiled.document, opts.tolerance !== undefined ? { tolerance: opts.tolerance } : undefined);

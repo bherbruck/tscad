@@ -28,7 +28,7 @@ fn from_js<T: serde::de::DeserializeOwned>(v: JsValue, what: &str) -> Result<T, 
 }
 
 fn to_js<T: serde::Serialize>(v: &T) -> Result<JsValue, JsError> {
-    v.serialize(&serde_wasm_bindgen::Serializer::new().serialize_missing_as_null(false))
+    v.serialize(&serde_wasm_bindgen::Serializer::new().serialize_missing_as_null(false).serialize_maps_as_objects(true))
         .map_err(|e| JsError::new(&format!("result: {e}")))
 }
 

@@ -87,6 +87,7 @@ pub struct EvalResult {
     pub millis: f64,
     /// The face frame (column-vector 4x4, row-major) each `onFace` node placed its children in,
     /// by node path: where a sketch drawn on a face sits in model space.
+    #[tsify(type = "Record<string, number[]>")]
     pub frames: std::collections::BTreeMap<String, Vec<f64>>,
 }
 
