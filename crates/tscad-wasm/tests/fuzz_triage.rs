@@ -67,3 +67,14 @@ fn moved_torus_workaround() {
     let out = run(&format!(r#"{{"type":"difference","children":[{rot},{rot}]}}"#));
     assert!(out.contains("vol=None"), "{out}");
 }
+
+#[test]
+fn rounded_rotation_torus() {
+    let torus = r#"{"type":"torus","majorRadius":20,"minorRadius":3}"#;
+    // 30 degrees about Z, rounded to 6 decimals
+    let rot = format!(r#"{{"type":"transform","matrix":[0.866025,-0.5,0,4, 0.5,0.866025,0,-2, 0,0,1,1, 0,0,0,1],"children":[{torus}]}}"#);
+    let out = run(&rot);
+    assert!(out.contains("warn=[]") && out.contains("ok=true"), "{out}");
+    let out = run(&format!(r#"{{"type":"difference","children":[{rot},{rot}]}}"#));
+    assert!(out.contains("vol=None"), "{out}");
+}

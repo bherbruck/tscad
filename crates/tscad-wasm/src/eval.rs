@@ -610,25 +610,35 @@ fn torus_in_place(m: &[f64; 16], r_major: f64, r_minor: f64) -> Option<Node> {
     };
     let (x, y, z) = (lin([1.0, 0.0, 0.0]), lin([0.0, 1.0, 0.0]), lin([0.0, 0.0, 1.0]));
     let k = dot(x, x).sqrt();
+    // a similarity up to the rounding of a matrix written out by hand or to a few decimals
+    let tol = 1e-5;
     let similar = k > 1e-12
-        && [dot(y, y).sqrt(), dot(z, z).sqrt()].iter().all(|l| (l - k).abs() <= 1e-9 * k)
-        && [dot(x, y), dot(y, z), dot(x, z)].iter().all(|d| d.abs() <= 1e-9 * k * k)
+        && [dot(y, y).sqrt(), dot(z, z).sqrt()].iter().all(|l| (l - k).abs() <= tol * k)
+        && [dot(x, y), dot(y, z), dot(x, z)].iter().all(|d| d.abs() <= tol * k * k)
         && m[12] == 0.0 && m[13] == 0.0 && m[14] == 0.0 && m[15] == 1.0;
     if !similar {
         return None;
     }
+    // exact orthonormal axes: z, then x made square to it, then y = z × x (a mirror flips y)
+    let zu = norm(z);
+    let xu = norm(sub(x, [dot(x, zu) * zu[0], dot(x, zu) * zu[1], dot(x, zu) * zu[2]]));
+    let mirrored = dot(cross(x, y), z) < 0.0;
+    let yu = if mirrored { cross(xu, zu) } else { cross(zu, xu) };
+    let k = (dot(x, x).sqrt() + dot(y, y).sqrt() + dot(z, z).sqrt()) / 3.0;
+    let origin = at([0.0; 3]);
+    let centre = [origin[0] + r_major * k * xu[0], origin[1] + r_major * k * xu[1], origin[2] + r_major * k * xu[2]];
     let tau = std::f64::consts::TAU;
     Some(Node::Revolve {
         profile: vec![Curve::Arc {
-            center: at([r_major, 0.0, 0.0]),
-            axis: norm(lin([0.0, -1.0, 0.0])),
-            reference: norm(x),
+            center: centre,
+            axis: [-yu[0], -yu[1], -yu[2]],
+            reference: xu,
             radius: r_minor * k,
             start: 0.0,
             end: tau,
         }],
-        origin: at([0.0; 3]),
-        axis: norm(z),
+        origin,
+        axis: zu,
         angle: tau,
     })
 }
