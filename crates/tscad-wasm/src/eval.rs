@@ -354,10 +354,16 @@ fn union(children: &[Node], path: &str, cache: &mut Cache) -> R<Solid> {
                     pending.sort_by(|a, b| b.0.total_cmp(&a.0));
                     let mut acc = pending.remove(0).1;
                     let mut last = format!("{first}");
+                    // each failing boolean can be slow: give up after a bounded number of tries
+                    let mut budget = 3 * pending.len() + 4;
                     while !pending.is_empty() {
                         let mut progressed = false;
                         let mut i = 0;
                         while i < pending.len() {
+                            if budget == 0 {
+                                return Err(fail(path, "union", last));
+                            }
+                            budget -= 1;
                             let (Ok(a), Ok(b)) = (acc.copy(), pending[i].1.copy()) else { break };
                             match ops::boolean::boolean(a, b, BooleanOp::Union) {
                                 Ok(Some(u)) => {
