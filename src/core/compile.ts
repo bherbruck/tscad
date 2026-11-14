@@ -139,6 +139,7 @@ const SOLID_TAGS = new Set([
   "group", "step", "translate", "rotate", "scale", "mirror", "transform", "box", "cylinder", "cone", "sphere", "torus",
   "union", "difference", "subtract", "intersection", "intersect", "extrude", "revolve", "loft", "sweep",
   "linearPattern", "gridPattern", "polarPattern", "fillet", "chamfer", "shell", "draft", "pushPull", "offsetFaces", "split",
+  "onFace", "pocket", "boss", "cutThrough",
 ]);
 const SHAPE_TAGS = new Set(["text", "rect", "roundedRect", "circle", "ellipse", "polygon", "regularPolygon", "slot", "path", "star", "dxf", "svg"]);
 /** 2D booleans (and their short aliases) → the operation. */
@@ -154,7 +155,7 @@ const SKETCH_TAGS = new Set([...SHAPE_TAGS, "sketch", "section", "offset", "hull
 const CONTAINER_TAGS = new Set(["part", "assembly", "drawing"]);
 const ALL_TAGS = [...SOLID_TAGS, ...SKETCH_TAGS, ...CONTAINER_TAGS, ...CONSTRAINT_TAGS, ...ASSEMBLY_TAGS];
 /** Tags whose x/y/z mean something else (no universal placement). */
-const OWN_TRANSFORM = new Set(["translate", "rotate", "scale", "mirror", "transform"]);
+const OWN_TRANSFORM = new Set(["translate", "rotate", "scale", "mirror", "transform", "onFace", "pocket", "boss", "cutThrough"]);
 
 interface SketchLoop {
   loop: Loop2;
@@ -336,12 +337,18 @@ class Compiler {
     const assembly = this.asm.solve(parts);
 
     const sourceMap: Record<string, SourceLoc> = {};
-    const walk = (node: Node, path: string, inherited: SourceLoc | undefined, acc: Mat4) => {
+    const walk = (node: Node, path: string, inherited: SourceLoc | undefined, acc: Mat4, face?: string) => {
       const loc = this.locs.get(node) ?? inherited;
       if (loc) sourceMap[path] = loc;
-      this.sketchRec.visit(node, path, acc);
+      this.sketchRec.visit(node, path, acc, face);
       const inner = node.type === "transform" ? mul(acc, node.matrix as Mat4) : acc;
-      if ("children" in node) node.children.forEach((c, i) => walk(c, `${path}/${i}`, loc, inner));
+      if (node.type === "onFace") {
+        // the base at the kernel's `…/base` path; the tools live in the face's frame (known only after evaluation)
+        walk(node.base, `${path}/base`, loc, inner, face);
+        node.children.forEach((c, i) => walk(c, `${path}/${i}`, loc, identity(), path));
+        return;
+      }
+      if ("children" in node) node.children.forEach((c, i) => walk(c, `${path}/${i}`, loc, inner, face));
     };
     doc.forEach((p, i) => walk(p.node, `parts/${i}`, infos.find((x) => x.index === i)?.loc, identity()));
     const names = new Set<string>();
@@ -697,6 +704,13 @@ class Compiler {
         if (p.faces === undefined) this.fail(h, "missing faces", `<${h.tag} distance={2} faces=">Z">`);
         return [this.emit({ type: "offsetFaces", distance: d, faces: this.selector(h, "faces", p.faces), children: kids } as Node, h)];
       }
+      case "onFace":
+      case "pocket":
+      case "boss":
+      case "cutThrough": {
+        const n = this.faceFeature(h);
+        return n ? [n] : null;
+      }
       case "split": {
         const kids = this.solids(h.children);
         if (!kids.length) {
@@ -723,6 +737,63 @@ class Compiler {
       }
     }
     return this.fail(h, `unhandled element <${h.tag}>`);
+  }
+
+  /**
+   * Sketch on a face. `<onFace face index op>`: the first child is the base, the rest are tools
+   * modelled in the face's frame (origin at the face's centre, +Z out of the material, +X along
+   * model X projected, else Y). `<pocket depth>` / `<boss height>` / `<cutThrough>`: solid
+   * children are the base, 2D children are the profile drawn on the face (x/y/rotate place it).
+   */
+  faceFeature(h: Host): Node | null {
+    const p = h.props;
+    if (p.face === undefined) this.fail(h, "missing face", `<${h.tag} face=">Z" ...>`);
+    const faces = this.selector(h, "face", p.face);
+    const index = this.num(h, "index", p.index, { int: true, min: 0 });
+    const onFaceNode = (base: Node, op: string, tools: Node[]): Node =>
+      this.emit({ type: "onFace", base, faces, ...(index ? { index } : {}), ...(op !== "union" ? { op } : {}), children: tools } as Node, h);
+    if (h.tag === "onFace") {
+      const kids = this.solids(h.children);
+      if (!kids.length) {
+        this.warn(h, "is empty");
+        return null;
+      }
+      const ops: Record<string, string> = { union: "union", add: "union", cut: "difference", difference: "difference", subtract: "difference", intersect: "intersection", intersection: "intersection", none: "none" };
+      const op = ops[String(p.op ?? "union")];
+      if (!op) this.fail(h, `op must be "union", "cut", "intersect" or "none" (got ${show(p.op)})`);
+      if (kids.length === 1) {
+        this.warn(h, "has only a base (its first child) and no tools");
+        return kids[0]!;
+      }
+      return onFaceNode(kids[0]!, op, kids.slice(1));
+    }
+    // pocket / boss / cutThrough: solids = base, 2D = profile
+    const solidKids = h.children.filter((c) => SOLID_TAGS.has(c.tag) || (!SKETCH_TAGS.has(c.tag) && !CONSTRAINT_TAGS.has(c.tag) && !CONTAINER_TAGS.has(c.tag)));
+    const flat = h.children.filter((c) => !solidKids.includes(c));
+    const base = this.group(solidKids, h);
+    if (!base) this.fail(h, "needs a base solid to work on", `<${h.tag} face=">Z" ${h.tag === "boss" ? "height" : "depth"}={5}><box size={40} /><circle r={5} /></${h.tag}>`);
+    if (!flat.length) this.fail(h, "needs a 2D profile (a sketch or 2D shapes) to draw on the face");
+    const loops = this.sketch(flat, this.place2(h), h);
+    for (const l of loops) this.checkClosed(l);
+    const merged = this.mergeOverlaps(loops, h);
+    for (const l of merged) l.loop = ccw(l.loop);
+    if (!merged.length) {
+      this.warn(h, "its profile draws nothing; skipped");
+      return base;
+    }
+    const draft = this.num(h, "draft", p.draft) ?? 0;
+    // a hair of overlap with the face so the boolean never meets coplanar faces
+    const eps = 0.01;
+    let tool: Node | null;
+    if (h.tag === "boss") {
+      const height = this.req(h, "height", this.alias(h, ["height", "h"], { positive: true }));
+      tool = this.extrudeLoops(h, merged, height + eps, PLANES.XY, -eps, draft);
+    } else {
+      const depth = h.tag === "cutThrough" ? this.num(h, "depth", p.depth, { positive: true }) ?? 2000 : this.req(h, "depth", this.alias(h, ["depth", "d"], { positive: true }));
+      tool = this.extrudeLoops(h, merged, -(depth + eps), PLANES.XY, eps, draft);
+    }
+    if (!tool) return base;
+    return onFaceNode(base, h.tag === "boss" ? "union" : "difference", [tool]);
   }
 
   /** A direction: an axis name or a non-zero vector (unit-ised). */

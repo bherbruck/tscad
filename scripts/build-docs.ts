@@ -86,6 +86,7 @@ const GROUPS: [string, string, string[]][] = [
   ["Sketch → solid", "Turn 2D shapes into solids.", ["extrude", "revolve", "loft", "sweep", "sweepPath"]],
   ["Patterns", "Repeat children.", ["linearPattern", "gridPattern", "polarPattern"]],
   ["Features", "Round, bevel, hollow, draft, push/pull and split. Edges and faces are picked with selectors.", ["fillet", "chamfer", "shell", "draft", "pushPull", "offsetFaces", "split"]],
+  ["Features on faces", "Sketch on a face of a solid, then pocket into it, raise a boss from it or cut through. The face is picked with a selector; x, y and rotate place the sketch in the face.", ["pocket", "boss", "cutThrough", "onFace"]],
 ];
 
 const ref = referenceEntries();

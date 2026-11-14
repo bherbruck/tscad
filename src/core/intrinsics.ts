@@ -476,6 +476,60 @@ export interface OffsetProps extends Placement2D, SketchChildren {
  * inside, it is a **constraint sketch**: solved, then its closed loops become profiles.
  */
 /**
+ * Model on a face of another solid ("sketch on face"). The **first child is the base**; the
+ * other children are tools modelled in the face's frame — origin at the centre of the face's
+ * bounding box, +Z pointing out of the material, +X along model X projected onto the face (Y
+ * when the face is square to X) — then combined with the base by `op`.
+ * @example
+ * <onFace face=">Z" op="cut">
+ *   <box size={[40, 30, 10]} />
+ *   <cylinder r={3} h={4} z={-4} />
+ * </onFace>
+ */
+export interface OnFaceProps extends SolidChildren {
+  /** Which face: a selector (`">Z"`, `faces.max("x")`...) matching planar faces. */
+  face: SelectorLike | Selector;
+  /** Which of the matching faces (0-based, kernel order). Default 0. */
+  index?: number;
+  /** How the tools combine with the base. Default `"union"`. */
+  op?: "union" | "add" | "cut" | "difference" | "intersect" | "intersection" | "none";
+  key?: Key;
+}
+
+/**
+ * A pocket, boss or through-cut drawn on a face: **solid children are the base, 2D children
+ * (shapes, `<sketch>`, constraint sketches, `<svg>`...) the profile**, drawn in the face's frame
+ * (origin at the face's centre, x along model X projected). `x`/`y`/`rotate` move the profile
+ * within the face.
+ */
+export interface FaceFeatureProps extends Placement2D {
+  /** Which face: a selector matching planar faces. */
+  face: SelectorLike | Selector;
+  /** Which of the matching faces. Default 0. */
+  index?: number;
+  /** Taper, degrees. */
+  draft?: number;
+  /** The base solid(s) and the 2D profile. */
+  children?: Children;
+}
+export interface PocketProps extends FaceFeatureProps {
+  /** How deep into the face, mm. */
+  depth: number;
+  /** Alias of `depth`. */
+  d?: number;
+}
+export interface BossProps extends FaceFeatureProps {
+  /** How far out of the face, mm. */
+  height: number;
+  /** Alias of `height`. */
+  h?: number;
+}
+export interface CutThroughProps extends FaceFeatureProps {
+  /** How far to cut, mm. Default 2000 (through anything reasonable). */
+  depth?: number;
+}
+
+/**
  * An imported DXF drawing as 2D shapes: LINE, ARC, CIRCLE, LWPOLYLINE/POLYLINE (bulges become
  * exact arcs), SPLINE, ELLIPSE, INSERTed BLOCKs. `$INSUNITS` → mm. Loose entities are chained
  * into closed loops; nested loops are holes.
@@ -888,6 +942,15 @@ export interface IntrinsicElements extends ConstraintSketchElements, AssemblyEle
   chamfer: ChamferProps;
   /** Hollow out. */
   shell: ShellProps;
+
+  /** Model on a face of the first child (sketch on face). */
+  onFace: OnFaceProps;
+  /** Cut a 2D profile `depth` into a face of the base. */
+  pocket: PocketProps;
+  /** Raise a 2D profile `height` out of a face of the base. */
+  boss: BossProps;
+  /** Cut a 2D profile through the base, from a face. */
+  cutThrough: CutThroughProps;
   /** Mould draft on faces. */
   draft: DraftProps;
   /** Move faces along their normals (push/pull). */

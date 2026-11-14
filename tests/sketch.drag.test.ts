@@ -119,3 +119,8 @@ describe("source edits", () => {
     expect(r4.ok && r4.source).toBe(`<sketch>\n  <point id="q" />\n</sketch>`);
   });
 });
+
+test("dragging a corner straight along its line: the dimension that resists ranks first", () => {
+  const r = dragSolve(mod, values, { sketch: sketchLoc, point: "b", target: [40, 30] });
+  expect(r.blockedBy[0]!.label).toBe('length=20 on line "side"');
+});

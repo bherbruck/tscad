@@ -452,3 +452,41 @@ TypeScript parser.
 `blockedBy` lists the constraints left with residuals when the target is enforced in least
 squares, those on the dragged point first. A point on a line slides along it, and reports the
 `<onCurve>` as what blocks the rest of the motion.
+
+## Sketch on a face: `<pocket>`, `<boss>`, `<cutThrough>`, `<onFace>`
+
+Draw on a face of the solid built so far. The kernel finds the face, builds a frame there and
+places the feature, so no coordinates are computed for where the face ended up.
+
+```tsx
+<pocket face=">Z" depth={7}>                 {/* solid children: the base */}
+  <boss face=">Z" height={8}>
+    <box size={[60, 50, 10]} />
+    <circle d={32} />                         {/* 2D children: the profile, on the face */}
+  </boss>
+  <circle d={22} />
+</pocket>
+```
+
+- **The face frame:** origin at the centre of the face's bounding box, +Z out of the material,
+  +X along model X projected onto the face (Y when the face is square to X), +Y = Z × X. The
+  face must be planar.
+- **`face`** is a face selector (`">Z"`, `"<Y"`, `faces.within(...)`...), and **`index`** picks
+  among several matches (kernel order).
+- **`<pocket depth>`** cuts the profile into the face; **`<boss height>`** raises it;
+  **`<cutThrough depth?>`** cuts through (default 2000 mm). `draft` tapers. `x`/`y`/`rotate` move the
+  profile within the face. Profiles can be shapes, `<sketch>`es, constraint sketches, `<svg>`...
+- **`<onFace face index op>`** is the general form: the **first child is the base**, and the other
+  children are 3D tools modelled in the face frame (+Z out of the face), combined by `op`:
+  `"union"` (default), `"cut"`, `"intersect"`, or `"none"` (just the placed tools).
+- Features chain: a feature's base can be another feature's result, so the face is found on
+  the solid as it is at that step. To pick a face that is no longer the topmost (say the base's
+  top once a boss stands on it), use `faces.within(min, max)` around it.
+
+**Metadata:** sketches drawn on a face carry `onFace: "<IR path of the onFace node>"` in
+`CompileResult.sketches`. Their `plane` is relative to the face frame, which only the kernel
+knows (it is built during evaluation), so an overlay can't place them in model space from the
+compile result alone. The source map covers the base at `<path>/base`.
+
+See `examples/sketch-on-face.tsx`: a bearing block with a boss, a bearing pocket, a shaft bore,
+counterbored holes from a patterned constraint sketch, and a slot in the front face.

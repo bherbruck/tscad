@@ -242,6 +242,8 @@ an OpenSCAD model you paste or open. `tscad dev` gives you the same viewer local
 - section and measure tools;
 - sketch and assembly overlays, including dragging joints;
 - pick-to-selector;
+- a **gallery** when you point it at a folder (`tscad dev examples/`): every model as a card with
+  a thumbnail, its doc comment, parts and volume;
 - **geometry diff** (`D`): after each edit, added material shows green and removed material
   red, with per-part Δvolume. **Pin** a version to compare later edits against it.
 
@@ -304,10 +306,10 @@ One npm package, `tscad`, with subpath exports. The full API is in [docs/api.md]
 | Command | |
 |---|---|
 | `tscad init [dir]` | scaffold a project (`index.tsx`, `package.json`, `tsconfig.json`, …) |
-| `tscad dev [file]` | live viewer with hot reload (`--open`, `--port`) |
+| `tscad dev [file\|folder]` | live viewer with hot reload (`--open`, `--port`); a folder opens a gallery of its models |
 | `tscad build [file] -o out.step` | `step` `stl` `3mf` `glb` `obj` `dxf` `svg`; `-p key=value`, `-t <mm>`, `--part`, `--json` |
 | `tscad info [file]` | params, volume, mass and bounds per part |
-| `tscad render [file] -o out.png` | `--view iso\|front\|top\|…`, `--width`, `--background`, `--ortho` |
+| `tscad render [file\|folder] -o out.png` | `--view iso\|front\|top\|…`, `--width`, `--background`, `--ortho`, `--json`; a folder renders every model into `-o <dir>` (cached) |
 | `tscad convert in.scad -o out.tsx` | convert an OpenSCAD model |
 | `tscad mcp` | MCP server over stdio |
 

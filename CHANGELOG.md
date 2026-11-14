@@ -103,6 +103,11 @@ The first release: CAD as TSX.
   obj, dxf, svg), `info`, `render`, `convert`, `mcp`.
   - `tscad dev` evaluates on the server with the native kernel when it's available, and falls
     back to the browser, where parts also evaluate in parallel (up to 4 wasm kernels).
+  - `tscad dev <folder>` (or a folder without `index.tsx`) serves a gallery of every model in the
+    tree: thumbnails, doc-comment titles and descriptions, parts, volume and error badges, with
+    filter and sort. Thumbnails are cached in `.tscad/cache/` (which `tscad init` gitignores).
+  - `tscad render <folder> -o <dir>` renders every model to `<dir>/<path>.png` through the same
+    cache, and `tscad render file --json` prints each part's status and volume.
 - **Viewer:**
   - param sliders, pick-to-selector, section and measure tools, export;
   - sketch overlays (dimensions, free points, patterns) with click-to-source;
@@ -112,7 +117,8 @@ The first release: CAD as TSX.
     booleans), a Diff panel with per-part added/removed mm³, Δvolume and Δsize, and **Pin**
     to keep a baseline for A/B comparisons.
 - **Playground:** a static in-browser editor with autocompletion, error squiggles, share links
-  and **Import .scad**.
+  and **Import .scad**. Share links carry text-imported files (`files=` next to `code=`), so
+  models like engraved-logo that import an SVG share whole.
 - **VS Code extension** (`editors/vscode`, not yet on the Marketplace):
   - a live preview beside the editor;
   - squiggles for compile, kernel and sketch problems;

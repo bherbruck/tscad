@@ -87,6 +87,11 @@ export interface SketchInfo extends SolvedSketch {
   path: string;
   /** Row-major 4×4: sketch `(x, y, 0, 1)` → model space (includes every enclosing transform). */
   plane: number[];
+  /**
+   * Drawn on a face: the IR path of the `onFace` node. `plane` is then relative to that face's
+   * frame, which only the kernel knows (origin at the face's centre, +Z out of the material).
+   */
+  onFace?: string;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -2251,9 +2256,19 @@ export function dragSketch(sketch: Host, point: string, target: Vec2, o: { chang
       const c = r.owner[i]!;
       if (c < constraints.length && !constraints[c]!.structural && Math.abs(f) > Math.max(1e-7 * S, 1e-4 * big)) seen.add(c);
     });
-    // the constraints on the dragged point itself first (a point-on-line before the line's own fix)
+    // rank by what actually resists: how much closer the point gets with that constraint
+    // alone released (the length that holds a corner before the vertical it slides along),
+    // then the constraints on the dragged point itself
+    const stuck = vlen(vsub(at(xd), target));
+    const gain = new Map<number, number>();
+    for (const i of seen) {
+      const ord = order.filter((j) => j !== i);
+      const xr = walk(constraints, ord, xd);
+      gain.set(i, stuck - vlen(vsub(at(xr), target)));
+    }
     const direct = (i: number) => (constraints[i]!.vars.includes(pt.ix) || constraints[i]!.vars.includes(pt.ix + 1) ? 0 : 1);
-    blockers = [...seen].sort((a, b) => direct(a) - direct(b) || a - b);
+    const g = (i: number) => Math.round((gain.get(i) ?? 0) / Math.max(tol, 1e-9 * S)) * Math.max(tol, 1e-9 * S);
+    blockers = [...seen].sort((a, b) => g(b) - g(a) || direct(a) - direct(b) || a - b);
   }
 
   const dimensionChanges: DragResult["dimensionChanges"] = [];
@@ -2477,7 +2492,7 @@ export class SketchRecorder {
   }
 
   /** During the document walk: record sketches bound to `node` at `path`, `acc` = model matrix. */
-  visit(node: Node, path: string, acc: Mat4): void {
+  visit(node: Node, path: string, acc: Mat4, face?: string): void {
     const list = this.byNode.get(node);
     if (!list) return;
     for (const p of list) {
@@ -2486,7 +2501,7 @@ export class SketchRecorder {
       // frame columns u, v, n, origin; then the 2D affine in sketch space
       const F: Mat4 = [f.u[0], f.v[0], f.n[0], f.origin[0], f.u[1], f.v[1], f.n[1], f.origin[1], f.u[2], f.v[2], f.n[2], f.origin[2], 0, 0, 0, 1];
       const A: Mat4 = [a, b, 0, e, c, dd, 0, ff, 0, 0, 1, 0, 0, 0, 0, 1];
-      this.sketches.push({ ...p.info, path, plane: mul4(acc, mul4(F, A)).map((v) => (Math.abs(v) < 1e-15 ? 0 : v)) });
+      this.sketches.push({ ...p.info, path, plane: mul4(acc, mul4(F, A)).map((v) => (Math.abs(v) < 1e-15 ? 0 : v)), ...(face ? { onFace: face } : {}) });
     }
   }
 }
