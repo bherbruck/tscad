@@ -54,6 +54,16 @@ export default function Bracket(p: ParamValues<typeof params>) {
 \`<difference>\` keeps the FIRST child and subtracts all others; \`<union>\`, \`<intersection>\`.
 Several children of \`<part>\`/\`<group>\` are unioned.
 
+## Refs (operate on named solids, often shorter than nesting)
+
+Any solid or component call takes \`name\`; ops then point at names instead of wrapping:
+\`<subtract from=".plate" tool=".bolt > .shank" />\`, \`<union of=".a, .b" />\`, \`<intersect of=".a, .b" />\`,
+\`<fillet target=".plate" radius={1} edges={...} />\` (also \`chamfer\`, \`shell\`, \`draft\` with \`target\`).
+Selectors: \`.name\`, \`.a > .b\` (nearest named ancestor), \`.a .b\` (descendant), \`.a, .b\`. Refs resolve within the
+\`<part>\` (inside a component: within that call), in written order. The result keeps \`from\`/\`target\`'s name and
+place; tools are used up (removed). \`from\`/\`target\` must match one solid. Library parts name their sub-solids
+(\`<Bolt name="b">\` → \`.b > .head\`, \`.b > .shank\`; \`<Bolt cutter>\` is a clearance tool). Ref ops take no x/y/rotate.
+
 ## Sketches → solids
 
 2D shapes live only inside \`<extrude>\`, \`<revolve>\`, \`<loft>\`, \`<sweep>\`, \`<drawing>\`:

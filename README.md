@@ -149,6 +149,25 @@ so selectors survive param changes. In the viewer, click an edge to get its sele
 </fillet>
 ```
 
+### Refs: operate on named solids
+
+Nesting isn't the only way to combine solids. Name a solid (or a component call), then point an
+operation at it from outside, tscircuit-style. That reaches inside library components without
+forking them, and it's a lot shorter for AI agents writing models.
+
+```tsx
+<part name="bracket">
+  <box name="plate" size={[40, 20, 4]} />
+  <Bolt name="bolt" thread="M3" length={12} z={4} />
+  <subtract from=".plate" tool=".bolt > .shank" />        {/* the shank is used up */}
+  <fillet target=".plate" radius={1} edges={edges.max("z")} />
+</part>
+```
+
+`<union of>`, `<intersect of>`, `<chamfer target>`, `<shell target>` and `<draft target>` work
+the same way. Selectors are `.name`, `.a > .b`, `.a .b` and `.a, .b`; refs resolve within the
+part, and a typo gets a "did you mean". See [docs/refs.md](docs/refs.md).
+
 ### Parts library: `tscad/parts`
 
 <a href="examples/parts-showcase.tsx"><img src="docs/images/parts-showcase.png" align="right" width="320" alt="A NEMA 17 plate and a Raspberry Pi base built from tscad/parts"></a>
@@ -157,6 +176,12 @@ Parts are just components. The library has ISO metric holes (clearance, counterb
 countersink, tap), nut traps, heat-set insert pockets, standoffs, published mounting patterns
 (Raspberry Pi 4 and Zero, Arduino Uno, NEMA 17/23) and 2020 extrusion. It also exports the
 `metric` table (`metric.M3.clearance.normal` → 3.4).
+
+Standard hardware is modelled from ISO tables:
+- **Parts:** `<Bolt thread="M3" length={10} head="socket" />` (also hex, button, flat and pan heads), `<Nut>` (hex or nyloc), `<Washer>` (flat or spring), `<SetScrew>`, `<DowelPin>`, `<Bearing designation="608" />` and `<ShaftCollar>`.
+- **Clearance cutters:** `<Bolt ... cutter />` is the bolt's own clearance cutter: the hole plus a pocket for the head.
+- **Names and anchors:** sub-solids are named (`head`, `shank`, `socket`...), and anchors are available for `<mate>`.
+- **Example:** [examples/fasteners.tsx](examples/fasteners.tsx), with the reference in [docs/parts.md](docs/parts.md).
 
 Board models do the measuring for you. `boards.raspberryPi5` (also Pi 4, Zero 2 W, Pico,
 Arduino Uno and ESP32-DevKitC) holds every connector as data. `<BoardCase board={boards.raspberryPi5} />`
@@ -272,7 +297,7 @@ See [docs/convert.md](docs/convert.md).
 <td width="33%" valign="top"><a href="examples/vase.tsx"><img src="docs/images/vase.png" alt="Vase"></a><br><b>Vase</b>: SVG-path silhouette, revolve, shell</td>
 </tr>
 <tr>
-<td valign="top"><a href="examples/bolt-and-nut.tsx"><img src="docs/images/bolt-and-nut.png" alt="Bolt and nut"></a><br><b>Bolt and nut</b>: ISO table as a choice param</td>
+<td valign="top"><a href="examples/fasteners.tsx"><img src="docs/images/fasteners.png" alt="Bolted bearing block"></a><br><b>Standard hardware</b>: <code>&lt;Bolt&gt;</code>, nyloc nuts, washers, a 608 bearing, each bolt cutting its own hole</td>
 <td valign="top"><a href="examples/assembly-hinge-box.tsx"><img src="docs/images/assembly-hinge-box.png" alt="Hinged box"></a><br><b>Hinged box</b>: a revolute mate driven by a param</td>
 <td valign="top"><a href="examples/sketch-pulley.tsx"><img src="docs/images/sketch-pulley.png" alt="V-belt pulley"></a><br><b>V-belt pulley</b>: a constrained half section, revolved</td>
 </tr>

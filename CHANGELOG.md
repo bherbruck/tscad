@@ -17,6 +17,11 @@ The first release: CAD as TSX.
 - **Booleans:** `<union>`, `<difference>` (`<subtract>`), `<intersection>` (`<intersect>`).
 - **Transforms:** `<translate>`, `<rotate>`, `<scale>`, `<mirror keep>` and `<transform matrix>`,
   plus placement props on every solid (`x y z at rotate rotateX/Y/Z scale mirror`).
+- **Refs:** every solid and component call takes `name`, and ops can point at names instead of
+  wrapping children: `<subtract from tool>`, `<union of>`, `<intersect of>`, and `target` on
+  `<fillet>`, `<chamfer>`, `<shell>` and `<draft>`. Selectors `.name`, `.a > .b`, `.a .b`,
+  `.a, .b`; resolved per part (or per component call), with "did you mean" and ambiguity
+  errors at the op's line. Tools are used up; the result keeps the target's name and place.
 - **Patterns:** `<linearPattern>`, `<gridPattern>`, `<polarPattern>`.
 - **Features:**
   - `<fillet>`, `<chamfer>`, `<shell>`

@@ -55,6 +55,12 @@ export interface Placement {
   mirror?: Axis;
   /** Reconciliation key (like React's); tscad only uses it for diagnostics. */
   key?: Key;
+  /**
+   * A name other elements can refer to (`".plate"`, `".bolt > .shank"`): `<subtract from tool>`,
+   * `<union of>`, `<intersect of>`, `<fillet target>`, `<chamfer target>`, `<shell target>`,
+   * `<draft target>`. Refs resolve within the enclosing `<part>`. Component calls take `name` too.
+   */
+  name?: string;
 }
 
 /**
@@ -119,10 +125,7 @@ export interface DrawingProps extends Placement2D, SketchChildren {
   density?: number;
 }
 
-export interface GroupProps extends Placement, SolidChildren {
-  /** Optional label (diagnostics only). */
-  name?: string;
-}
+export interface GroupProps extends Placement, SolidChildren {}
 
 // ---------------------------------------------------------------------------------------------
 // Explicit transforms
@@ -294,11 +297,29 @@ export interface StepProps extends Placement {
 // Booleans
 
 /** Everything in any child. */
-export interface UnionProps extends Placement, SolidChildren {}
+export interface UnionProps extends Placement, SolidChildren {
+  /**
+   * By ref instead of children: unite the named solids (`".a, .b"`). The first keeps its place
+   * and name; the others are moved into it and removed from where they were.
+   */
+  of?: string;
+}
 /** The first child minus every other child. */
-export interface DifferenceProps extends Placement, SolidChildren {}
+export interface DifferenceProps extends Placement, SolidChildren {
+  /**
+   * By ref instead of children: the named solid to cut (`".plate"`). The result keeps its name
+   * and place in the tree. Needs `tool`.
+   * @example <subtract from=".plate" tool=".bolt > .shank" />
+   */
+  from?: string;
+  /** By ref: the solid(s) to cut away (`".hole"`, `".a, .b"`). They are used up: removed from the output. */
+  tool?: string;
+}
 /** Only what every child shares. */
-export interface IntersectionProps extends Placement, SolidChildren {}
+export interface IntersectionProps extends Placement, SolidChildren {
+  /** By ref instead of children: keep what the named solids share (`".a, .b"`); the first keeps its place and name. */
+  of?: string;
+}
 
 // ---------------------------------------------------------------------------------------------
 // Sketch (2D) shapes: children of <extrude>, <revolve>, <loft>, <sweep>
@@ -858,6 +879,8 @@ export interface PolarPatternProps extends Placement, SolidChildren {
 
 /** Round edges of the children (unioned). `radius` 0 skips the fillet (handy for params). */
 export interface FilletProps extends Placement, SolidChildren {
+  /** By ref instead of children: the named solid to apply it to (`".plate"`); the result keeps its name. */
+  target?: string;
   /** Fillet radius, mm. */
   radius?: number;
   /** Alias of `radius`. */
@@ -871,6 +894,8 @@ export interface FilletProps extends Placement, SolidChildren {
 
 /** Bevel edges of the children (unioned). `distance` 0 skips it. */
 export interface ChamferProps extends Placement, SolidChildren {
+  /** By ref instead of children: the named solid to apply it to (`".plate"`); the result keeps its name. */
+  target?: string;
   /** Setback along each face, mm. */
   distance?: number;
   /** Alias of `distance`. */
@@ -881,6 +906,8 @@ export interface ChamferProps extends Placement, SolidChildren {
 
 /** Hollow the children (unioned) to a wall `thickness`, leaving the `open` faces open. */
 export interface ShellProps extends Placement, SolidChildren {
+  /** By ref instead of children: the named solid to apply it to (`".plate"`); the result keeps its name. */
+  target?: string;
   /** Wall thickness, mm. Walls grow inward unless `outward` (the sign is ignored: −2 is also 2 mm inward). */
   thickness: number;
   /** Faces to remove: `faces.top()`, `">Z"`, ... Default: none (a closed hollow). */
@@ -899,6 +926,8 @@ export type PlaneSpec = "XY" | "XZ" | "YZ" | { origin?: Vec3; normal: Vec3 | Axi
  * @example <draft angle={3}><box size={[40, 30, 20]} /></draft>
  */
 export interface DraftProps extends Placement, SolidChildren {
+  /** By ref instead of children: the named solid to apply it to (`".plate"`); the result keeps its name. */
+  target?: string;
   /** Draft angle, degrees (0 skips it). */
   angle: number;
   /** Faces to draft. Default: the walls square to `pull` (`"#Z"` for the default pull). */

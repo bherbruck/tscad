@@ -27,6 +27,8 @@ export declare namespace JSX {
   interface IntrinsicAttributes {
     /** Reconciliation key (diagnostics only). */
     key?: Key;
+    /** A ref name for this element or component call (`".bolt > .shank"` picks inside it). */
+    name?: string;
   }
   /** `children` is the prop that receives JSX children. */
   interface ElementChildrenAttribute {

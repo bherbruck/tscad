@@ -44,6 +44,7 @@ const docPages: DocPage[] = [
   { path: "docs/guide.html", title: "Guide", src: join(DOCS, "guide.md") },
   { path: "docs/sketch.html", title: "Constraint sketches", src: join(DOCS, "sketch.md") },
   { path: "docs/assembly.html", title: "Assemblies & mates", src: join(DOCS, "assembly.md") },
+  { path: "docs/refs.html", title: "Refs: named solids", src: join(DOCS, "refs.md") },
   { path: "docs/sheet-metal.html", title: "Sheet metal", src: join(DOCS, "sheet-metal.md") },
   { path: "docs/cookbook.html", title: "Cookbook", src: join(DOCS, "cookbook.md") },
   { path: "docs/sweep.html", title: "Param sweep", src: join(DOCS, "SWEEP.md") },
@@ -103,7 +104,7 @@ const allGroups: [string, string, string[]][] = [
 ];
 
 const sidebar: NavGroup[] = [
-  { title: "Start", items: docPages.filter((p) => ["docs/getting-started.html", "docs/guide.html", "docs/cookbook.html", "docs/sketch.html", "docs/assembly.html", "docs/sheet-metal.html"].includes(p.path)).map((p) => ({ title: p.title, href: p.path })) },
+  { title: "Start", items: docPages.filter((p) => ["docs/getting-started.html", "docs/guide.html", "docs/cookbook.html", "docs/sketch.html", "docs/assembly.html", "docs/refs.html", "docs/sheet-metal.html"].includes(p.path)).map((p) => ({ title: p.title, href: p.path })) },
   {
     title: "Reference",
     items: [
@@ -135,6 +136,7 @@ const DOC_LINKS: Record<string, string> = {
   "api.md": "reference/api.html",
   "sheet-metal.md": "docs/sheet-metal.html",
   "SWEEP.md": "docs/sweep.html",
+  "refs.md": "docs/refs.html",
 };
 
 /** Rewrite a markdown URL found in `srcFile`, for a page at `pagePath`. */
@@ -231,6 +233,7 @@ const DOC_BLURBS: Record<string, string> = {
   "docs/cookbook.html": "Complete recipes: enclosures, brackets, bins, gears, laser-cut tags.",
   "docs/sketch.html": "Constraint-solved sketches: dimensions, tangency, patterns.",
   "docs/assembly.html": "Parts with anchors and mates, joints you can drive, gears.",
+  "docs/refs.html": "Name solids and component calls, then subtract, unite or fillet them by reference.",
   "docs/sheet-metal.html": "Bent sheet parts and their flat patterns.",
   "docs/checks.html": "Printability, interference and model tests with bun:test.",
   "docs/convert.html": "Convert OpenSCAD models to tscad.",

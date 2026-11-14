@@ -14,6 +14,7 @@ import { resolveParams, type ParamIssue, type ParamSchema, type ParamValues } fr
 import type { Path3 } from "./paths";
 import { polyline3 } from "./paths";
 import { render, type Host } from "./render";
+import { invertAffine, matches, parseRefSelector, refPath, RefSyntaxError, type ComponentInstance, type RefNode } from "./refs";
 import { layoutText, loadFont } from "./text/font";
 import { toSelector, type SelectorLike } from "./select";
 import { offsetLoops, OffsetError } from "./sketch/offset";
@@ -170,6 +171,19 @@ const ALL_TAGS = [...SOLID_TAGS, ...SKETCH_TAGS, ...CONTAINER_TAGS, ...CONSTRAIN
 /** Tags whose x/y/z mean something else (no universal placement). */
 const OWN_TRANSFORM = new Set(["translate", "rotate", "scale", "mirror", "transform", "onFace", "pocket", "boss", "cutThrough"]);
 
+/** A host standing for an already-built node (ref ops rebuild features around their target). */
+const NODE_TAG = "#node";
+interface NodeHost extends Host {
+  node: Node;
+}
+/** Features that take `target` (a ref) instead of children. */
+const REF_FEATURES = new Set(["fillet", "chamfer", "shell", "draft"]);
+const REF_PROPS: Record<string, string> = {
+  difference: "from, tool", subtract: "from, tool", union: "of", intersection: "of", intersect: "of",
+  fillet: "target", chamfer: "target", shell: "target", draft: "target",
+};
+const PLACEMENT_PROPS = ["x", "y", "z", "at", "rotate", "rotateX", "rotateY", "rotateZ", "scale", "mirror"] as const;
+
 interface SketchLoop {
   loop: Loop2;
   host: Host;
@@ -183,6 +197,16 @@ class Compiler {
   readonly sketchRec = new SketchRecorder();
   /** Flat-pattern drawings of `<sheetMetal>` parts. */
   readonly sheetDrawings: Drawing[] = [];
+  /** Named solids → their nodes (refs). */
+  readonly named = new Map<RefNode, Node>();
+  /** Component calls: their root nodes, and how many roots are built. */
+  readonly instances = new Map<ComponentInstance, { nodes: Node[]; built: number }>();
+  /** Deferred ref ops, one list per open scope (the bottom one: loose solids). */
+  readonly ops: Host[][] = [[]];
+  /** Nodes consumed as tools (pruned when their part is finished), and by which op. */
+  readonly consumed = new Map<Node, Host>();
+  /** Refs consumed with them. */
+  readonly consumedRefs = new Map<RefNode, Host>();
   /** Anchors and mates, solved once every part is built. */
   readonly asm = new AssemblyRecorder({ placement: (h) => this.placement(h), warn: (h, msg) => this.warn(h, msg), emit: (n, h) => this.emit(n, h) });
 
@@ -285,7 +309,9 @@ class Compiler {
         return;
       }
       if (h.tag === "part") {
-        const body = this.group(h.children, h);
+        this.ops.push([]);
+        const built = this.group(h.children, h);
+        const body = this.finishScope(built ? [built] : [], h)[0] ?? null;
         const node = body && this.wrap(h, body, mul(m, this.placement(h)));
         if (!node) {
           this.warn(h, `part ${h.props.name ? JSON.stringify(h.props.name) : ""} is empty; skipped`);
@@ -313,6 +339,11 @@ class Compiler {
       }
     };
     for (const r of roots) visit(r, identity());
+    // ref ops among loose solids (outside any part) resolve over all of them
+    if (this.ops[0]!.length || loose.length) {
+      const kept = new Set(this.finishScope(loose, undefined));
+      for (let i = loose.length - 1; i >= 0; i--) if (!kept.has(loose[i]!)) (loose.splice(i, 1), looseHosts.splice(i, 1));
+    }
 
     if (loose.length) {
       const name = this.options.defaultPartName ?? "part";
@@ -377,6 +408,227 @@ class Compiler {
       names.add(n);
     }
     return { document: { parts: doc }, sourceMap, warnings: this.warnings, parts: infos, drawings, sketches: this.sketchRec.sketches, ...(assembly ? { assembly } : {}) };
+  }
+
+  // ---- refs: <subtract from tool>, <union of>, <intersect of>, <fillet target>...
+
+  isRefOp(h: Host): boolean {
+    const p = h.props;
+    const ref =
+      ((h.tag === "difference" || h.tag === "subtract") && (p.from !== undefined || p.tool !== undefined)) ||
+      ((h.tag === "union" || h.tag === "intersection" || h.tag === "intersect") && p.of !== undefined) ||
+      (REF_FEATURES.has(h.tag) && p.target !== undefined);
+    if (!ref) return false;
+    if (h.children.length) this.fail(h, `<${h.tag}> takes either children or a ref (${REF_PROPS[h.tag]}), not both`);
+    for (const k of PLACEMENT_PROPS) if (p[k] !== undefined) this.fail(h, `${k} has no effect on a ref <${h.tag}>: the result stays where its target is`, "move the named solid instead");
+    if ((h.tag === "difference" || h.tag === "subtract") && (p.from === undefined || p.tool === undefined)) {
+      this.fail(h, `<${h.tag}> by ref needs both from and tool`, `<${h.tag} from=".plate" tool=".bolt > .shank" />`);
+    }
+    return true;
+  }
+
+  instState(inst: ComponentInstance) {
+    let st = this.instances.get(inst);
+    if (!st) this.instances.set(inst, (st = { nodes: [], built: 0 }));
+    return st;
+  }
+
+  /** Every root of a component call is built: run the ref ops written in it, scoped to it. */
+  flushInstance(inst: ComponentInstance): void {
+    const list = this.ops[this.ops.length - 1]!;
+    const mine = list.filter((op) => op.instance === inst);
+    if (!mine.length) return;
+    const roots = this.instState(inst).nodes;
+    for (const op of mine) {
+      list.splice(list.indexOf(op), 1);
+      this.applyOp(op, roots, `<${inst.component}>`);
+    }
+  }
+
+  /** Close a scope (a part, or the loose solids): run its remaining ref ops, then drop consumed tools. */
+  finishScope(roots: Node[], part: Host | undefined): Node[] {
+    const list = this.ops.length > 1 ? this.ops.pop()! : this.ops[0]!.splice(0);
+    const label = part ? `part ${JSON.stringify(part.props.name ?? "part")}` : "the model";
+    for (const op of list) this.applyOp(op, roots, label);
+    if (!this.consumed.size) return roots;
+    const prune = (n: Node): Node | null => {
+      if (this.consumed.has(n)) return null;
+      if (n.type === "onFace") {
+        const base = prune(n.base);
+        if (base !== n.base) this.fail(this.consumed.get(n.base) ?? part, "consumed the base of an <onFace>");
+      }
+      if (!("children" in n)) return n;
+      const kids = n.children.map(prune);
+      if (kids.every((k, i) => k === n.children[i])) return n;
+      const left = kids.filter((k): k is Node => k !== null);
+      if (!left.length && (n.type === "union" || n.type === "transform")) return null;
+      if (left.length === 1 && n.type === "union") return left[0]!;
+      (n as { children: Node[] }).children = left;
+      return n;
+    };
+    return roots.map(prune).filter((n): n is Node => n !== null);
+  }
+
+  /** Every place `roots` hold a node (patterns can repeat one), with the frame it sits in. */
+  index(roots: Node[]): Map<Node, { frame: Mat4; count: number; up: { parent: Node | null; at: number }[] }> {
+    const out = new Map<Node, { frame: Mat4; count: number; up: { parent: Node | null; at: number }[] }>();
+    const visit = (n: Node, frame: Mat4, up: { parent: Node | null; at: number }[]) => {
+      if (this.consumed.has(n)) return;
+      const seen = out.get(n);
+      if (seen) seen.count++;
+      else out.set(n, { frame, count: 1, up });
+      const inner = n.type === "transform" ? mul(frame, n.matrix as Mat4) : frame;
+      // an <onFace>'s tools sit in the face's frame (known after evaluation): not reachable by refs
+      if (n.type === "onFace") visit(n.base, inner, [...up, { parent: n, at: -1 }]);
+      else if ("children" in n) n.children.forEach((c, i) => visit(c, inner, [...up, { parent: n, at: i }]));
+    };
+    roots.forEach((r, i) => visit(r, identity(), [{ parent: null, at: i }]));
+    return out;
+  }
+
+  /** The solids `sel` (a prop of `op`) picks among `roots`. */
+  resolve(op: Host, prop: string, roots: Node[], idx: ReturnType<Compiler["index"]>, scope: string): { ref: RefNode; node: Node }[] {
+    const raw = op.props[prop];
+    let sel;
+    try {
+      sel = parseRefSelector(raw);
+    } catch (e) {
+      this.fail(op, `${prop}: ${e instanceof RefSyntaxError ? e.message : String(e)}`, `${prop}=".name" or ".outer > .inner"`);
+    }
+    const here: { ref: RefNode; node: Node }[] = [];
+    const elsewhere: RefNode[] = [];
+    const add = (ref: RefNode, node: Node | undefined) => {
+      if (node && idx.has(node)) here.push({ ref, node });
+      else elsewhere.push(ref);
+    };
+    for (const [ref, node] of this.named) add(ref, node);
+    for (const [inst, st] of this.instances) {
+      if (!inst.ref) continue;
+      const nodes = st.nodes.filter((n) => idx.has(n));
+      if (nodes.length === 1) add(inst.ref, nodes[0]);
+      else if (nodes.length > 1) {
+        if (matches(inst.ref, sel)) this.fail(op, `${prop}=${JSON.stringify(raw)}: <${inst.component} name=${JSON.stringify(inst.name)}> builds ${nodes.length} separate solids`, `name the one you mean, e.g. ${JSON.stringify(`.${inst.name} > .name`)}, or wrap them in one <group> inside the component`);
+      } else elsewhere.push(inst.ref);
+    }
+    const hit = here.filter((c) => matches(c.ref, sel));
+    if (!hit.length) {
+      const used = [...this.consumedRefs.keys()].find((r) => matches(r, sel));
+      if (used) {
+        const by = this.consumedRefs.get(used)!;
+        this.fail(op, `${prop}=${JSON.stringify(raw)}: ${refPath(used)} was already used up as a tool by <${by.tag}>${by.loc ? ` at ${by.loc.file.split("/").pop()}:${by.loc.line}` : ""}`);
+      }
+      const away = elsewhere.find((r) => matches(r, sel));
+      if (away) this.fail(op, `${prop}=${JSON.stringify(raw)} matches nothing in ${scope}`, `${refPath(away)} is outside it: refs reach named solids in the same <part> (and, inside a component, in the same component call)`);
+      const names = [...new Set(here.map((c) => c.ref.name))];
+      const last = sel.map((alt) => alt[alt.length - 1]!.name);
+      const guess = last.map((n) => closest(n, names)).find(Boolean);
+      const list = here.map((c) => refPath(c.ref));
+      this.fail(op, `${prop}=${JSON.stringify(raw)} matches nothing in ${scope}`, guess && !last.includes(guess) ? `did you mean ".${guess}"? Named here: ${list.join(", ")}` : list.length ? `named here: ${list.join(", ")}` : `nothing here has a name: give the solid one, e.g. <box name="plate" .../>`);
+    }
+    // a solid matched both directly and through an ancestor counts once (as the ancestor)
+    const nodes = new Set(hit.map((c) => c.node));
+    const out = hit.filter((c, i) => hit.findIndex((d) => d.node === c.node) === i && !idx.get(c.node)!.up.some((u) => u.parent && nodes.has(u.parent)));
+    for (const c of out) {
+      const n = idx.get(c.node)!.count;
+      if (n > 1) this.fail(op, `${prop}=${JSON.stringify(raw)}: ${refPath(c.ref)} appears ${n} times (repeated by a pattern)`, "a ref op needs one solid: name the pattern instead, or apply the op inside the patterned component");
+    }
+    return out;
+  }
+
+  /** Exactly one solid for `prop`. */
+  one(op: Host, prop: string, roots: Node[], idx: ReturnType<Compiler["index"]>, scope: string): { ref: RefNode; node: Node } {
+    const hit = this.resolve(op, prop, roots, idx, scope);
+    if (hit.length > 1) this.fail(op, `${prop}=${JSON.stringify(op.props[prop])} matches ${hit.length} solids: ${hit.map((c) => refPath(c.ref)).join(", ")}`, "qualify it with the parent's name, e.g. .bolt > .shank");
+    return hit[0]!;
+  }
+
+  /** Replace `target` in place by `make(copyOfTarget)`; refs to the target now name the result. */
+  replace(target: Node, op: Host, make: (copy: Node) => Node): void {
+    const copy = { ...target } as Node;
+    const loc = this.locs.get(target);
+    if (loc) this.locs.set(copy, loc);
+    if (this.soft.has(target)) (this.soft.delete(target), this.soft.add(copy));
+    this.sketchRec.moved(target, copy);
+    const result = make(copy);
+    if (result === copy) return;
+    for (const k of Object.keys(target)) delete (target as any)[k];
+    Object.assign(target, result);
+    if (op.loc) this.locs.set(target, op.loc);
+  }
+
+  /** `node` (at `from` in the tree) moved into the frame of `to`. */
+  moveInto(node: Node, idx: ReturnType<Compiler["index"]>, to: Node, op: Host): Node {
+    const rel = mul(invertAffine(idx.get(to)!.frame), idx.get(node)!.frame);
+    const copy = { ...node } as Node;
+    const loc = this.locs.get(node);
+    if (loc) this.locs.set(copy, loc);
+    if (isIdentity(rel)) return copy;
+    return this.emit({ type: "transform", matrix: tidy(rel) as any, children: [copy] }, op);
+  }
+
+  /** Mark `node` used up by `op` (pruned when the scope closes), after checking it can go. */
+  consume(node: Node, op: Host, idx: ReturnType<Compiler["index"]>, label: string): void {
+    // walk up past wrappers that would be left empty; stop at the first container that keeps others
+    const up = idx.get(node)!.up;
+    let child = node;
+    for (let k = up.length - 1; k >= 0; k--) {
+      const { parent, at } = up[k]!;
+      if (!parent) break;
+      if (parent.type === "onFace") this.fail(op, `can't use ${label} as a tool: it's the base of an <onFace>`);
+      const kids = (parent as { children: Node[] }).children;
+      if (parent.type === "difference" && at === 0) this.fail(op, `can't use ${label} as a tool: it's the body a <difference> cuts from`, "subtract from the outer solid instead");
+      if (parent.type === "intersection") this.fail(op, `can't use ${label} as a tool: it's one side of an <intersection>`);
+      const others = kids.filter((c) => c !== child && !this.consumed.has(c));
+      if (others.length) break;
+      if (parent.type !== "union" && parent.type !== "transform") this.fail(op, `can't use ${label} as a tool: it's the only solid of a <${parent.type}>`, "name the outer element instead");
+      child = parent;
+    }
+    this.consumed.set(node, op);
+    const inside = new Set<Node>();
+    const collect = (n: Node) => {
+      inside.add(n);
+      if (n.type === "onFace") collect(n.base);
+      if ("children" in n) n.children.forEach(collect);
+    };
+    collect(node);
+    for (const [ref, n] of this.named) if (inside.has(n) && !this.consumedRefs.has(ref)) this.consumedRefs.set(ref, op);
+    for (const [inst, st] of this.instances) if (inst.ref && st.nodes.length && st.nodes.every((n) => inside.has(n)) && !this.consumedRefs.has(inst.ref)) this.consumedRefs.set(inst.ref, op);
+  }
+
+  applyOp(op: Host, roots: Node[], scope: string): void {
+    const idx = this.index(roots);
+    const p = op.props;
+    if (op.tag === "difference" || op.tag === "subtract") {
+      const from = this.one(op, "from", roots, idx, scope);
+      const tools = this.resolve(op, "tool", roots, idx, scope);
+      for (const t of tools) {
+        if (t.node === from.node) this.fail(op, `tool ${refPath(t.ref)} is the same solid as from`);
+        if (idx.get(t.node)!.up.some((u) => u.parent === from.node)) this.fail(op, `tool ${refPath(t.ref)} is inside from ${refPath(from.ref)}`, "a solid can't cut itself: name a solid outside it");
+        if (idx.get(from.node)!.up.some((u) => u.parent === t.node)) this.fail(op, `from ${refPath(from.ref)} is inside tool ${refPath(t.ref)}`);
+      }
+      const moved = tools.map((t) => this.moveInto(t.node, idx, from.node, op));
+      for (const t of tools) this.consume(t.node, op, idx, refPath(t.ref));
+      this.replace(from.node, op, (copy) => ({ type: "difference", children: [copy, ...moved] }));
+      return;
+    }
+    if (op.tag === "union" || op.tag === "intersection" || op.tag === "intersect") {
+      const all = this.resolve(op, "of", roots, idx, scope);
+      if (all.length < 2) this.fail(op, `of=${JSON.stringify(p.of)} matches ${all.length} solid; <${op.tag}> by ref needs two or more`, `of=".a, .b"`);
+      const [keep, ...rest] = all;
+      const moved = rest.map((t) => this.moveInto(t.node, idx, keep!.node, op));
+      for (const t of rest) this.consume(t.node, op, idx, refPath(t.ref));
+      const type = op.tag === "union" ? "union" : "intersection";
+      this.replace(keep!.node, op, (copy) => ({ type, children: [copy, ...moved] }) as Node);
+      return;
+    }
+    // a feature on one named solid: built exactly as if it wrapped it
+    const target = this.one(op, "target", roots, idx, scope);
+    const { target: _t, ...props } = p;
+    this.replace(target.node, op, (copy) => {
+      const host: Host = { ...op, props, children: [{ tag: NODE_TAG, props: {}, children: [], key: null, node: copy } as NodeHost] };
+      const r = this.local(host);
+      return r ? r[0] : copy;
+    });
   }
 
   partInfo(h: Host): PartInfo {
@@ -451,6 +703,30 @@ class Compiler {
   }
 
   solid(h: Host): Node | null {
+    if (h.tag === NODE_TAG) return (h as NodeHost).node;
+    let node: Node | null;
+    if (this.isRefOp(h)) {
+      this.ops[this.ops.length - 1]!.push(h);
+      node = null;
+    } else node = this.build(h);
+    if (node && h.ref) {
+      this.named.set(h.ref, node);
+      // a named group stays one node (a transform must not dissolve it into its children)
+      this.soft.delete(node);
+    }
+    if (h.rootOf) {
+      for (let k = h.rootOf.length - 1; k >= 0; k--) {
+        const inst = h.rootOf[k]!;
+        const st = this.instState(inst);
+        if (node) st.nodes.push(node);
+        if (++st.built === inst.roots.length) this.flushInstance(inst);
+      }
+    }
+    return node;
+  }
+
+  /** A solid element's node (placement applied). */
+  build(h: Host): Node | null {
     if (SHAPE_TAGS.has(h.tag) || h.tag === "sketch" || h.tag === "section" || h.tag === "offset" || h.tag === "hull" || h.tag === "sweepPath" || h.tag in SKETCH_BOOLEANS) {
       this.fail(h, `<${h.tag}> is a 2D sketch shape and can't stand alone as a solid`, `put it inside <extrude height={...}>, <revolve>, <loft> or <sweep>`);
     }
@@ -1342,6 +1618,7 @@ function hintFor(tag: string, prop: string): string | undefined {
 export const PARTS_COMPONENTS = [
   "Hole", "CounterboreHole", "CountersinkHole", "TapHole", "NutTrap", "HeatSetInsert", "Standoff", "Board", "BoardCase",
   "BoltPattern", "MountHoles", "Extrusion2020", "HexPrism", "FingerJointBox", "LivingHinge",
+  "Bolt", "Nut", "Washer", "SetScrew", "DowelPin", "Bearing", "ShaftCollar",
 ];
 
 function unknownHint(tag: string, guess: string | undefined): string | undefined {

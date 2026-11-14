@@ -2505,6 +2505,14 @@ export class SketchRecorder {
     this.pending = this.pending.filter((p) => p.parent !== parent);
   }
 
+  /** A ref op rebuilt `from` around a copy `to`: the sketches bound to it now belong to the copy. */
+  moved(from: Node, to: Node): void {
+    const list = this.byNode.get(from);
+    if (!list) return;
+    this.byNode.delete(from);
+    this.byNode.set(to, list);
+  }
+
   /** During the document walk: record sketches bound to `node` at `path`, `acc` = model matrix. */
   visit(node: Node, path: string, acc: Mat4, face?: string): void {
     const list = this.byNode.get(node);
