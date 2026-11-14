@@ -63,6 +63,19 @@ These have NOT been filed upstream.
 - ~10 boolean failures on revolves / rotated extrudes ("SmFace::PointClassify not supported yet",
   "proto edge is deleted", "mass::enclosure", empty unions).
 
+## 10. union_all refuses a union that pairwise unions (in the right order) accept
+- Three extruded rounded rectangles: two disjoint plates (z 0..0.8 and 2.6..5) and a third
+  touching the second at z = 5. `union_all` → "the result is not a closed solid"; folding left to
+  right fails too (disjoint ∪ disjoint, then the touching one). Unioning the large touching one
+  first, then the rest, works. Boxes in the same layout work.
+- Workaround: when `union_all` refuses, tscad unions greedily, largest body first, retrying any
+  union that fails after the others (`eval::union`).
+
+## 11. Extruding the DejaVu Sans glyph "s" at 11–13 mm fails
+- "the result is not a closed solid", only at those sizes; the glyph's many short Bézier edges.
+- Workaround (core): consecutive glyph Béziers are joined into one C0 B-spline (same curve,
+  fewer edges).
+
 ## Notes (tscad bugs found and fixed, not kernel bugs)
 - `solidcore_ops::blend` takes the kernel's *native* edge order, not record order (its
   `SetBack` docs say so; the function's own docs read as record indices). tscad now uses

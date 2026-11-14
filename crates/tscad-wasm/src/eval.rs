@@ -323,7 +323,47 @@ fn union(children: &[Node], path: &str, cache: &mut Cache) -> R<Solid> {
     match bodies.len() {
         0 => Ok(None),
         1 => Ok(bodies.pop()),
-        _ => kernel(path, "union", ops::boolean::union_all(bodies)).map(Some),
+        _ => {
+            // union_all can refuse what pairwise unions accept (solidcore, docs/KERNEL_ISSUES.md
+            // #10): keep copies and fold one by one when it does
+            let copies: Option<Vec<Body>> = bodies.iter().map(|b| b.copy().ok()).collect();
+            match ops::boolean::union_all(bodies) {
+                Ok(b) => Ok(Some(b)),
+                Err(first) => {
+                    let Some(copies) = copies else { return Err(fail(path, "union", format!("{first}"))) };
+                    // greedy: largest first, a union that fails is retried after the others
+                    let mut pending: Vec<(f64, Body)> =
+                        copies.into_iter().map(|b| (b.volume(1e-3).unwrap_or(0.0), b)).collect();
+                    pending.sort_by(|a, b| b.0.total_cmp(&a.0));
+                    let mut acc = pending.remove(0).1;
+                    let mut last = format!("{first}");
+                    while !pending.is_empty() {
+                        let mut progressed = false;
+                        let mut i = 0;
+                        while i < pending.len() {
+                            let (Ok(a), Ok(b)) = (acc.copy(), pending[i].1.copy()) else { break };
+                            match ops::boolean::boolean(a, b, BooleanOp::Union) {
+                                Ok(Some(u)) => {
+                                    acc = u;
+                                    pending.remove(i);
+                                    progressed = true;
+                                }
+                                Ok(None) => i += 1,
+                                Err(e) => {
+                                    last = format!("{e}");
+                                    i += 1;
+                                }
+                            }
+                        }
+                        if !progressed {
+                            return Err(fail(path, "union", last));
+                        }
+                    }
+                    let acc = Some(acc);
+                    Ok(acc)
+                }
+            }
+        }
     }
 }
 
