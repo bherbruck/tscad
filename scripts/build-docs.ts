@@ -43,6 +43,7 @@ const docPages: DocPage[] = [
   { path: "docs/getting-started.html", title: "Getting started", src: join(CONTENT, "getting-started.md") },
   { path: "docs/guide.html", title: "Guide", src: join(DOCS, "guide.md") },
   { path: "docs/sketch.html", title: "Constraint sketches", src: join(DOCS, "sketch.md") },
+  { path: "docs/assembly.html", title: "Assemblies & mates", src: join(DOCS, "assembly.md") },
   { path: "docs/selectors.html", title: "Selectors", src: join(CONTENT, "selectors.md") },
   { path: "docs/checks.html", title: "Checks & testing", src: join(DOCS, "checks.md") },
   { path: "docs/mcp.html", title: "MCP server (AI agents)", src: join(DOCS, "mcp.md") },
@@ -80,7 +81,7 @@ const GROUPS: [string, string, string[]][] = [
   ["Sketch shapes", "2D shapes, used inside extrude, revolve, loft, sweep and drawing. Nested loops become holes.", ["rect", "roundedRect", "circle", "ellipse", "polygon", "regularPolygon", "slot", "path", "star", "text", "sketch", "offset", "section"]],
   ["Sketch → solid", "Turn 2D shapes into solids.", ["extrude", "revolve", "loft", "sweep"]],
   ["Patterns", "Repeat children.", ["linearPattern", "gridPattern", "polarPattern"]],
-  ["Features", "Round, bevel and hollow. Edges and faces are picked with selectors.", ["fillet", "chamfer", "shell"]],
+  ["Features", "Round, bevel, hollow, draft, push/pull and split. Edges and faces are picked with selectors.", ["fillet", "chamfer", "shell", "draft", "pushPull", "offsetFaces", "split"]],
 ];
 
 const ref = referenceEntries();
@@ -94,7 +95,7 @@ const allGroups: [string, string, string[]][] = [
 ];
 
 const sidebar: NavGroup[] = [
-  { title: "Start", items: docPages.filter((p) => ["docs/getting-started.html", "docs/guide.html", "docs/sketch.html"].includes(p.path)).map((p) => ({ title: p.title, href: p.path })) },
+  { title: "Start", items: docPages.filter((p) => ["docs/getting-started.html", "docs/guide.html", "docs/sketch.html", "docs/assembly.html"].includes(p.path)).map((p) => ({ title: p.title, href: p.path })) },
   {
     title: "Reference",
     items: [
@@ -119,6 +120,8 @@ const DOC_LINKS: Record<string, string> = {
   "ARCHITECTURE.md": "docs/architecture.html",
   "getting-started.md": "docs/getting-started.html",
   "selectors.md": "docs/selectors.html",
+  "assembly.md": "docs/assembly.html",
+  "api.md": "reference/api.html",
 };
 
 /** Rewrite a markdown URL found in `srcFile`, for a page at `pagePath`. */
@@ -126,6 +129,8 @@ function rewrite(href: string, srcFile: string, pagePath: string, kind: "link" |
   if (/^([a-z]+:|#|\/\/)/i.test(href)) return href;
   const r = rootOf(pagePath);
   const [pathPart, hash = ""] = href.split("#");
+  // links written for the site (`../reference/elements.html`) are relative to the page
+  if (/\.html$/.test(pathPart!)) return href;
   const abs = resolve(dirname(srcFile), pathPart!);
   const relRepo = abs.startsWith(ROOT) ? abs.slice(ROOT.length + 1) : pathPart!;
   if (kind === "image" || /\.(png|jpe?g|svg|gif|webp)$/i.test(abs)) {
@@ -267,64 +272,14 @@ ISO data is exported too: \`metric.M3.clearance.normal\` (3.4 mm), \`metric.M4.t
     const toc: Heading[] = ref.components.map((c) => ({ level: 2, text: c.name, id: c.name }));
     write(path, page({ path, title: "Parts library", body: `${intro.html}<div class="chips">${ref.components.map((c) => `<a href="#${c.name}">&lt;${c.name}&gt;</a>`).join("")}</div>${cards}`, section: "reference", sidebar, toc }));
   }
-  // API (the TS functions)
+  // API: docs/api.md
   {
     const path = "reference/api.html";
-    const { html, headings } = renderMarkdown(API_MD, { highlight, url: (h) => (h.startsWith("../") || h.startsWith("#") || /^[a-z]+:/.test(h) ? h : h) });
-    write(path, page({ path, title: "API", body: html, section: "reference", sidebar, toc: headings }));
+    const src = join(DOCS, "api.md");
+    const { html, headings } = md(readFileSync(src, "utf8"), src, path);
+    write(path, page({ path, title: "API reference", body: html, section: "reference", sidebar, toc: headings }));
   }
 }
-
-const API_MD = `# API
-
-Besides JSX, \`tscad\` exports a handful of functions. Everything is typed; hover in your editor.
-
-## \`tscad\`
-
-| Export | What |
-|---|---|
-| \`defineParams(schema)\` | Declare parameters (\`number\`, \`int\`, \`boolean\`, \`choice\`, \`text\`, \`color\`); \`ParamValues<typeof params>\` types the props. |
-| \`edges\`, \`faces\` | [Selector](../docs/selectors.html) builders. |
-| \`compile(element)\` | → \`{ document, sourceMap, warnings, parts, drawings }\` — the IR, a map from IR node paths to TSX locations, per-part material info, and flat drawings. |
-| \`renderModule(mod, overrides?)\` | Render a model module (\`{ default, params }\`) with parameter overrides and compile it. |
-| \`createContext\`, \`useContext\` | React-style context during compile. |
-| \`helix\`, \`polyline3\`, \`arc3\`, \`line3\`, \`bezier3\` | 3D paths for \`<sweep>\`. |
-| \`materials\`, \`massOf(volume, density)\` | Material presets (density g/cm³, colour). |
-| \`inch\`, \`cm\`, \`rad\`, \`turn\`, \`range\`, \`linspace\` | Unit and loop helpers (tscad works in mm and degrees). |
-| \`getDefaultFont\`, \`loadFont\`, \`layoutText\` | Text layout behind \`<text>\`. |
-| \`TscadError\` | Modelling errors carry \`loc\` (file, line, column, tag) and a \`hint\`. |
-
-## \`tscad/kernel\`
-
-\`\`\`ts
-import { loadKernel } from "tscad/kernel"
-const k = await loadKernel()
-const result = await k.evaluate(compile(<Model />).document) // per part: ok, volume, area, bbox, counts, error
-const mesh = await k.mesh("part")                            // typed arrays for rendering
-const step = await k.step()                                  // STEP AP242 text
-\`\`\`
-
-The session caches subtrees by structural equality, so re-evaluating after a parameter change only
-recomputes what changed.
-
-## \`tscad/export\`
-
-\`exportModel(kernel, parts, "stl" | "3mf" | "glb" | "obj" | "step")\`, plus \`toSTL\`, \`to3MF\`,
-\`toGLB\`, \`toOBJ\` for meshes.
-
-## \`tscad/drawing\`
-
-\`toDXF(drawings)\` (R12, real arcs) and \`toSVG(drawings)\` for \`<drawing>\` parts;
-\`section(mesh, { origin, normal })\`, \`sectionToSVG\`, \`sectionToDXF\` to slice solids.
-
-## \`tscad/parts\`
-
-The [parts library](parts.html).
-
-## \`tscad/mcp\`
-
-\`runMcpServer({ stdin, stdout })\` — the [MCP server](../docs/mcp.html) behind \`tscad mcp\`.
-`;
 
 const SAMPLE = `import { defineParams, edges, type ParamValues } from "tscad"
 import { BoltPattern, CounterboreHole, mountPatterns } from "tscad/parts"

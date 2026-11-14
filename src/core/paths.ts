@@ -7,6 +7,7 @@ import { DEG, dot, normalize, snap, snap3, type Vec3 } from "./math";
 /** A 3D path: IR curves, end to end. */
 export type Path3 = Curve[];
 
+/** Options for {@link helix}. */
 export interface HelixOptions {
   /** Radius of the helix, mm (distance from the Z axis to the path). */
   radius: number;
@@ -75,6 +76,7 @@ export function line3(start: Vec3, end: Vec3): Path3 {
   return [{ type: "line", start: [...start], end: [...end] }];
 }
 
+/** Options for {@link arc3}: a circular arc in 3D. */
 export interface Arc3Options {
   /** Centre, default origin. */
   center?: Vec3;

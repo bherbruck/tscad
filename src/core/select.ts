@@ -125,6 +125,7 @@ export const edges: Sel = new Sel("edges", undefined);
  */
 export const faces: Sel = new Sel("faces", undefined);
 
+/** A selector string that doesn't parse (the message quotes the input). */
 export class SelectorSyntaxError extends Error {
   constructor(message: string, readonly input: string) {
     super(`${message} in selector ${JSON.stringify(input)}`);

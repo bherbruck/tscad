@@ -27,6 +27,7 @@ export const materials = {
   acrylic: { name: "Acrylic", density: 1.18, color: "#cfe8ff" },
 } as const satisfies Record<string, Material>;
 
+/** A built-in material preset name (`"pla"`, `"aluminum"`...). */
 export type MaterialName = keyof typeof materials;
 
 /** Mass in grams of `volume` mm³ at `density` g/cm³. */

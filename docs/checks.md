@@ -32,7 +32,7 @@ describe("bracket", () => {
 })
 ```
 
-Run it with `bun test`. A full example is in [`examples/bracket.test.tsx`](../examples/bracket.test.tsx).
+Run model tests with `bun test ./examples/` (plain `bun test` only runs `tests/`; see `bunfig.toml`). A full example is in [`examples/tests/bracket.spec.tsx`](../examples/tests/bracket.spec.tsx).
 Kernel evaluations take a second or more, so give model tests a timeout such as `60_000`.
 
 ### `evaluateModel(model, params?, { kernel?, tolerance? })`

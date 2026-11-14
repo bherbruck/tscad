@@ -1,6 +1,7 @@
 /** Is a triangle mesh a closed, consistently oriented 2-manifold? */
 import { weld, type CheckMesh } from "./mesh";
 
+/** What {@link checkWatertight} found. */
 export interface WatertightResult {
   /** Closed, manifold and consistently oriented. */
   watertight: boolean;

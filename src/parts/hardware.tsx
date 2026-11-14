@@ -9,6 +9,7 @@ import { placement, positive } from "./place";
 
 const LIFT = 0.01;
 
+/** Props of {@link NutTrap}. */
 export interface NutTrapProps extends Placement {
   /** ISO metric size of the nut (ISO 4032), e.g. `"M3"` (5.5 mm across flats). */
   size: MetricSize;
@@ -40,6 +41,7 @@ export function NutTrap(props: NutTrapProps) {
   );
 }
 
+/** Props of {@link HeatSetInsert}. */
 export interface HeatSetInsertProps extends Placement {
   /** Insert size, `"M2"` to `"M8"`. */
   size: MetricSize;
@@ -66,6 +68,7 @@ export function HeatSetInsert(props: HeatSetInsertProps) {
   );
 }
 
+/** Props of {@link Standoff}. */
 export interface StandoffProps extends Placement {
   /** Screw size, e.g. `"M3"`. */
   size: MetricSize;

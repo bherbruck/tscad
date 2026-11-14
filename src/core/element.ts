@@ -12,6 +12,7 @@ export function Fragment(props: { children?: Children }): Children {
 }
 export type FragmentType = typeof Fragment;
 
+/** An element key (diagnostics only; tscad doesn't reconcile). */
 export type Key = string | number | bigint;
 
 /** One thing JSX can hold as a child. Booleans, null and undefined render nothing. */
@@ -35,6 +36,7 @@ export interface TscadElement<P = any> {
 }
 export type { TscadElement as Element };
 
+/** Is `x` a tscad JSX element? */
 export function isElement(x: unknown): x is TscadElement {
   return typeof x === "object" && x !== null && (x as any).$$typeof === ELEMENT;
 }
@@ -51,8 +53,6 @@ export function createElement(
   else if (children.length > 1) p.children = children;
   return makeElement(type, p, (key as Key | undefined) ?? null, captureSource(2));
 }
-/** Short alias of {@link createElement}. */
-export const h = createElement;
 
 export function makeElement(type: TscadElement["type"], props: any, key: Key | null | undefined, source?: SourceLoc): TscadElement {
   const el: TscadElement = { $$typeof: ELEMENT, type, props: props ?? {}, key: key ?? null, ...(source ? { source } : {}) };

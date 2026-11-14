@@ -23,6 +23,7 @@ export function planeFrame(normal: Vec3): { u: Vec3; v: Vec3; n: Vec3 } {
   return { u, v, n };
 }
 
+/** What {@link section} found, in the plane's 2D frame. */
 export interface SectionResult {
   /** Closed loops in the plane frame, mm. */
   loops: Vec2[][];

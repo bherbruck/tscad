@@ -21,7 +21,7 @@
 
 // elements & components
 export {
-  createContext, createElement, Fragment, h, isElement, setSourceCapture, useContext,
+  createContext, createElement, Fragment, isElement, setSourceCapture, useContext,
   type Child, type Children, type Component, type Context, type Element, type FC, type Key, type TscadElement,
 } from "./core/element";
 export { TscadError, formatLoc, type SourceLoc } from "./core/errors";
@@ -31,7 +31,7 @@ export { compile, renderModule, type CompileOptions, type CompileResult, type Dr
 
 // params
 export {
-  coerce, defineParams, paramDefaults, paramLabel, resolveParams,
+  coerceParam, defineParams, paramDefaults, paramLabel, resolveParams,
   type BooleanParam, type ChoiceParam, type ColorParam, type IntParam, type NumberParam, type ParamIssue, type ParamSchema,
   type ParamSpec, type ParamValue, type ParamValues, type TextParam,
 } from "./core/params";
@@ -41,7 +41,7 @@ export { edges, faces, parseSelector, Sel, SelectorSyntaxError, toSelector, type
 
 // paths & units & materials
 export { arc3, bezier3, helix, line3, path3, polyline3, type Arc3Options, type HelixOptions, type Path3 } from "./core/paths";
-export { cm, deg, ft, inch, linspace, m, mm, rad, range, thou, turn } from "./core/units";
+export { cm, deg, ft, inch, linspace, meters, mm, rad, range, thou, turn } from "./core/units";
 export { massOf, materials, type Material, type MaterialName } from "./core/materials";
 
 // constraint sketches

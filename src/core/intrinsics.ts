@@ -617,6 +617,55 @@ export interface ShellProps extends Placement, SolidChildren {
   outward?: boolean;
 }
 
+/** A plane: `"XY"` (normal +Z), `"XZ"` (normal +Y), `"YZ"` (normal +X), or a point and normal. */
+export type PlaneSpec = "XY" | "XZ" | "YZ" | { origin?: Vec3; normal: Vec3 | Axis };
+
+/**
+ * Mould draft: tilt the selected faces of the children (unioned) by `angle` so the part
+ * releases from a mould pulled along `pull`. Faces pivot about the neutral plane (default
+ * z = 0, square to `pull`); a positive angle leans them in as they rise along `pull`.
+ * @example <draft angle={3}><box size={[40, 30, 20]} /></draft>
+ */
+export interface DraftProps extends Placement, SolidChildren {
+  /** Draft angle, degrees (0 skips it). */
+  angle: number;
+  /** Faces to draft. Default: the walls square to `pull` (`"#Z"` for the default pull). */
+  faces?: SelectorLike | Selector;
+  /** Neutral plane: a height along `pull` (mm), or a plane. Default 0. */
+  neutral?: number | PlaneSpec;
+  /** Mould pull direction: an axis (`"z"`, `"-z"`) or a vector. Default `"z"`. */
+  pull?: Axis | `-${Axis}` | Vec3;
+}
+
+/**
+ * Push or pull faces: move the selected faces of the children (unioned) along their normals
+ * by `distance` (negative: inward); neighbouring faces stretch or shrink to meet them.
+ * `distance={0}` skips it.
+ * @example <pushPull distance={2} faces=">Z"><box size={10} /></pushPull> // 10 × 10 × 12
+ */
+export interface PushPullProps extends Placement, SolidChildren {
+  /** How far to move the faces, mm (negative: into the solid). */
+  distance: number;
+  /** Alias of `distance`. */
+  d?: number;
+  /** Faces to move: `faces.top()`, `">Z"`, ... */
+  faces: SelectorLike | Selector;
+}
+
+/**
+ * Cut the children (unioned) with a plane and keep one side — section views, halves for
+ * printing, flat bottoms.
+ * @example <split plane="XY" offset={5}><sphere r={10} /></split> // the cap above z = 5
+ */
+export interface SplitProps extends Placement, SolidChildren {
+  /** The cutting plane (in the children's own coordinates). Default `"XY"`. */
+  plane?: PlaneSpec;
+  /** Move the plane along its normal, mm. */
+  offset?: number;
+  /** Keep the side the normal points to (`"above"`, default) or the other (`"below"`). */
+  keep?: "above" | "below";
+}
+
 // ---------------------------------------------------------------------------------------------
 
 /** Every intrinsic element and its props. */
@@ -712,6 +761,14 @@ export interface IntrinsicElements extends ConstraintSketchElements, AssemblyEle
   chamfer: ChamferProps;
   /** Hollow out. */
   shell: ShellProps;
+  /** Mould draft on faces. */
+  draft: DraftProps;
+  /** Move faces along their normals (push/pull). */
+  pushPull: PushPullProps;
+  /** Move faces along their normals (alias of `<pushPull>`; the IR name). */
+  offsetFaces: PushPullProps;
+  /** Cut with a plane, keep one side. */
+  split: SplitProps;
 }
 
 export type IntrinsicTag = keyof IntrinsicElements;

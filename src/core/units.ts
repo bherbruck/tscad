@@ -8,7 +8,7 @@ export const mm = (v: number): number => v;
 /** Centimetres → mm. */
 export const cm = (v: number): number => v * 10;
 /** Metres → mm. */
-export const m = (v: number): number => v * 1000;
+export const meters = (v: number): number => v * 1000;
 /** Inches → mm. */
 export const inch = (v: number): number => v * 25.4;
 /** Feet → mm. */

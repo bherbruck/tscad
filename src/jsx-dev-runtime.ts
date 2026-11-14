@@ -16,6 +16,7 @@ export interface JsxSource {
   columnNumber?: number;
 }
 
+/** Create an element, recording where it was written. */
 export function jsxDEV(
   type: TscadElement["type"],
   props: Record<string, unknown>,

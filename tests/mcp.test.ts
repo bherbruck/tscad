@@ -67,7 +67,7 @@ describe("mcp server", () => {
       expect(r.get(1).result.serverInfo.name).toBe("tscad");
       // tools/list
       const names = r.get(2).result.tools.map((t: any) => t.name);
-      expect(names).toEqual(expect.arrayContaining(["tscad_evaluate", "tscad_render", "tscad_export", "tscad_pick_selectors", "tscad_list_examples", "tscad_read_example", "tscad_docs"]));
+      expect(names).toEqual(expect.arrayContaining(["tscad_evaluate", "tscad_render", "tscad_export", "tscad_pick_selectors", "tscad_list_examples", "tscad_read_example", "tscad_docs", "tscad_check"]));
       for (const t of r.get(2).result.tools) expect(t.inputSchema.type).toBe("object");
       // evaluate
       const ev = r.get(3).result;
@@ -128,6 +128,25 @@ describe("mcp server", () => {
     const pngPart = img.result.content.find((c: any) => c.type === "image");
     expect(pngPart?.mimeType).toBe("image/png");
     expect(Buffer.from(pngPart.data, "base64").subarray(1, 4).toString()).toBe("PNG");
+
+    const chk = (await h(call(7, "tscad_check", {
+      source: `export default () => (<assembly>
+        <part name="t"><union><box size={[6, 6, 20]} /><box size={[30, 6, 4]} z={20} /></union></part>
+        <part name="clash" x={2}><box size={4} z={2} /></part>
+      </assembly>)`,
+      bed: [200, 200, 200],
+    }))) as any;
+    const cs = chk.result.structuredContent;
+    expect(cs.ok).toBe(false);
+    const t = cs.parts.find((p: any) => p.name === "t");
+    expect(t.overhang.area).toBeCloseTo(144, 3);
+    expect(t.overhang.faces.length).toBe(2);
+    expect(t.overhang.faces[0].bbox[0][2]).toBeCloseTo(20);
+    expect(t.thickness.min).toBeCloseTo(4, 3);
+    expect(t.watertight).toBe(true);
+    expect(cs.interference.pairs[0]).toMatchObject({ a: "t", b: "clash" });
+    expect(cs.interference.pairs[0].volume).toBeCloseTo(48, 3);
+    expect(chk.result.content[0].text).toContain("overhangs > 45°: 2 face(s), 144 mm²");
 
     const ex = (await h(call(4, "tscad_read_example", { name: "bracket" }))) as any;
     expect(ex.result.content[0].text).toContain("export default");

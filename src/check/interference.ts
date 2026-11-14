@@ -6,6 +6,7 @@
 import type { Document, EvalOptions, Node, PartResult } from "../ir";
 import type { KernelHost } from "../kernel/index";
 
+/** Two parts that share volume. */
 export interface InterferencePair {
   a: string;
   b: string;
@@ -15,6 +16,7 @@ export interface InterferencePair {
   bbox?: [[number, number, number], [number, number, number]];
 }
 
+/** What {@link checkInterference} found. */
 export interface InterferenceResult {
   /** No pair shares more than `minVolume`. */
   ok: boolean;
@@ -29,6 +31,7 @@ export interface InterferenceResult {
   millis: number;
 }
 
+/** Options for {@link checkInterference}. */
 export interface InterferenceOptions {
   /** Ignore overlaps smaller than this, mm³. Default 1e-3. */
   minVolume?: number;

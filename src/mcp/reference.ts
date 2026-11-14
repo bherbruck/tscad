@@ -5,6 +5,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
+/** One documented prop. */
 export interface Member {
   name: string;
   optional: boolean;
@@ -177,19 +178,19 @@ function build() {
   return cache;
 }
 
-export function elementsReference(): string {
+export function elementsMarkdown(): string {
   return (cache ?? build()).elements;
 }
-export function partsReference(): string {
+export function partsMarkdown(): string {
   return (cache ?? build()).parts;
 }
 /** One element's or parts component's reference, or undefined. */
-export function lookup(name: string): string | undefined {
+export function lookupReference(name: string): string | undefined {
   const c = cache ?? build();
   const n = name.replace(/^<|\/?>$/g, "");
   return c.byTag.get(n) ?? c.byComponent.get(n);
 }
-export function names(): { elements: string[]; components: string[] } {
+export function referenceNames(): { elements: string[]; components: string[] } {
   const c = cache ?? build();
   return { elements: [...c.byTag.keys()], components: [...c.byComponent.keys()] };
 }

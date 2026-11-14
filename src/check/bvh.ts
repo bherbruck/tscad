@@ -18,6 +18,7 @@ export interface Bvh {
 
 const LEAF = 4;
 
+/** Build a BVH over a triangle mesh (`positions` xyz, `indices` 3 per triangle). */
 export function buildBvh(positions: ArrayLike<number>, indices: ArrayLike<number>): Bvh {
   const nt = Math.floor(indices.length / 3);
   const cx = new Float64Array(nt), cy = new Float64Array(nt), cz = new Float64Array(nt);
@@ -76,6 +77,7 @@ export function buildBvh(positions: ArrayLike<number>, indices: ArrayLike<number
   return { bounds, first, count, right, tris, positions, indices };
 }
 
+/** A ray hit: distance along the ray and the triangle index. */
 export interface Hit {
   t: number;
   tri: number;

@@ -42,6 +42,7 @@ function isFont(x: unknown): x is Font {
   return typeof x === "object" && x !== null && typeof (x as Font).stringToGlyphs === "function";
 }
 
+/** Layout options for {@link layoutText} (the `<text>` props, resolved). */
 export interface TextLayout {
   /** Em size, mm (the font size; capitals are ~0.73 × this in the default font). */
   size: number;
@@ -140,6 +141,7 @@ function scaleLoop(loop: Loop2, s: number, dx: number, dy: number): Loop2 {
   });
 }
 
+/** Laid-out text: outline loops in mm plus what couldn't be drawn. */
 export interface TextResult {
   loops: Loop2[];
   /** Characters the font has no glyph for. */

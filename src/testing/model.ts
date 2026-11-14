@@ -14,6 +14,7 @@ type Box = [[number, number, number], [number, number, number]];
 /** A model module (`import * as model from "./model"`), a component, or an element. */
 export type ModelInput = { default: Component<any>; params?: ParamSchema } | Component<any> | Children;
 
+/** Options for {@link evaluateModel}. */
 export interface EvaluateOptions {
   /** Kernel session (default: the shared one from `loadKernel()`). */
   kernel?: KernelHost;

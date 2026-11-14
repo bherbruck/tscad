@@ -3,6 +3,7 @@ import { expect } from "bun:test";
 import type { PrintabilityOptions } from "../check/printability";
 import { ModelResult } from "./model";
 
+/** Options for `toBePrintable()`: {@link PrintabilityOptions} plus pass thresholds. */
 export interface PrintableOptions extends PrintabilityOptions {
   /** Largest allowed overhang share of the surface. Default 0.05 (5 %). */
   maxOverhangFraction?: number;
@@ -34,6 +35,7 @@ function asModel(x: unknown, name: string): ModelResult {
 
 const fmt = (n: number) => (Math.abs(n) >= 100 ? n.toFixed(1) : n.toPrecision(4));
 
+/** The tscad matchers (already registered with `expect.extend` on import). */
 export const matchers = {
   toEvaluate(received: unknown) {
     const r = asModel(received, "toEvaluate");

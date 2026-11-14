@@ -58,6 +58,7 @@ export interface ColorParam extends ParamBase<string> {
   type: "color";
 }
 
+/** One parameter's spec: number, int, boolean, choice, text or color. */
 export type ParamSpec = NumberParam | IntParam | BooleanParam | ChoiceParam<any> | TextParam | ColorParam;
 /** A model's parameters: name → spec. */
 export type ParamSchema = Record<string, ParamSpec>;
@@ -151,7 +152,7 @@ export function resolveParams<S extends ParamSchema>(schema: S, overrides: Recor
       issues.push({ key, message: `unknown param "${key}"`, given, used: undefined });
       continue;
     }
-    const { value, message } = coerce(spec, given);
+    const { value, message } = coerceParam(spec, given);
     if (message) issues.push({ key, message, given, used: value });
     values[key] = value;
   }
@@ -159,7 +160,7 @@ export function resolveParams<S extends ParamSchema>(schema: S, overrides: Recor
 }
 
 /** Coerce and clamp one value to its spec. */
-export function coerce(spec: ParamSpec, given: unknown): { value: unknown; message?: string } {
+export function coerceParam(spec: ParamSpec, given: unknown): { value: unknown; message?: string } {
   switch (spec.type) {
     case "number":
     case "int": {

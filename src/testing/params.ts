@@ -2,6 +2,7 @@
 import type { ParamSchema, ParamSpec, ParamValues } from "../core/params";
 import { paramDefaults } from "../core/params";
 
+/** Options for {@link paramCombos} / {@link forEachParamCombo}. */
 export interface ComboOptions {
   /**
    * Numeric sampling: `"lhs"` (latin hypercube, default), `"random"`, `"corners"` (min/max of

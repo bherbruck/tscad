@@ -23,6 +23,7 @@ export const extrusion2020Outline: Vec2[] = (() => {
   return pts;
 })();
 
+/** Props of {@link Extrusion2020}. */
 export interface Extrusion2020Props extends Placement {
   /** Length along +Z from z = 0, mm. */
   length: number;
@@ -48,6 +49,7 @@ export function Extrusion2020(props: Extrusion2020Props) {
   );
 }
 
+/** Props of {@link HexPrism}. */
 export interface HexPrismProps extends Placement {
   /** Across flats, mm. */
   af: number;

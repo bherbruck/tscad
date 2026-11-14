@@ -1,11 +1,11 @@
 /**
- * Testing a model with tscad/testing: run with `bun test examples/bracket.test.tsx`.
+ * Testing a model with tscad/testing: run with `bun test ./examples/`.
  * Importing "tscad/testing" registers the matchers (toEvaluate, toHaveVolume, toFitIn,
  * toHaveNoInterference, toBePrintable).
  */
 import { describe, expect, test } from "bun:test"
 import { evaluateModel, paramCombos } from "tscad/testing"
-import * as bracket from "./bracket"
+import * as bracket from "../bracket"
 
 describe("bracket", () => {
   test("defaults: evaluates, fits a 60 × 40 × 45 envelope, prints upright", async () => {

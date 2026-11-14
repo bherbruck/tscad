@@ -14,6 +14,7 @@ export type MetricSize = "M2" | "M2.5" | "M3" | "M4" | "M5" | "M6" | "M8" | "M10
 /** Clearance-hole fit: ISO 273 fine (`close`), medium (`normal`), coarse (`loose`). */
 export type HoleFit = "close" | "normal" | "loose";
 
+/** Fastener data for one ISO metric size, mm. */
 export interface MetricData {
   /** Nominal diameter, mm. */
   d: number;

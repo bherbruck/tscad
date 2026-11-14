@@ -52,6 +52,7 @@ Any other MCP client: run `bunx tscad mcp` as a stdio server (newline-delimited 
 | `tscad_evaluate` | Compile + evaluate a model (`source` TSX text or `file` path, optional `params`). Per part: ok, volume (mm³), mass (g, from `material`/`density`), size and bounding box, face/edge counts, timings; warnings; params. Errors name the TSX line with a code frame. |
 | `tscad_render` | Same, plus a PNG (`view`: iso/front/top/... or `"az,el"`, `width`, `height`, `background`, `ortho`). |
 | `tscad_export` | Write `step`, `stl`, `3mf`, `glb`, `obj`, `dxf` or `svg` to `path`; returns the path and size. DXF/SVG come from `<drawing>`s, or else a section of each part at `sectionZ` (default mid-height). |
+| `tscad_check` | Design checks: 3D-printing overhangs (faces steeper than `maxOverhangDeg`, with their location and a selector), the thinnest wall and where it is, bed fit (`bed`), watertight meshes, and interference between parts (the volume and location of each overlap). |
 | `tscad_pick_selectors` | The edge (or face) nearest a `point` (or by `index`) and selectors that pick it — `">X and >Z"` / `edges.max("x").and(edges.top())` — with how many each selects. For `edges=` on `<fillet>`/`<chamfer>` and `open=` on `<shell>`. |
 
 Every model tool takes:

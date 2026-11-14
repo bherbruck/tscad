@@ -109,5 +109,6 @@ inside a \`<difference>\`: \`<Hole size="M3" depth={6} z={6}/>\`, \`<Counterbore
 
 1. \`tscad_docs\` (this) and \`tscad_docs\` with \`element\` for exact props; \`tscad_read_example\` for full models.
 2. Write the TSX; \`tscad_evaluate\` it (source string or file). Fix errors (they point at TSX lines).
-3. \`tscad_render\` to look at it (iso/top/front...). 4. \`tscad_export\` to STEP/STL/3MF/GLB/OBJ/DXF/SVG.
+3. \`tscad_render\` to look at it (iso/top/front...). 4. \`tscad_check\` for printability (overhangs,
+thin walls, bed fit) and part interference. 5. \`tscad_export\` to STEP/STL/3MF/GLB/OBJ/DXF/SVG.
 `;

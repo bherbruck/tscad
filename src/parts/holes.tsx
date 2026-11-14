@@ -23,6 +23,7 @@ interface HoleBase extends Placement {
   depth?: number;
 }
 
+/** Props of {@link Hole}. */
 export interface HoleProps extends HoleBase {
   /** ISO 273 clearance fit. Default `"normal"` (medium series: M3 → 3.4 mm). */
   fit?: HoleFit;
@@ -44,6 +45,7 @@ export function Hole(props: HoleProps) {
   );
 }
 
+/** Props of {@link CounterboreHole}. */
 export interface CounterboreHoleProps extends HoleProps {
   /** Counterbore diameter, mm. Default: DIN 974-1 for a socket head cap screw (M3 → 6.5). */
   boreDiameter?: number;
@@ -69,6 +71,7 @@ export function CounterboreHole(props: CounterboreHoleProps) {
   );
 }
 
+/** Props of {@link CountersinkHole}. */
 export interface CountersinkHoleProps extends HoleProps {
   /** Countersink diameter at the surface, mm. Default: the ISO 10642 head diameter (M3 → 6.72). */
   sinkDiameter?: number;
@@ -97,6 +100,7 @@ export function CountersinkHole(props: CountersinkHoleProps) {
   );
 }
 
+/** Props of {@link TapHole}. */
 export interface TapHoleProps extends HoleBase {
   /** Override the drill diameter, mm (default: tap drill, M4 → 3.3). */
   diameter?: number;

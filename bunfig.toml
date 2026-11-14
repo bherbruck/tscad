@@ -1,0 +1,3 @@
+[test]
+# Plain `bun test` runs tests/ only; model tests in examples/ are opt-in: `bun test ./examples/`
+root = "tests"

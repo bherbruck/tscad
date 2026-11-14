@@ -9,12 +9,13 @@ import { PKG_ROOT } from "../cli/bundle";
 import { describeError, runModel, type ModelRun } from "../cli/model";
 import { parseView } from "../cli/render";
 import { codeFrame } from "../cli/ui";
+import { checkInterference, checkPrintability, checkWatertight } from "../check";
 import { massOf } from "../core/materials";
 import { section, toDXF, toSVG } from "../drawing";
 import { exportModel, type ExportFormat } from "../export";
 import type { MeshArrays } from "../kernel";
 import { renderPNG, type RenderPart } from "../render";
-import { elementsReference, lookup, names, partsReference } from "./reference";
+import { elementsMarkdown, lookupReference, partsMarkdown, referenceNames } from "./reference";
 import { GUIDE } from "./guide";
 import { selectorCode, selectorString } from "./selectors";
 
@@ -22,11 +23,13 @@ import { selectorCode, selectorString } from "./selectors";
 // Tool result shapes (MCP 2025-06-18)
 
 export type Content = { type: "text"; text: string } | { type: "image"; data: string; mimeType: string };
+/** An MCP `tools/call` result. */
 export interface ToolResult {
   content: Content[];
   structuredContent?: Record<string, unknown>;
   isError?: boolean;
 }
+/** An MCP tool: its listing plus the function that runs it. */
 export interface ToolDef {
   name: string;
   title: string;
@@ -417,6 +420,125 @@ async function pickTool(args: Record<string, any>): Promise<ToolResult> {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Check
+
+type B3 = [[number, number, number], [number, number, number]];
+
+/** Bounds of the given triangles (or of every triangle of B-rep face `faceId`). */
+function trianglesBox(mesh: MeshArrays, tris: Iterable<number>): B3 {
+  const lo: [number, number, number] = [Infinity, Infinity, Infinity], hi: [number, number, number] = [-Infinity, -Infinity, -Infinity];
+  for (const t of tris)
+    for (let k = 0; k < 3; k++) {
+      const v = mesh.indices[3 * t + k]! * 3;
+      for (let c = 0; c < 3; c++) {
+        const x = mesh.positions[v + c]!;
+        if (x < lo[c]!) lo[c] = x;
+        if (x > hi[c]!) hi[c] = x;
+      }
+    }
+  return [lo, hi];
+}
+
+const r1 = (v: number) => Math.round(v * 10) / 10;
+const fmtBox = (b: B3) => `x ${r1(b[0][0])}..${r1(b[1][0])}, y ${r1(b[0][1])}..${r1(b[1][1])}, z ${r1(b[0][2])}..${r1(b[1][2])}`;
+const fmtPt = (p: number[]) => `(${p.map(r1).join(", ")})`;
+
+async function checkTool(args: Record<string, any>): Promise<ToolResult> {
+  const opts = {
+    ...(Array.isArray(args.buildDir) ? { buildDir: args.buildDir.map(Number) as [number, number, number] } : {}),
+    ...(typeof args.maxOverhangDeg === "number" ? { maxOverhangDeg: args.maxOverhangDeg } : {}),
+    ...(typeof args.minWall === "number" ? { minWall: args.minWall } : {}),
+    ...(Array.isArray(args.bed) && args.bed.length === 3 ? { bed: args.bed.map(Number) as [number, number, number] } : {}),
+  };
+  const maxDeg = opts.maxOverhangDeg ?? 45, minWall = opts.minWall ?? 0.8;
+  return withModel(args, async (m) => {
+    const r = await run(m, args);
+    if (!r.run) return { content: [{ type: "text", text: r.error! }], isError: true };
+    const { kernel, result, rendered } = r.run;
+    const failed = result.parts.filter((p) => !p.ok);
+    if (failed.length) {
+      const { text } = summarize(m, r.run, r.logs);
+      return { content: [{ type: "text", text: `can't check: the model has errors\n${text}` }], isError: true };
+    }
+    const only: string[] | undefined = Array.isArray(args.parts) ? args.parts.map(String) : undefined;
+    const lines: string[] = [];
+    const parts: Record<string, unknown>[] = [];
+    let problems = 0;
+    for (const p of result.parts) {
+      if (p.empty || (only && !only.includes(p.name))) continue;
+      const mesh = await kernel.mesh(p.name);
+      if (!mesh) continue;
+      const pr = checkPrintability(mesh, opts);
+      const wt = checkWatertight(mesh);
+      // overhang faces with where they are and a selector naming them
+      const faceTris = new Map<number, number[]>();
+      for (const t of pr.overhang.triangles) {
+        const f = mesh.faceIds[t]!;
+        (faceTris.get(f) ?? faceTris.set(f, []).get(f)!).push(t);
+      }
+      const faces = [];
+      for (const f of pr.overhang.faces.slice(0, 8)) {
+        const box = trianglesBox(mesh, faceTris.get(f.faceId) ?? []);
+        let selector: string | undefined;
+        try {
+          const info = await kernel.pickFace(p.name, f.faceId);
+          // the most specific suggestion that isn't a fragile index
+          const s = info.suggestions.find((x) => x.selector.type !== "index");
+          if (s) selector = `${selectorString(s.selector) ?? selectorCode(s.selector, "faces")}${s.count > 1 ? ` (selects ${s.count} faces)` : ""}`;
+        } catch {
+          /* no pick info */
+        }
+        faces.push({ faceId: f.faceId, area: r3(f.area), angle: r1(f.maxAngle), bbox: box.map((v) => v.map(r3)), ...(selector ? { selector } : {}) });
+      }
+      // thinnest wall: where
+      let thin: Record<string, unknown> | undefined;
+      if (pr.thickness && Number.isFinite(pr.thickness.min)) {
+        let worst = -1;
+        for (let t = 0; t < pr.thickness.byTriangle.length; t++) if (worst < 0 || pr.thickness.byTriangle[t]! < pr.thickness.byTriangle[worst]!) worst = t;
+        const box = trianglesBox(mesh, [worst]);
+        const at = [0, 1, 2].map((c) => (box[0][c]! + box[1][c]!) / 2);
+        thin = { min: r3(pr.thickness.min), at: at.map(r3), faceId: mesh.faceIds[worst], thinArea: r3(pr.thickness.thinArea), thinFraction: r3(pr.thickness.thinFraction) };
+      }
+      const ok = pr.overhang.area === 0 && (!pr.thickness || pr.thickness.thinArea === 0) && (!pr.bed || pr.bed.fits) && wt.watertight;
+      if (!ok) problems++;
+      parts.push({
+        name: p.name,
+        ok,
+        size: pr.size.map(r3),
+        overhang: { area: r3(pr.overhang.area), fraction: r3(pr.overhang.fraction), faces },
+        ...(thin ? { thickness: thin } : {}),
+        ...(pr.bed ? { bed: pr.bed } : {}),
+        watertight: wt.watertight,
+        ...(wt.watertight ? {} : { mesh: { boundaryEdges: wt.boundaryEdges, nonManifoldEdges: wt.nonManifoldEdges, flippedEdges: wt.flippedEdges } }),
+      });
+      lines.push(`${p.name}: ${ok ? "OK" : "ISSUES"} — size ${pr.size.map(r1).join(" × ")} mm`);
+      if (faces.length) {
+        lines.push(`  - overhangs > ${maxDeg}°: ${pr.overhang.faces.length} face(s), ${r1(pr.overhang.area)} mm² (${r1(pr.overhang.fraction * 100)} % of the surface)`);
+        for (const f of faces) lines.push(`      face ${f.faceId}: ${f.area} mm² at ${f.angle}° from vertical, ${fmtBox(f.bbox as B3)}${f.selector ? `, selector ${f.selector}` : ""}`);
+      } else lines.push(`  - overhangs > ${maxDeg}°: none`);
+      if (thin) lines.push(`  - thinnest wall ${thin.min} mm near ${fmtPt(thin.at as number[])}${(thin.thinArea as number) > 0 ? `; ${r1((thin.thinFraction as number) * 100)} % of the surface is thinner than ${minWall} mm` : ` (≥ ${minWall} mm everywhere)`}`);
+      if (pr.bed) lines.push(`  - bed ${opts.bed!.join(" × ")}: ${pr.bed.fits ? (pr.bed.rotated ? "fits turned 90°" : "fits") : "DOES NOT FIT"}`);
+      lines.push(`  - mesh: ${wt.watertight ? "watertight" : `NOT watertight (${wt.boundaryEdges} open, ${wt.nonManifoldEdges} non-manifold, ${wt.flippedEdges} flipped edges)`}`);
+    }
+    let interference: Record<string, unknown> | undefined;
+    const docParts = (rendered.document.parts ?? []).filter((p) => !only || only.includes(p.name ?? ""));
+    if (args.interference !== false && docParts.length > 1) {
+      const ir = await checkInterference(kernel, { parts: docParts }, { restore: false, ...(typeof args.minVolume === "number" ? { minVolume: args.minVolume } : {}) });
+      interference = { ok: ir.ok, pairs: ir.pairs.map((x) => ({ ...x, volume: r3(x.volume), bbox: x.bbox?.map((v) => v.map(r3)) })), checked: ir.checked, skipped: ir.skipped, errors: ir.errors };
+      if (!ir.ok) problems++;
+      lines.push(ir.ok ? `interference: none (${ir.checked} pair(s) checked, ${ir.skipped} apart)` : `interference:`);
+      for (const x of ir.pairs) lines.push(`  - ${x.a} ∩ ${x.b}: ${r3(x.volume)} mm³${x.bbox ? ` in ${fmtBox(x.bbox)}` : ""}`);
+      for (const e of ir.errors) lines.push(`  - ${e.a} ∩ ${e.b}: kernel error ${e.message}`);
+    }
+    lines.unshift(problems ? `${problems} issue(s) found` : "all checks passed");
+    return {
+      content: [{ type: "text", text: lines.join("\n") }],
+      structuredContent: { ok: problems === 0, parts, ...(interference ? { interference } : {}), options: { maxOverhangDeg: maxDeg, minWall, ...opts } },
+    };
+  });
+}
+
+// ---------------------------------------------------------------------------------------------
 // Examples & docs
 
 const EXAMPLES = join(PKG_ROOT, "examples");
@@ -453,14 +575,14 @@ async function readExampleTool(args: Record<string, any>): Promise<ToolResult> {
 async function docsTool(args: Record<string, any>): Promise<ToolResult> {
   if (args.element) {
     const list = Array.isArray(args.element) ? args.element : [args.element];
-    const found = list.map((e: unknown) => lookup(String(e)) ?? `### ${String(e)}\n(unknown — elements: ${names().elements.join(", ")}; parts: ${names().components.join(", ")})`);
+    const found = list.map((e: unknown) => lookupReference(String(e)) ?? `### ${String(e)}\n(unknown — elements: ${referenceNames().elements.join(", ")}; parts: ${referenceNames().components.join(", ")})`);
     return { content: [{ type: "text", text: found.join("\n\n") }] };
   }
   const topic = String(args.topic ?? "guide");
-  const n = names();
+  const n = referenceNames();
   const index = `\n## Element index\nIntrinsic: ${n.elements.map((e) => `<${e}>`).join(" ")}\nParts library: ${n.components.map((e) => `<${e}>`).join(" ")}\nCall tscad_docs with {"element": "<name>"} (or a list) for exact props, or {"topic": "elements"} for all.`;
   const text =
-    topic === "elements" ? elementsReference() : topic === "parts" ? partsReference() : topic === "all" ? `${GUIDE}\n${elementsReference()}\n\n${partsReference()}` : GUIDE + index;
+    topic === "elements" ? elementsMarkdown() : topic === "parts" ? partsMarkdown() : topic === "all" ? `${GUIDE}\n${elementsMarkdown()}\n\n${partsMarkdown()}` : GUIDE + index;
   return { content: [{ type: "text", text }] };
 }
 
@@ -468,6 +590,7 @@ async function docsTool(args: Record<string, any>): Promise<ToolResult> {
 
 const RO = { readOnlyHint: true, openWorldHint: false };
 
+/** Every tool the tscad MCP server offers. */
 export const TOOLS: ToolDef[] = [
   {
     name: "tscad_docs",
@@ -550,6 +673,27 @@ export const TOOLS: ToolDef[] = [
     },
     annotations: RO,
     run: (a) => serial(() => pickTool(a)),
+  },
+  {
+    name: "tscad_check",
+    title: "Check a tscad model",
+    description:
+      "Design checks on an evaluated model: 3D-printing overhangs (faces steeper than maxOverhangDeg from vertical, with where they are and a selector naming them), wall thickness (thinnest wall and where), bed fit, watertight meshes, and interference between parts (shared volume of each overlapping pair). Use it before exporting for printing or after building an assembly.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ...MODEL_PROPS,
+        buildDir: { type: "array", items: { type: "number" }, minItems: 3, maxItems: 3, description: "Print direction (default [0, 0, 1])." },
+        maxOverhangDeg: { type: "number", description: "Steepest printable overhang, degrees from vertical (default 45)." },
+        minWall: { type: "number", description: "Thinnest printable wall, mm (default 0.8)." },
+        bed: { type: "array", items: { type: "number" }, minItems: 3, maxItems: 3, description: "Build volume [x, y, z] mm." },
+        interference: { type: "boolean", description: "Check part pairs for overlap (default true)." },
+        minVolume: { type: "number", description: "Ignore overlaps smaller than this, mm³ (default 0.001)." },
+        parts: { type: "array", items: { type: "string" }, description: "Only these parts." },
+      },
+    },
+    annotations: RO,
+    run: (a) => serial(() => checkTool(a)),
   },
   {
     name: "tscad_list_examples",

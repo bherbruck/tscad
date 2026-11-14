@@ -42,6 +42,7 @@ export interface PartInfo {
   loc?: SourceLoc;
 }
 
+/** What {@link compile} returns: the IR plus everything needed to explain it. */
 export interface CompileResult {
   /** The IR to evaluate. */
   document: Document;
@@ -72,6 +73,7 @@ export interface Drawing {
   loc?: SourceLoc;
 }
 
+/** Options for {@link compile} and {@link renderModule}. */
 export interface CompileOptions {
   /** Name of the implicit part made for loose solids. Default `"part"`. */
   defaultPartName?: string;
@@ -91,6 +93,7 @@ export interface TscadModule {
   [k: string]: unknown;
 }
 
+/** What {@link renderModule} returns: a {@link CompileResult} plus the params used. */
 export interface RenderResult<S extends ParamSchema = ParamSchema> extends CompileResult {
   /** The module's param schema (`{}` when it has none). */
   params: S;
@@ -129,7 +132,7 @@ export function renderModule<S extends ParamSchema = ParamSchema>(
 const SOLID_TAGS = new Set([
   "group", "step", "translate", "rotate", "scale", "mirror", "box", "cylinder", "cone", "sphere", "torus",
   "union", "difference", "subtract", "intersection", "intersect", "extrude", "revolve", "loft", "sweep",
-  "linearPattern", "gridPattern", "polarPattern", "fillet", "chamfer", "shell",
+  "linearPattern", "gridPattern", "polarPattern", "fillet", "chamfer", "shell", "draft", "pushPull", "offsetFaces", "split",
 ]);
 const SHAPE_TAGS = new Set(["text", "rect", "roundedRect", "circle", "ellipse", "polygon", "regularPolygon", "slot", "path", "star"]);
 const SKETCH_TAGS = new Set([...SHAPE_TAGS, "sketch", "section", "offset"]);
@@ -609,6 +612,58 @@ class Compiler {
           : { type: "chamfer", distance: size, ...(edges ? { edges } : {}), children: kids };
         return [this.emit(node, h)];
       }
+      case "draft": {
+        const angle = this.req(h, "angle", this.num(h, "angle", p.angle));
+        if (Math.abs(angle) >= 90) this.fail(h, `angle must be between -90 and 90 degrees (got ${angle})`);
+        const kids = this.solids(h.children);
+        if (!kids.length) {
+          this.warn(h, "is empty");
+          return null;
+        }
+        if (angle === 0) return [kids.length === 1 ? kids[0]! : this.soften(this.emit({ type: "union", children: kids }, h))];
+        const pull = this.direction(h, "pull", p.pull) ?? [0, 0, 1];
+        const axis = pull.filter((v) => v !== 0).length === 1 ? (["x", "y", "z"] as const)[pull.findIndex((v) => v !== 0)]! : undefined;
+        if (p.faces === undefined && !axis) this.fail(h, "give faces when pull is not along an axis", `faces="#Z" drafts the walls square to Z`);
+        const faces = p.faces === undefined ? ({ type: "perpendicular", axis: axis! } as Selector) : this.selector(h, "faces", p.faces);
+        const node: Record<string, unknown> = { type: "draft", angle: angle * DEG, faces, children: kids };
+        if (p.pull !== undefined) node.pull = pull;
+        const neutral = p.neutral;
+        if (typeof neutral === "number") {
+          const n = normalize(pull);
+          node.origin = [n[0] * neutral, n[1] * neutral, n[2] * neutral];
+          node.normal = n;
+        } else if (neutral !== undefined) {
+          const pl = this.plane(h, "neutral", neutral);
+          node.origin = pl.origin;
+          node.normal = pl.normal;
+        }
+        return [this.emit(node as Node, h)];
+      }
+      case "pushPull":
+      case "offsetFaces": {
+        const d = this.req(h, "distance", this.alias(h, ["distance", "d"]));
+        const kids = this.solids(h.children);
+        if (!kids.length) {
+          this.warn(h, "is empty");
+          return null;
+        }
+        if (d === 0) return [kids.length === 1 ? kids[0]! : this.soften(this.emit({ type: "union", children: kids }, h))];
+        if (p.faces === undefined) this.fail(h, "missing faces", `<${h.tag} distance={2} faces=">Z">`);
+        return [this.emit({ type: "offsetFaces", distance: d, faces: this.selector(h, "faces", p.faces), children: kids } as Node, h)];
+      }
+      case "split": {
+        const kids = this.solids(h.children);
+        if (!kids.length) {
+          this.warn(h, "is empty");
+          return null;
+        }
+        const pl = this.plane(h, "plane", p.plane ?? "XY");
+        const off = this.num(h, "offset", p.offset) ?? 0;
+        const origin: Vec3 = [pl.origin[0] + pl.normal[0] * off, pl.origin[1] + pl.normal[1] * off, pl.origin[2] + pl.normal[2] * off];
+        const keep = p.keep ?? "above";
+        if (keep !== "above" && keep !== "below") this.fail(h, `keep must be "above" or "below" (got ${show(keep)})`);
+        return [this.emit({ type: "split", origin, normal: pl.normal, ...(keep === "below" ? { keep } : {}), children: kids } as Node, h)];
+      }
       case "shell": {
         // magnitude = wall; inward unless `outward` (a negative thickness, the IR's convention, is inward too)
         const t = Math.abs(this.req(h, "thickness", this.num(h, "thickness", p.thickness, { nonZero: true })));
@@ -622,6 +677,34 @@ class Compiler {
       }
     }
     return this.fail(h, `unhandled element <${h.tag}>`);
+  }
+
+  /** A direction: an axis name or a non-zero vector (unit-ised). */
+  direction(h: Host, name: string, v: unknown): Vec3 | undefined {
+    if (v === undefined) return undefined;
+    if (typeof v === "string") {
+      const m = v.match(/^([+-]?)([xyz])$/i);
+      if (!m) this.fail(h, `${name} must be "x", "y", "z" (optionally "-z") or a vector (got ${show(v)})`);
+      const a = axisVector(m[2]!.toLowerCase() as "x");
+      return m[1] === "-" ? [-a[0] + 0, -a[1] + 0, -a[2] + 0] : a;
+    }
+    const d = this.vec3(h, name, v)!;
+    if (d.every((x) => x === 0)) this.fail(h, `${name} must not be zero`);
+    return normalize(d);
+  }
+
+  /** A plane: "XY" | "XZ" | "YZ" (normals +Z, +Y, +X) or { origin?, normal }. */
+  plane(h: Host, name: string, v: unknown): { origin: Vec3; normal: Vec3 } {
+    if (v === "XY" || v === "xy") return { origin: [0, 0, 0], normal: [0, 0, 1] };
+    if (v === "XZ" || v === "xz") return { origin: [0, 0, 0], normal: [0, 1, 0] };
+    if (v === "YZ" || v === "yz") return { origin: [0, 0, 0], normal: [1, 0, 0] };
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      const o = v as { origin?: unknown; normal?: unknown };
+      const normal = this.direction(h, `${name}.normal`, o.normal);
+      if (!normal) this.fail(h, `${name} needs a normal`, `${name}={{ origin: [0, 0, 5], normal: [0, 0, 1] }}`);
+      return { origin: this.vec3(h, `${name}.origin`, o.origin) ?? [0, 0, 0], normal };
+    }
+    return this.fail(h, `${name} must be "XY", "XZ", "YZ" or { origin, normal } (got ${show(v)})`);
   }
 
   soften(n: Node): Node {

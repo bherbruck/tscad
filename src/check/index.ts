@@ -7,4 +7,4 @@ export { checkPrintability, type OverhangFace, type PrintabilityOptions, type Pr
 export { checkInterference, type InterferenceOptions, type InterferencePair, type InterferenceResult } from "./interference";
 export { checkWatertight, type WatertightResult } from "./watertight";
 export { buildBvh, raycast, type Bvh, type Hit } from "./bvh";
-export { triangleNormals, weld, type CheckMesh } from "./mesh";
+export type { CheckMesh } from "./mesh";

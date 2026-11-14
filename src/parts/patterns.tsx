@@ -9,6 +9,7 @@ import { HeatSetInsert } from "./hardware";
 import type { MetricSize } from "./metric";
 import { placement } from "./place";
 
+/** `[x, y]`, mm. */
 export type Vec2 = [number, number];
 
 /** A mounting hole pattern. Points are relative to the pattern's centre. */
@@ -72,6 +73,7 @@ export const mountPatterns = {
   nema23: { name: "NEMA 23", points: square(47.14), size: "M5", holeDiameter: 5.1, outline: [56.4, 56.4], outlineOffset: [-28.2, -28.2], pilot: 38.1 },
 } as const satisfies Record<string, MountPattern>;
 
+/** Props of {@link BoltPattern}. */
 export interface BoltPatternProps extends Placement {
   /** The pattern (e.g. `mountPatterns.nema17`), or a list of `[x, y]` points. */
   pattern: MountPattern | readonly Vec2[];
@@ -93,6 +95,7 @@ export function BoltPattern(props: BoltPatternProps) {
   );
 }
 
+/** Props of {@link MountHoles}. */
 export interface MountHolesProps extends Placement {
   /** The pattern; its `size` picks the screw. */
   pattern: MountPattern;

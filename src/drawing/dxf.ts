@@ -9,6 +9,7 @@ import { TAU, type Arc2, type Loop2 } from "../core/sketch/seg";
 import { bounds, flattenNurbs, fmt, layers, type DrawingInput } from "./common";
 import type { Vec2 } from "../core/math";
 
+/** Options for {@link toDXF}. */
 export interface DxfOptions {
   /** Entity style. Default `"primitives"`. */
   entities?: "primitives" | "polyline";
@@ -25,6 +26,7 @@ const deg = (r: number) => {
 };
 const layerName = (s: string) => s.replace(/[^A-Za-z0-9_\-$]/g, "_").toUpperCase() || "0";
 
+/** DXF R12 text (mm) for drawings or loops; one layer per drawing. */
 export function toDXF(input: DrawingInput, o: DxfOptions = {}): string {
   const tol = o.tolerance ?? 0.01;
   const ls = layers(input, o.layer ?? "0");

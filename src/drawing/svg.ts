@@ -6,6 +6,7 @@
 import { TAU, type Loop2 } from "../core/sketch/seg";
 import { bounds, flattenNurbs, fmt, layers, type DrawingInput } from "./common";
 
+/** Options for {@link toSVG}. */
 export interface SvgOptions {
   /** Stroke colour. Default `"#000"`. */
   stroke?: string;
@@ -53,6 +54,7 @@ export function svgPathData(loops: readonly Loop2[], tolerance = 0.01): string {
   return parts.join(" ");
 }
 
+/** SVG text (mm units, y up) for drawings or loops: one `<g>` + even-odd `<path>` per drawing. */
 export function toSVG(input: DrawingInput, o: SvgOptions = {}): string {
   const ls = layers(input, "drawing");
   const m = o.margin ?? 1;

@@ -6,8 +6,10 @@
 import { buildBvh, raycast } from "./bvh";
 import { meshBounds, triangleNormals, type CheckMesh } from "./mesh";
 
+/** `[x, y, z]`. */
 export type Vec3 = [number, number, number];
 
+/** Options for {@link checkPrintability}. */
 export interface PrintabilityOptions {
   /** Build direction (the printer's +Z in model space). Default `[0, 0, 1]`. */
   buildDir?: Vec3;
@@ -26,6 +28,7 @@ export interface PrintabilityOptions {
   skipThickness?: boolean;
 }
 
+/** Overhang area grouped by B-rep face. */
 export interface OverhangFace {
   /** B-rep face id (when the mesh has `faceIds`), else −1. */
   faceId: number;
@@ -35,6 +38,7 @@ export interface OverhangFace {
   maxAngle: number;
 }
 
+/** What {@link checkPrintability} found. Per-triangle arrays follow `mesh.indices` order. */
 export interface PrintabilityResult {
   overhang: {
     /** Total overhanging area, mm². */
@@ -81,6 +85,11 @@ function norm(v: Vec3): Vec3 {
   return [v[0] / l, v[1] / l, v[2] / l];
 }
 
+/**
+ * Check a mesh for 3D printing: overhangs steeper than `maxOverhangDeg`, walls thinner than
+ * `minWall` (ray casts inward from every triangle), bed fit and tiny dimensions.
+ * @example checkPrintability(await kernel.mesh("bracket"), { minWall: 0.8, bed: [220, 220, 250] })
+ */
 export function checkPrintability(mesh: CheckMesh, o: PrintabilityOptions = {}): PrintabilityResult {
   const t0 = performance.now();
   const up = norm(o.buildDir ?? [0, 0, 1]);
