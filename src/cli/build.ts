@@ -95,7 +95,7 @@ export async function build(opts: BuildOptions): Promise<number> {
         if (!layers.some((l) => l.loops.length)) throw new Error(drawings.length ? "the drawings are empty" : `the section at z = ${fmtNum(sectionZOf(good, opts.sectionZ))} cuts nothing (try --section-z)`);
         data = fmt === "dxf" ? toDXF(layers) : toSVG(layers);
       } else {
-        if (!good.length) throw new Error("no solid parts (this model only has drawings — export .dxf or .svg)");
+        if (!good.length) throw new Error("no solid parts (this model only has drawings: export .dxf or .svg)");
         data = await exportModel(run.kernel, good.map((p) => ({ name: p.name, color: colors.get(p.name) })), fmt, { tolerance: opts.tolerance, binary: !opts.ascii });
       }
     } catch (e) {
@@ -123,15 +123,15 @@ function printParts(parts: PartResult[], infos: { name: string; density?: number
   const head = ["part", "volume", ...(anyMass ? ["mass"] : []), "size (mm)", "faces/edges", "time", ""];
   const rows = parts.map((p) => {
     const info = infos.find((i) => i.name === p.name);
-    const size = p.bbox ? p.bbox[1].map((v, i) => fmtNum(v - p.bbox![0][i]!, 1)).join(" × ") : "—";
-    const mass = info?.density !== undefined && p.volume !== undefined ? `${fmtNum((p.volume / 1000) * info.density)} g` : "—";
+    const size = p.bbox ? p.bbox[1].map((v, i) => fmtNum(v - p.bbox![0][i]!, 1)).join(" × ") : "-";
+    const mass = info?.density !== undefined && p.volume !== undefined ? `${fmtNum((p.volume / 1000) * info.density)} g` : "-";
     const status = !p.ok ? c.red("failed") : p.empty ? c.yellow("empty") : p.cached ? c.yellow("⚡ cached") : c.green("ok");
     return [
       c.bold(p.name),
       fmtVolume(p.volume),
       ...(anyMass ? [mass] : []),
       size,
-      p.counts ? `${p.counts[0]}/${p.counts[1]}` : "—",
+      p.counts ? `${p.counts[0]}/${p.counts[1]}` : "-",
       fmtMs(p.millis),
       status,
     ];

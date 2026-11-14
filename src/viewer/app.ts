@@ -243,7 +243,7 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
   };
   sketches.onDimensionClick = (sk, dim) => {
     if (dim.loc) sourceClick(dim.loc, { kind: "dimension", sketch: sk, dimension: dim });
-    else toast(`${dim.text} (${dim.kind}) — no source location`);
+    else toast(`${dim.text} (${dim.kind}): no source location`);
   };
 
   const statusPill = h("div", { class: "status" });
@@ -625,7 +625,7 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
   async function copyLink() {
     const hash = withKept(valuesToHash(state.schema, state.values));
     const url = `${location.origin}${location.pathname}${hash ? `#${hash}` : ""}`;
-    if (await copyText(url)) toast("Link copied — it reproduces these parameters");
+    if (await copyText(url)) toast("Link copied. It reproduces these parameters.");
   }
 
   // ───────────────────────── pointer ─────────────────────────
@@ -642,7 +642,7 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
     if (cfg.onSourceClick) return cfg.onSourceClick(loc, target);
     const where = `${shortFile(loc.file)}:${loc.line}:${loc.column}`;
     void copyText(where);
-    toast(`${target.kind === "dimension" ? `${target.dimension.text} — ` : ""}${where} (copied)`);
+    toast(`${target.kind === "dimension" ? `${target.dimension.text}: ` : ""}${where} (copied)`);
   }
 
   // ───────────────────────── export ─────────────────────────

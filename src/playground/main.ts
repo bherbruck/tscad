@@ -179,7 +179,7 @@ async function main() {
       document.body.classList.remove("pg-code-hidden");
       const props = target.kind === "dimension" ? DIMENSION_PROPS[target.dimension.kind] : target.kind === "mate" ? ["angle", "offset"] : undefined;
       editor?.revealSource(loc.line, loc.column, props);
-      if (target.kind === "dimension") viewer.toast(`${target.dimension.text} — line ${loc.line}`);
+      if (target.kind === "dimension") viewer.toast(`${target.dimension.text}: line ${loc.line}`);
     },
     onErrors: (err, bundleErrors) => {
       const problems: EditorProblem[] = [];
@@ -246,7 +246,7 @@ async function main() {
         editor!.setValue(out.text);
         history.replaceState(null, "", location.pathname + location.search);
         run();
-        viewer.toast(r.warnings.length ? `Converted with ${r.warnings.length} note${r.warnings.length > 1 ? "s" : ""} — see the top of the file` : "Converted from OpenSCAD");
+        viewer.toast(r.warnings.length ? `Converted with ${r.warnings.length} note${r.warnings.length > 1 ? "s" : ""}: see the top of the file` : "Converted from OpenSCAD");
         return undefined;
       } catch (e) {
         if (e instanceof ScadSyntaxError) return `Line ${e.line}:${e.col}: ${e.message.replace(/^line \d+:\d+: /, "")}`;
@@ -265,7 +265,7 @@ async function main() {
     // A fresh model: drop the old params and code from the hash.
     history.replaceState(null, "", `#example=${encodeURIComponent(ex.name)}`);
     run();
-    viewer.toast(`${ex.title}${ex.description ? ` — ${ex.description}` : ""}`);
+    viewer.toast(`${ex.title}${ex.description ? `: ${ex.description}` : ""}`);
   });
 
   // ── share
@@ -277,7 +277,7 @@ async function main() {
     else q.delete("files");
     const url = `${location.origin}${location.pathname}#${q.toString()}`;
     history.replaceState(null, "", `#${q.toString()}`);
-    if (await copyText(url)) viewer.toast(`Link copied (${(url.length / 1024).toFixed(1)} kB) — opens this code with these parameters`);
+    if (await copyText(url)) viewer.toast(`Link copied (${(url.length / 1024).toFixed(1)} kB). It opens this code with these parameters.`);
   });
 
   // ── layout: code toggle + resizer

@@ -46,7 +46,7 @@ export function installStats(ctx: ViewerContext) {
         "div",
         { class: "stat-rows" },
         row("Triangles", tris.toLocaleString()),
-        row("Kernel", state.kernelVersion ? `solidcore ${state.kernelVersion}${d.workers > 1 ? ` · ${d.workers}× parallel` : ""}` : "—"),
+        row("Kernel", state.kernelVersion ? `solidcore ${state.kernelVersion}${d.workers > 1 ? ` · ${d.workers}× parallel` : ""}` : "-"),
       ),
     );
     for (const w of d.warnings) statsBody.append(h("div", { class: "warning" }, icon("alert", 12), w));

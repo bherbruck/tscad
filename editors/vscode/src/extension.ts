@@ -232,7 +232,7 @@ async function exportModel(format: string | undefined, uri: vscode.Uri | undefin
     const body = (await r.json()) as { path?: string; bytes?: number; error?: string };
     if (!r.ok || !body.path) {
       output.appendLine(body.error ?? `export failed (${r.status})`);
-      void vscode.window.showErrorMessage(`tscad: export failed — ${(body.error ?? "").split("\n")[0]}`, "Show Log").then((a) => a && output.show());
+      void vscode.window.showErrorMessage(`tscad: export failed: ${(body.error ?? "").split("\n")[0]}`, "Show Log").then((a) => a && output.show());
       return;
     }
     const kb = ((body.bytes ?? 0) / 1024).toFixed(1);

@@ -23,7 +23,7 @@ export function installSketchDrag(ctx: ViewerContext) {
       d.result = res.result;
       sketches.showPreview(d.sketch, res.result.entities, res.result.points, d.id, res.result.reached);
       const b = res.result.blockedBy[0];
-      showTip(res.result.reached ? `${d.id} → ${d.target.map((v) => fmtNum(v)).join(", ")}${d.shift ? " · changing dimensions" : ""}` : `held by ${b?.label ?? "constraints"}${b?.loc ? ` (line ${b.loc.line})` : ""} — Shift to change it`);
+      showTip(res.result.reached ? `${d.id} → ${d.target.map((v) => fmtNum(v)).join(", ")}${d.shift ? " · changing dimensions" : ""}` : `held by ${b?.label ?? "constraints"}${b?.loc ? ` (line ${b.loc.line})` : ""}. Shift to change it`);
     } else if (res.error) showTip(res.error);
     if (d.queued) {
       d.queued = false;

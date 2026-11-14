@@ -25,7 +25,7 @@ export class RemoteWorker {
       this.onmessage?.(new MessageEvent("message", { data }));
     };
     this.#ws.onclose = () => {
-      this.onerror?.(new ErrorEvent("error", { message: "Lost the dev server's evaluation socket — restart `tscad dev` and reload." }));
+      this.onerror?.(new ErrorEvent("error", { message: "Lost the dev server's evaluation socket. Restart `tscad dev` and reload." }));
     };
   }
 

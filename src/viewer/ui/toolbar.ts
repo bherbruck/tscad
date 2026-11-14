@@ -33,7 +33,7 @@ export function installToolbar(ctx: ViewerContext) {
     sketches.setVisible(on);
     tb.sketch.classList.toggle("active", on);
     tb.sketch.classList.toggle("dim", !has);
-    tb.sketch.title = has ? "Sketch overlay (K)" : "Sketch overlay (K) — this model has no constraint sketches";
+    tb.sketch.title = has ? "Sketch overlay (K)" : "Sketch overlay (K): this model has no constraint sketches";
   }
   function toggleSketches() {
     const { applySketchVisibility, sketches, toast } = ctx;

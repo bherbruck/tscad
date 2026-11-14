@@ -65,7 +65,7 @@ export function installParts(ctx: ViewerContext) {
         const chip = m.ok ? h("span", { class: "sk-chip ok", title: `residual ${m.residual.toExponential(1)} mm` }, icon("check", 11), "ok") : h("span", { class: "sk-chip bad", title: `residual ${m.residual.toFixed(3)} mm` }, icon("x", 11), "unsolved");
         const row = h(
           "button",
-          { class: "part sketch-row", title: `${m.type} mate${m.loc ? ` — click to show it in the code (${shortFile(m.loc.file)}:${m.loc.line})` : ""}${drive.length ? `\ndriven by ${drive.join(", ")} — drag its gizmo` : ""}` },
+          { class: "part sketch-row", title: `${m.type} mate${m.loc ? `. Click to show it in the code (${shortFile(m.loc.file)}:${m.loc.line})` : ""}${drive.length ? `\ndriven by ${drive.join(", ")}: drag its gizmo` : ""}` },
           h("span", { class: "swatch mate-swatch" }, icon(m.type === "slider" ? "slider" : m.type === "fastened" ? "link" : "joint", 12)),
           h(
             "div",
@@ -89,7 +89,7 @@ export function installParts(ctx: ViewerContext) {
       const where = sk.loc ? `${shortFile(sk.loc.file)}:${sk.loc.line}` : sk.path;
       const row = h(
         "button",
-        { class: "part sketch-row", title: sk.loc ? `Sketch ${i + 1} — click to show it in the code (${where})` : `Sketch ${i + 1}` },
+        { class: "part sketch-row", title: sk.loc ? `Sketch ${i + 1}. Click to show it in the code (${where})` : `Sketch ${i + 1}` },
         h("span", { class: "swatch sketch-swatch" }, icon("sketch", 12)),
         h("div", { class: "part-main" }, h("div", { class: "part-name" }, `Sketch ${i + 1}`, chip), h("div", { class: "part-meta" }, `${sk.part ?? "part"} · ${sk.entities.length} curves · ${sk.dimensions.length} dims · ${where}`)),
       );
@@ -103,7 +103,7 @@ export function installParts(ctx: ViewerContext) {
       partsList.append(
         h(
           "div",
-          { class: `part${visible ? "" : " hidden-part"}`, title: `${dr.name}: a flat drawing — export it with tscad build -o ${dr.name}.dxf` },
+          { class: `part${visible ? "" : " hidden-part"}`, title: `${dr.name}: a flat drawing. Export it with tscad build -o ${dr.name}.dxf` },
           h("span", { class: "swatch drawing-swatch", style: { "--c": v?.color ?? dr.color ?? "#ffb020" } }),
           h("div", { class: "part-main" }, h("div", { class: "part-name" }, dr.name, h("span", { class: "chip" }, "2D")), h("div", { class: "part-meta" }, `drawing · ${dr.loops} loop${dr.loops === 1 ? "" : "s"}`)),
           h("div", { class: "part-actions" }, eye),

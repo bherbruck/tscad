@@ -6,7 +6,7 @@ import { c, logo, sym, fmtMs } from "./ui";
 import pkg from "../../package.json" with { type: "json" };
 
 const HELP = `
-${logo()} ${c.gray(`v${pkg.version}`)} — CAD as TSX
+${logo()} ${c.gray(`v${pkg.version}`)}: CAD as TSX
 
 ${c.bold("Usage")}
   ${c.accent("tscad init")} ${c.gray("[dir]")}                 scaffold a model project
@@ -193,7 +193,7 @@ async function renderFolder(dir: string, f: Parsed["flags"]): Promise<number> {
     "\n" +
       table(
         ["model", "parts", "png", ""],
-        results.map((r) => [relative(dir, r.file), String(r.info.parts), r.png ? relative(process.cwd(), r.png) : "—", r.info.ok ? c.green("ok") : c.red(r.info.error ?? "failed")]),
+        results.map((r) => [relative(dir, r.file), String(r.info.parts), r.png ? relative(process.cwd(), r.png) : "-", r.info.ok ? c.green("ok") : c.red(r.info.error ?? "failed")]),
         ["l", "r", "l", "l"],
       ),
   );

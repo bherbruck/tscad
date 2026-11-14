@@ -3,9 +3,9 @@
  * three.js), so a number, a time or a size reads the same in the terminal and in the browser.
  */
 
-/** A number for display: grouped, at most `digits` decimals (fewer for big values), "—" when missing or not finite. */
+/** A number for display: grouped, at most `digits` decimals (fewer for big values), "-" when missing or not finite. */
 export function fmtNum(v: number | undefined, digits = 2): string {
-  if (v === undefined || !isFinite(v)) return "—";
+  if (v === undefined || !isFinite(v)) return "-";
   const a = Math.abs(v);
   const d = a >= 1000 ? 0 : a >= 100 ? 1 : digits;
   return v.toLocaleString("en-US", { maximumFractionDigits: d, minimumFractionDigits: 0 });
@@ -21,9 +21,9 @@ export function fmtBytes(n: number): string {
   return n >= 1e6 ? `${(n / 1e6).toFixed(1)} MB` : n >= 1e3 ? `${(n / 1e3).toFixed(1)} kB` : `${n} B`;
 }
 
-/** A volume in mm³ (cm³ from 100 000 mm³); "—" when missing. */
+/** A volume in mm³ (cm³ from 100 000 mm³); "-" when missing. */
 export function fmtVol(mm3: number | undefined): string {
-  if (mm3 === undefined) return "—";
+  if (mm3 === undefined) return "-";
   return mm3 >= 1e5 ? `${fmtNum(mm3 / 1000)} cm³` : `${fmtNum(mm3)} mm³`;
 }
 

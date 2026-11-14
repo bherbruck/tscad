@@ -1,6 +1,6 @@
 {
   "name": "tscad-vscode",
-  "displayName": "tscad — CAD as TSX",
+  "displayName": "tscad: CAD as TSX",
   "description": "Live 3D preview, kernel diagnostics, click-to-source and exports for tscad models.",
   "version": "0.1.0",
   "publisher": "tscad",

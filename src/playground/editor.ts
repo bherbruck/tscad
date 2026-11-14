@@ -118,7 +118,7 @@ export function tscadCompletions(data: CompletionData) {
       return { from: ctx.pos - m[1]!.length, options: data.exports.map((x) => ({ label: x.name, type: "function", detail: "tscad" })), validFor: /^\w*$/ };
     }
 
-    // <box |  — props of the open tag (not inside a {...} or "..." value)
+    // <box |  : props of the open tag (not inside a {...} or "..." value)
     const open = before.match(/<([a-z]\w*)((?:\s+[\w-]+(?:=(?:"[^"]*"|'[^']*'|\{(?:[^{}]|\{[^{}]*\})*\}))?)*)\s+([\w-]*)$/);
     if (open) {
       const info = tagMap.get(open[1]!);
@@ -152,8 +152,8 @@ export interface Editor {
   setValue(text: string): void;
   setProblems(problems: EditorProblem[]): void;
   /**
-   * Select the JSX element starting at `line`:`column` (1-based) — or just its `prop={...}`
-   * when one of `props` is on it — scroll it into view and focus the editor.
+   * Select the JSX element starting at `line`:`column` (1-based), or just its `prop={...}`
+   * when one of `props` is on it; scroll it into view and focus the editor.
    */
   revealSource(line: number, column: number, props?: string[]): boolean;
 }

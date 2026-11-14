@@ -85,11 +85,11 @@ export function installChecksPanel(ctx: ViewerContext) {
         checks.showPrintability(r.printability, mode, checkState.minWall);
         if (mode === "overhang") {
           const area = r.printability.reduce((s, x) => s + x.overhangArea, 0);
-          checkSummary.replaceChildren(area > 0 ? h("span", { class: "warn" }, `Overhang past ${checkState.maxOverhang}°: ${fmtArea(area)} — needs support`) : h("span", { class: "good" }, `No overhangs past ${checkState.maxOverhang}° (build direction +Z)`));
+          checkSummary.replaceChildren(area > 0 ? h("span", { class: "warn" }, `Overhang past ${checkState.maxOverhang}°: ${fmtArea(area)} needs support`) : h("span", { class: "good" }, `No overhangs past ${checkState.maxOverhang}° (build direction +Z)`));
         } else {
           const min = Math.min(...r.printability.map((x) => x.minWall ?? Infinity));
           const thin = r.printability.some((x) => (x.thinFraction ?? 0) > 0);
-          checkSummary.replaceChildren(thin ? h("span", { class: "bad" }, `Thinnest wall ${fmtNum(min)} mm — under ${checkState.minWall} mm in red`) : h("span", { class: "good" }, `Thinnest wall ${isFinite(min) ? `${fmtNum(min)} mm` : "—"}: all ≥ ${checkState.minWall} mm`));
+          checkSummary.replaceChildren(thin ? h("span", { class: "bad" }, `Thinnest wall ${fmtNum(min)} mm (under ${checkState.minWall} mm in red)`) : h("span", { class: "good" }, `Thinnest wall ${isFinite(min) ? `${fmtNum(min)} mm` : "-"}: all ≥ ${checkState.minWall} mm`));
         }
       }
     } catch (e) {

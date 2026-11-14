@@ -63,7 +63,7 @@ export function installInspector(ctx: ViewerContext) {
       return;
     }
     if ((info as { smooth?: boolean }).smooth) {
-      inspectorBody.append(h("div", { class: "note" }, icon("info", 12), h("span", null, h("b", null, "Smooth edge"), " — a tangent joint between faces, nothing to fillet. Broad selectors skip these; only its index names it.")));
+      inspectorBody.append(h("div", { class: "note" }, icon("info", 12), h("span", null, h("b", null, "Smooth edge"), ": a tangent joint between faces, nothing to fillet. Broad selectors skip these; only its index names it.")));
     }
     const formToggle = h(
       "div",

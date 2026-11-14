@@ -155,7 +155,7 @@ export class ServerManager {
       child.stderr!.on("data", onData);
       child.on("error", (e) => {
         clearTimeout(timer);
-        reject(new Error(`couldn't run ${cmd}: ${e.message} — install bun (https://bun.sh) or set "tscad.command"`));
+        reject(new Error(`couldn't run ${cmd}: ${e.message}. Install bun (https://bun.sh) or set "tscad.command"`));
       });
       child.on("exit", (code) => {
         clearTimeout(timer);

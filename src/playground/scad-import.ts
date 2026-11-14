@@ -10,7 +10,7 @@ export const NOTES_HEAD = "// Converted from OpenSCAD";
  */
 export function withNotes(tsx: string, warnings: { line: number; message: string }[], file: string): { text: string; notes: EditorProblem[] } {
   if (!warnings.length) return { text: `${NOTES_HEAD} (${file}).\n${tsx}`, notes: [] };
-  const lines = [`${NOTES_HEAD} (${file}). Check these — they didn't convert exactly:`];
+  const lines = [`${NOTES_HEAD} (${file}). Check these, they didn't convert exactly:`];
   const notes: EditorProblem[] = [];
   for (const w of warnings) {
     lines.push(`//   ${file}:${w.line}: ${w.message}`);

@@ -1,4 +1,4 @@
-/** Viewer UI: pointer input on the viewport — hover tips, picking, measuring, and sketch / mate drags. */
+/** Viewer UI: pointer input on the viewport: hover tips, picking, measuring, and sketch / mate drags. */
 import type { ParamValuesData } from "../protocol";
 import type { Hit } from "../scene";
 import { fmtNum } from "../fmt";
@@ -44,7 +44,7 @@ export function installPointer(ctx: ViewerContext, deps: PointerDeps) {
       if (sp) {
         viewport.setHover(undefined);
         viewport.canvas.style.cursor = "move";
-        return showTip(`point ${sp.id}${sp.free ? "" : " (fixed)"} — drag to move · Shift: change dimensions`);
+        return showTip(`point ${sp.id}${sp.free ? "" : " (fixed)"}. Drag to move, Shift to change dimensions`);
       }
       const giz = !state.measure ? assembly.hover(ev.clientX, ev.clientY) : undefined;
       if (giz) {
@@ -91,7 +91,7 @@ export function installPointer(ctx: ViewerContext, deps: PointerDeps) {
       e.stopPropagation();
       downAt = undefined;
       if (!g?.drive) {
-        if (g) toast(`${assembly.describe(g)} — bind its ${g.field} to a param to drag it`);
+        if (g) toast(`${assembly.describe(g)}: bind its ${g.field} to a param to drag it`);
         return;
       }
       viewport.controls.enabled = false;

@@ -294,7 +294,7 @@ export class AssemblyOverlay {
     const v = m[g.field];
     const unit = g.field === "angle" ? "°" : " mm";
     const val = v === undefined ? "free" : `${+v.toFixed(2)}${unit}`;
-    return g.drive ? `${m.type} ${m.b} · ${val} — drag to change ${g.drive.param}` : `${m.type} ${m.b} · ${val}${v === undefined ? "" : " (not bound to a param)"}`;
+    return g.drive ? `${m.type} ${m.b} · ${val}. Drag to change ${g.drive.param}` : `${m.type} ${m.b} · ${val}${v === undefined ? "" : " (not bound to a param)"}`;
   }
 
   /** Start dragging the gizmo under the cursor. Returns false when there's nothing to drag. */

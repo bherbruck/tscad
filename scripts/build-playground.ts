@@ -81,17 +81,20 @@ export function describeExample(name: string, source: string): Example {
     .join(" ")
     .replace(/\s+/g, " ")
     .trim();
-  const firstSentence = text.split(/(?<=[.:—])\s/)[0] ?? "";
-  const cut = text.match(/^(.{3,60}?)(?::| — |, )/);
+  const firstSentence = text.split(/(?<=[.:\u2014])\s/)[0] ?? "";
+  const cut = text.match(/^(.{3,60}?)(?::| \u2014 |, )/);
   const title = (cut?.[1] ?? name.replace(/-/g, " ")).replace(/^"|"$/g, "").replace(/`/g, "").trim();
   // `HexBitHolder` (converted from OpenSCAD) → "Hex bit holder".
   const words = /^[A-Z][a-z0-9]*(?:[A-Z][a-z0-9]*)+$/.test(title) ? title.replace(/(?<=[a-z0-9])([A-Z])/g, (_m, c: string) => ` ${c.toLowerCase()}`) : title;
   const nice = words.charAt(0).toUpperCase() + words.slice(1);
-  return { name, title: nice, description: (cut ? text.slice(cut[0].length) : firstSentence).trim().split(/(?<=\.)\s/)[0] ?? "", source };
+  const description = (cut ? text.slice(cut[0].length) : firstSentence).trim().split(/(?<=\.)\s/)[0] ?? "";
+  // No em dashes in what the picker shows (a doc comment may still have one).
+  const plain = (t: string) => t.replace(/\s*\u2014\s*/g, ", ");
+  return { name, title: plain(nice), description: plain(description), source };
 }
 
 async function build() {
-  if (!existsSync(join(WASM_DIR, "tscad_wasm_bg.wasm"))) throw new Error("wasm/ is missing — run `bun run build:wasm` first");
+  if (!existsSync(join(WASM_DIR, "tscad_wasm_bg.wasm"))) throw new Error("wasm/ is missing: run `bun run build:wasm` first");
   rmSync(OUT, { recursive: true, force: true });
   mkdirSync(OUT, { recursive: true });
 
@@ -146,7 +149,7 @@ async function build() {
 
   const wasmBytes = statSync(join(OUT, "wasm/tscad_wasm_bg.wasm")).size;
   console.log(
-    `✓ dist/playground in ${(performance.now() - t0).toFixed(0)} ms — js ${(jsBytes / 1e6).toFixed(2)} MB, wasm ${(wasmBytes / 1e6).toFixed(2)} MB, ${examples.length} examples, ${completions.tags.length} elements`,
+    `✓ dist/playground in ${(performance.now() - t0).toFixed(0)} ms: js ${(jsBytes / 1e6).toFixed(2)} MB, wasm ${(wasmBytes / 1e6).toFixed(2)} MB, ${examples.length} examples, ${completions.tags.length} elements`,
   );
 }
 

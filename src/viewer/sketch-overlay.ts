@@ -1,5 +1,5 @@
 /**
- * Constraint-sketch overlay: each solved `<sketch>` drawn on its plane — curves (construction
+ * Constraint-sketch overlay: each solved `<sketch>` drawn on its plane: curves (construction
  * dashed), points (free ones orange), and dimension annotations with extension lines, arrows
  * and screen-facing labels you can click. Fades as the camera turns edge-on to a sketch plane.
  */
@@ -281,7 +281,7 @@ export class SketchOverlay {
       const el = document.createElement("button");
       el.className = "dim-label pattern-label";
       el.textContent = p.kind === "mirror" ? "mirror" : `×${n}${p.kind === "circular" && p.angle ? ` · ${+p.angle.toFixed(2)}°` : ""}`;
-      el.title = `${p.kind} pattern of ${p.of.length} entit${p.of.length === 1 ? "y" : "ies"}${p.loc ? ` · ${shortFile(p.loc.file)}:${p.loc.line}` : ""} — click to find in code`;
+      el.title = `${p.kind} pattern of ${p.of.length} entit${p.of.length === 1 ? "y" : "ies"}${p.loc ? ` · ${shortFile(p.loc.file)}:${p.loc.line}` : ""}. Click to find in code`;
       el.addEventListener("click", (ev) => {
         ev.stopPropagation();
         this.onPatternClick(s, p);
@@ -324,7 +324,7 @@ export class SketchOverlay {
       const el = document.createElement("button");
       el.className = "dim-label";
       el.textContent = d.text;
-      el.title = `${d.kind}${d.loc ? ` · ${shortFile(d.loc.file)}:${d.loc.line}` : ""} — click to find in code`;
+      el.title = `${d.kind}${d.loc ? ` · ${shortFile(d.loc.file)}:${d.loc.line}` : ""}. Click to find in code`;
       el.addEventListener("click", (ev) => {
         ev.stopPropagation();
         this.onDimensionClick(s, d);

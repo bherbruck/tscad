@@ -172,6 +172,23 @@ describe("static build", () => {
     }
   });
 
+  test("no em dashes in what the playground shows (page, example picker and code, UI strings)", () => {
+    const hits: string[] = [];
+    const html = readFileSync(join(out, "index.html"), "utf8");
+    if (html.includes("\u2014")) hits.push("index.html");
+    for (const e of JSON.parse(readFileSync(join(out, "examples.json"), "utf8")) as { name: string; title: string; description: string; source: string; files?: Record<string, string> }[]) {
+      for (const [field, text] of [["title", e.title], ["description", e.description], ["source", e.source], ...Object.entries(e.files ?? {})]) {
+        if (text?.includes("\u2014")) hits.push(`examples.json ${e.name} ${field}`);
+      }
+    }
+    // Prose in the bundles: " — " between words. (Font code-page and HTML-entity tables hold a bare "—" and are fine.)
+    const walk = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((d) => (d.isDirectory() ? walk(join(dir, d.name)) : d.name.endsWith(".js") ? [join(dir, d.name)] : []));
+    for (const f of walk(join(out, "__tscad"))) {
+      for (const m of readFileSync(f, "utf8").matchAll(/.{0,40}\s\u2014\s.{0,20}/g)) hits.push(`${f.slice(out.length + 1)}: ${m[0]}`);
+    }
+    expect(hits).toEqual([]);
+  });
+
   test("ships every example and the completion data", () => {
     const examples = JSON.parse(readFileSync(join(out, "examples.json"), "utf8"));
     expect(examples.length).toBe(EXAMPLES.length);

@@ -73,8 +73,8 @@ export function describeModel(name: string, source: string): { title: string; de
     .join(" ")
     .replace(/\s+/g, " ")
     .trim();
-  const firstSentence = text.split(/(?<=[.:—])\s/)[0] ?? "";
-  const cut = text.match(/^(.{3,60}?)(?::| — |, )/);
+  const firstSentence = text.split(/(?<=[.:\u2014])\s/)[0] ?? "";
+  const cut = text.match(/^(.{3,60}?)(?::| \u2014 |, )/);
   const title = (cut?.[1] ?? (name.replace(/[-_]+/g, " ") || "model")).replace(/^"|"$/g, "").replace(/`/g, "").trim();
   return { title: title.charAt(0).toUpperCase() + title.slice(1), description: (cut ? text.slice(cut[0].length) : text ? firstSentence : "").trim().split(/(?<=\.)\s/)[0] ?? "" };
 }
@@ -241,7 +241,7 @@ export async function renderAll(opts: { dir: string; out: string; width?: number
         mkdirSync(resolve(png, ".."), { recursive: true });
         writeFileSync(png, readFileSync(join(cache.dir, info.png)));
       }
-      opts.log?.(`${info.ok ? "ok" : "x "} ${m.rel}${info.error ? ` — ${info.error}` : ""}`);
+      opts.log?.(`${info.ok ? "ok" : "x "} ${m.rel}${info.error ? `: ${info.error}` : ""}`);
       results.push({ file: m.file, png, info });
     }),
   );

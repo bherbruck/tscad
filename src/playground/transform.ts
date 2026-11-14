@@ -125,7 +125,7 @@ function compile(source: string, file: string, dir: string, runtime: (specifier:
       return url;
     }
     if (spec.startsWith(".") || spec.startsWith("/")) {
-      throw Object.assign(new Error(`the playground runs a single file — "${spec}" can't be imported here (use \`tscad dev\` for multi-file projects)`), { line: lineOf(out.code, spec) });
+      throw Object.assign(new Error(`the playground runs a single file, so "${spec}" can't be imported here (use \`tscad dev\` for multi-file projects)`), { line: lineOf(out.code, spec) });
     }
     // Bare npm packages: an ES-module CDN.
     return `https://esm.sh/${spec}`;
