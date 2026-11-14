@@ -95,7 +95,9 @@ and `isAnchorRef`. See [Constraint sketches](../docs/sketch.html) and [Assemblie
 
 The parts library has fastener holes as cutting tools pointing −Z from z = 0
 (`Hole`, `CounterboreHole`, `CountersinkHole`, `TapHole`), hardware (`NutTrap`, `HeatSetInsert`,
-`Standoff`), patterns (`BoltPattern`, `MountHoles`, `mountPatterns`), profiles (`Extrusion2020`,
+`Standoff`), standard parts with ISO dimensions (`Bolt` with its own `cutter`, `Nut`, `Washer`,
+`SetScrew`, `DowelPin`, `Bearing`, `ShaftCollar`, `clearance()`; see [docs/parts.md](parts.md)),
+patterns (`BoltPattern`, `MountHoles`, `mountPatterns`), profiles (`Extrusion2020`,
 `HexPrism`), and ISO data (`metric`, `metricData(size)`, `metricSizes`). Each component's props
 are in the [parts reference](../reference/parts.html).
 
