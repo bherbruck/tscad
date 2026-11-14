@@ -139,11 +139,11 @@ describe("examples", () => {
     near(part.volume!, plate - 2 * hole + rod);
   }, 30_000);
 
-  test("vase: smooth loft of three sketched sections, shelled; fully constrained", async () => {
+  test("vase: smooth loft of three sketched sections, hollowed by an inset loft; fully constrained", async () => {
     const { renderModule } = await import("tscad");
     const r = renderModule(await import("../examples/sketch-vase.tsx"));
     expect(r.warnings).toEqual([]);
-    expect(r.sketches.map((s) => [s.dof, s.plane[11]])).toEqual([[0, 0], [0, 54], [0, 120]]);
+    expect(r.sketches.map((s) => [s.dof, s.plane[11]])).toEqual([[0, 0], [0, 54], [0, 120], [0, 2.4], [0, 54], [0, 122.4]]);
     const t0 = performance.now();
     const e = await k.evaluate(r.document, { noMesh: true });
     expect(e.parts[0]!.ok).toBe(true);

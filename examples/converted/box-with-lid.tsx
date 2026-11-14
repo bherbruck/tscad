@@ -11,7 +11,7 @@ export const params = defineParams({
   height: { type: "number", default: 25, min: 10, max: 100, step: 0.5, group: "Box" },
   wall: { type: "number", default: 2, min: 1, max: 5, step: 0.1, group: "Box" },
   part: { type: "choice", default: "both", options: ["base", "lid", "both"], description: "Which part to print", group: "Lid" },
-  lid_height: { type: "int", default: 6, min: 3, max: 20, group: "Lid" },
+  lid_height: { type: "int", default: 6, min: 6, max: 20, group: "Lid" },
 })
 
 /** OpenSCAD module shell(w, d, h, t) */

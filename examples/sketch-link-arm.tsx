@@ -36,8 +36,18 @@ function Slot({ a, b, width }: { a: PointHandle; b: PointHandle; width: number }
 }
 
 export default function LinkArm(p: ParamValues<typeof params>) {
-  const L = p.length, R1 = p.bigRadius, R2 = p.smallRadius
-  const gap = 4 // material between a boss's edge and the slot
+  const R1 = p.bigRadius, R2 = p.smallRadius
+  // keep any slider combination buildable: rounds under half the thickness, walls around the
+  // bores, the slot narrower than the arm and only when it fits between the bosses
+  const round = Math.min(p.edgeRound, p.thickness * 0.4)
+  const wall = Math.max(3, 2 * round + 1)
+  const gap = Math.max(4, wall) // material between a boss's edge and the slot
+  const bigBore = Math.min(p.bigBore, 2 * (R1 - wall))
+  const smallBore = Math.min(p.smallBore, 2 * (R2 - wall))
+  const L = Math.max(p.length, Math.abs(R1 - R2) + 2, bigBore / 2 + smallBore / 2 + wall)
+  const slotWidth = Math.min(p.slotWidth, 2 * (Math.min(R1, R2) - wall))
+  const slotFrom = R1 + gap + slotWidth / 2, slotTo = L - (R2 + gap + slotWidth / 2)
+  const withSlot = slotWidth > 1 && slotTo - slotFrom > 1
   // typed handles: `tangent={s.c1}` (a point) would not compile
   const s = sketchRefs<{
     c1: "point"; c2: "point"; s1: "point"; s2: "point"
@@ -45,7 +55,7 @@ export default function LinkArm(p: ParamValues<typeof params>) {
   }>()
   return (
     <part name="link-arm" material="aluminum">
-      <fillet radius={p.edgeRound} edges={edges.parallel("z").not()}>
+      <fillet radius={round} edges={edges.parallel("z").not()}>
         <extrude height={p.thickness}>
           <sketch>
             {/* the two boss centres */}
@@ -61,17 +71,21 @@ export default function LinkArm(p: ParamValues<typeof params>) {
             <line ref={s.upper} from={s.small.end} to={s.big.start} tangent={[s.small, s.big]} />
 
             {/* bores, concentric with the bosses */}
-            <circle center={s.c1} diameter={p.bigBore} />
-            <circle center={s.c2} diameter={p.smallBore} />
+            {bigBore > 0.5 && <circle center={s.c1} diameter={bigBore} />}
+            {smallBore > 0.5 && <circle center={s.c2} diameter={smallBore} />}
 
             {/* adjustment slot on the centre line, clear of both bosses */}
-            <point ref={s.s1} x={L / 3} y={0} />
-            <point ref={s.s2} x={(2 * L) / 3} y={0} />
-            <horizontal a={s.c1} b={s.s1} />
-            <horizontal a={s.c1} b={s.s2} />
-            <dimension a={s.c1} b={s.s1} dx={R1 + gap + p.slotWidth / 2} />
-            <dimension a={s.s2} b={s.c2} dx={R2 + gap + p.slotWidth / 2} />
-            <Slot a={s.s1} b={s.s2} width={p.slotWidth} />
+            {withSlot && (
+              <>
+                <point ref={s.s1} x={L / 3} y={0} />
+                <point ref={s.s2} x={(2 * L) / 3} y={0} />
+                <horizontal a={s.c1} b={s.s1} />
+                <horizontal a={s.c1} b={s.s2} />
+                <dimension a={s.c1} b={s.s1} dx={slotFrom} />
+                <dimension a={s.s2} b={s.c2} dx={R2 + gap + slotWidth / 2} />
+                <Slot a={s.s1} b={s.s2} width={slotWidth} />
+              </>
+            )}
           </sketch>
         </extrude>
       </fillet>

@@ -140,6 +140,27 @@ These have NOT been filed upstream.
   docs/PERF.md). That check may be returning false negatives on these bodies; worth checking it
   first.
 
+## 20. Fillet "no room" on an obround arm
+- `fillet` r 1.5 on `edges.parallel("z").not()` of an extruded obround (end bosses R 28 and
+  12.5, 54 apart, tangent lines) → "no room"; the same arm with R 20 works.
+- Hit by `examples/sketch-link-arm.tsx` (1 combo of 33). Repro:
+  `tests/fixtures/kernel-noroom-obround-fillet.json`.
+
+## 21. A union's result depends on how its children are grouped
+- union(union(padLow, padHigh), hollowBody) → "the result is not a closed solid", where the two
+  pads are disjoint and the hollow body sits on padHigh's top face (z = 5) with the same
+  rounded-square outline. union(low, high, body), union(body, pads), union(low, union(high,
+  body)) and a solid body all work. Related to #10.
+- Hit by `examples/converted/grid-bin.tsx` at 1 × 1 units. Repro:
+  `tests/fixtures/kernel-union-nested-not-closed.json`.
+
+## 22. Shell of a smooth loft fails
+- A loft through three rounded-square sections (30 / 40 / 20 mm, corner r 0.15 · w), shelled
+  0.2 mm with the top open → "the result is not a closed solid"; it works at corner r ≥ 0.35 · w
+  and fails erratically at larger sizes.
+- `examples/sketch-vase.tsx` now hollows with a second, inset loft instead. Repro:
+  `tests/fixtures/kernel-shell-loft-not-closed.json`.
+
 ## Notes (tscad bugs found and fixed, not kernel bugs)
 - `solidcore_ops::blend` takes the kernel's *native* edge order, not record order (its
   `SetBack` docs say so; the function's own docs read as record indices). tscad now uses

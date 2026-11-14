@@ -49,12 +49,23 @@ export default function Flange(p: ParamValues<typeof params>) {
             <horizontal a="o" b="lug" />
             <dimension a="o" b="lug" dx={reach} />
             <arc id="lugEnd" center="lug" from="l1" to="l2" radius={lugR} />
-            <line id="lugTop" from="l2" to="m2" tangent="lugEnd" />
-            <line id="lugBottom" from="m1" to="l1" tangent="lugEnd" />
+            {/* rough positions: where the lug's lines meet the lug and the disc */}
+            <point id="l1" x={reach} y={-lugR} />
+            <point id="l2" x={reach} y={lugR} />
+            <point id="m1" x={0.7 * R} y={-0.7 * R} />
+            <point id="m2" x={0.7 * R} y={0.7 * R} />
+            <line id="lugTop" from="l2" to="m2" />
+            <line id="lugBottom" from="m1" to="l1" />
 
             {/* the flange circle between the lugs: top and bottom arcs */}
-            <arc id="top" center="o" from="m2" to="m2'" radius={R} tangent="lugTop" />
-            <arc id="bottom" center="o" from="m1'" to="m1" equal="top" tangent="lugBottom" />
+            <arc id="top" center="o" from="m2" to="m2'" radius={R} />
+            <arc id="bottom" center="o" from="m1'" to="m1" equal="top" />
+            {/* the lug's lines are outer tangents: the disc's and the lug's centres both on their
+                left (`side` picks that branch whatever the sizes) */}
+            <tangent a="lugTop" b="lugEnd" side="left" />
+            <tangent a="lugBottom" b="lugEnd" side="left" />
+            <tangent a="lugTop" b="top" side="left" />
+            <tangent a="lugBottom" b="bottom" side="left" />
             <mirrorEntities about="axis" of={["lugEnd", "lugTop", "lugBottom"]} />
 
             {/* holes: bore, lug holes, bolt circle */}

@@ -4,14 +4,14 @@
  *
  *   tscad dev examples/sketch-vase.tsx
  */
-import { defineParams, faces, type ParamValues } from "tscad"
+import { defineParams, type ParamValues } from "tscad"
 
 export const params = defineParams({
   height: { type: "number", default: 120, min: 60, max: 250, step: 1, unit: "mm", label: "Height" },
   foot: { type: "number", default: 60, min: 30, max: 120, step: 1, unit: "mm", label: "Foot width" },
   belly: { type: "number", default: 90, min: 40, max: 160, step: 1, unit: "mm", label: "Belly width" },
   neck: { type: "number", default: 40, min: 20, max: 100, step: 1, unit: "mm", label: "Neck width" },
-  roundness: { type: "number", default: 0.3, min: 0.05, max: 0.5, step: 0.01, label: "Corner roundness" },
+  roundness: { type: "number", default: 0.3, min: 0.1, max: 0.45, step: 0.01, label: "Corner roundness" },
   wall: { type: "number", default: 2.4, min: 1, max: 6, step: 0.1, unit: "mm", label: "Wall" },
 })
 
@@ -40,15 +40,24 @@ function RoundedSquare({ w, r, z }: { w: number; r: number; z: number }) {
 
 export default function Vase(p: ParamValues<typeof params>) {
   const r = (w: number) => w * p.roundness
+  // the hollow is a second loft through the same sections inset by the wall (a boolean is
+  // sturdier than offsetting the skin); cap the wall so every inset section stays rounded
+  const wall = Math.min(p.wall, 0.5 * r(Math.min(p.foot, p.belly, p.neck)), p.height / 10)
+  const inner = (w: number) => ({ w: w - 2 * wall, r: r(w) - wall })
   return (
     <part name="vase" color="#7c9cbf">
-      <shell thickness={p.wall} open={faces.top()}>
+      <difference>
         <loft>
           <RoundedSquare w={p.foot} r={r(p.foot)} z={0} />
           <RoundedSquare w={p.belly} r={r(p.belly)} z={p.height * 0.45} />
           <RoundedSquare w={p.neck} r={r(p.neck)} z={p.height} />
         </loft>
-      </shell>
+        <loft>
+          <RoundedSquare {...inner(p.foot)} z={wall} />
+          <RoundedSquare {...inner(p.belly)} z={p.height * 0.45} />
+          <RoundedSquare {...inner(p.neck)} z={p.height + wall} />
+        </loft>
+      </difference>
     </part>
   )
 }

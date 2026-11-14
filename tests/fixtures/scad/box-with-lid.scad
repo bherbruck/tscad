@@ -9,7 +9,7 @@ wall = 2;   // [1:0.1:5]
 /* [Lid] */
 // Which part to print
 part = "both"; // [base, lid, both]
-lid_height = 6; // [3:20]
+lid_height = 6; // [6:20]
 
 /* [Hidden] */
 gap = 0.4;

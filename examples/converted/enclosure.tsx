@@ -11,7 +11,7 @@ export const params = defineParams({
   inner_z: { type: "int", default: 25, min: 10, max: 100, group: "Inside dimensions" },
   wall: { type: "number", default: 2, min: 1, max: 5, step: 0.2, group: "Walls" },
   floor_t: { type: "number", default: 2, min: 1, max: 5, step: 0.2, group: "Walls" },
-  corner_r: { type: "number", default: 3, min: 0, max: 10, step: 0.5, group: "Walls" },
+  corner_r: { type: "number", default: 3, min: 0.5, max: 10, step: 0.5, group: "Walls" },
   post_d: { type: "number", default: 6, min: 4, max: 12, step: 0.5, group: "Screw posts" },
   screw_d: { type: "number", default: 2.5, min: 1.5, max: 5, step: 0.1, group: "Screw posts" },
   post_inset: { type: "int", default: 4, min: 3, max: 15, group: "Screw posts" },
