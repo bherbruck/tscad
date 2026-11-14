@@ -19,12 +19,18 @@ tscad runs on [Bun](https://bun.sh) (≥ 1.2).
 ```sh
 bunx tscad init my-part
 cd my-part
+bun install          # installs tscad locally, so your editor gets its types
 bunx tscad dev --open
 ```
 
-`tscad init` writes `index.tsx`, `package.json` and `tsconfig.json`. `tscad dev` serves a live
-viewer at http://localhost:3333 that rebuilds on every save: orbit the model, drag parameter
-sliders, click an edge to get a selector for it, and export from the toolbar.
+`tscad init` writes `index.tsx`, `package.json`, `tsconfig.json`, `.gitignore` and a
+`README.md`. `tscad dev` serves a live viewer at http://localhost:3333 that rebuilds on every
+save: orbit the model, drag parameter sliders, click an edge to get a selector for it, and
+export from the **Export** button (top right).
+
+`tscad dev` evaluates models in the dev server with the native kernel when one is built for
+your platform, and otherwise in the browser with WebAssembly. The banner says which;
+`--browser-eval` forces the browser.
 
 To add tscad to an existing project:
 
@@ -79,8 +85,9 @@ bunx tscad info index.tsx                               # params, volumes, masse
 bunx tscad render index.tsx -o plate.png --view iso     # a PNG, no browser needed
 ```
 
-Formats: `step` (exact B-rep, AP242), `stl`, `3mf` (with colours), `glb`, `obj`; `dxf` and `svg`
-for flat [`<drawing>`](../reference/elements.html#drawing) parts.
+Formats: `step` (exact B-rep, AP242), `stl`, `3mf` (with colours), `glb`, `obj`. `dxf` and `svg`
+give flat [`<drawing>`](../reference/elements.html#drawing) parts; for solids they give a section
+at mid-height (`--section-z <mm>` picks the height).
 
 ## Design with an AI agent
 

@@ -88,6 +88,12 @@ These have NOT been filed upstream.
   half the edge length cannot be built, so a refusal (`TooLarge` / `NoRoom`) is expected.
 - Found by MCP dogfooding (docs/mcp-dogfood.md).
 
+## 14. Intersecting a nested lip with its rim: PointClassify unsupported
+- Board case base ∩ its lid (the lid's locating lip nested inside the rim, faces touching) →
+  "not supported yet: SmFace::PointClassify" — the same unsupported path as the fuzzer's
+  PointClassify findings (docs/upstream/pointclassify-cut-rounded-prism.md). Interference
+  checks of board-vs-base and board-vs-lid work.
+
 ## Notes (tscad bugs found and fixed, not kernel bugs)
 - `solidcore_ops::blend` takes the kernel's *native* edge order, not record order (its
   `SetBack` docs say so; the function's own docs read as record indices). tscad now uses

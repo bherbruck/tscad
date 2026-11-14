@@ -5,6 +5,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { mountPatterns } from "../parts/patterns";
+import { boards } from "../parts/boards/data";
 
 /** One documented prop. */
 export interface Member {
@@ -197,6 +198,12 @@ function build() {
     "| pattern | holes (span) | screw | outline | outline offset | pilot |",
     "|---|---|---|---|---|---|",
     ...Object.entries(mountPatternsData()).map(([k, v]) => `| \`${k}\` | ${span(v.points)} | ${v.size} | ${v.outline ? `${v.outline[0]} × ${v.outline[1]}` : "—"} | ${v.outlineOffset ? `[${v.outlineOffset.join(", ")}]` : "—"} | ${v.pilot ?? "—"} |`),
+    "",
+    "- `boards.<name>` (for `<Board>` / `<BoardCase>`): PCB size, thickness, holes and every connector (`id`, `type`, plan `rect`, `z`, `height`, `facing`). Frame: x/y from the PCB's lower-left corner, z = 0 at its underside.",
+    "",
+    "| board | PCB | holes | connectors (ids) |",
+    "|---|---|---|---|",
+    ...Object.entries(boards).map(([k, b]) => `| \`${k}\` | ${b.size[0]} × ${b.size[1]} × ${b.thickness} | ${b.holes.length ? `${b.holes.length} × ${b.screw}` : "none"} | ${b.connectors.map((c) => `${c.id} (${c.type}, ${c.facing})`).join(", ")} |`),
   );
   cache = {
     elements: sections.join("\n"),

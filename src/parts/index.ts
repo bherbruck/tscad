@@ -19,3 +19,4 @@ export { HeatSetInsert, NutTrap, Standoff, type HeatSetInsertProps, type NutTrap
 export { BoltPattern, MountHoles, mountPatterns, type BoltPatternProps, type MountHolesProps, type MountPattern } from "./patterns";
 export { Extrusion2020, extrusion2020Outline, HexPrism, type Extrusion2020Props, type HexPrismProps } from "./profiles";
 export { FingerJointBox, fingerBoxPanels, LivingHinge, type BoxPanel, type FingerJointBoxProps, type LivingHingeProps } from "./laser";
+export { Board, BoardCase, boardCaseLayout, boards, boardTop, connectorFace, type BoardCaseProps, type BoardDef, type BoardName, type BoardProps, type Connector, type ConnectorType, type Facing } from "./boards";

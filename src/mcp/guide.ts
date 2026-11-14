@@ -115,6 +115,10 @@ ISO holes as cutting tools pointing −Z from z = 0 — put them at the top face
 inside a \`<difference>\`: \`<Hole size="M3" depth={6} z={6}/>\`, \`<CounterboreHole>\`, \`<CountersinkHole>\`,
 \`<TapHole>\`, \`<NutTrap>\`, \`<HeatSetInsert>\`; solids \`<Standoff size height>\`, \`<HexPrism>\`, \`<Extrusion2020>\`;
 \`<BoltPattern pattern={mountPatterns.nema17}>{tool}</BoltPattern>\`; data \`metric\`, \`mountPatterns\`.
+Boards: \`boards.raspberryPi5 | raspberryPi4 | raspberryPiZero2W | pico | arduinoUno | esp32DevKitC\` with every
+connector as data; \`<Board board>\` (a 3D model with anchors per connector and hole) and
+\`<BoardCase board ports="auto" vents lid>\` — a complete enclosure: standoffs, port openings where
+connectors face the walls, a vented lid, the board mated in (check it with \`tscad_check\`).
 
 ## Flat parts (laser/CNC)
 

@@ -146,6 +146,12 @@ countersink, tap), nut traps, heat-set insert pockets, standoffs, published moun
 (Raspberry Pi 4 and Zero, Arduino Uno, NEMA 17/23) and 2020 extrusion. It also exports the
 `metric` table (`metric.M3.clearance.normal` → 3.4).
 
+Board models do the measuring for you. `boards.raspberryPi5` (also Pi 4, Zero 2 W, Pico,
+Arduino Uno and ESP32-DevKitC) holds every connector as data. `<BoardCase board={boards.raspberryPi5} />`
+generates the whole enclosure: standoffs, port openings, a vented lid, and the board mated
+inside it so an interference check proves the fit. See
+[examples/pi5-case-auto.tsx](examples/pi5-case-auto.tsx).
+
 It has laser-cut generators too. `<FingerJointBox>` produces finger-jointed panels with kerf
 compensation and engraved labels, on separate CUT and ENGRAVE DXF layers. It can also show the
 box folded up, so you can check the joints with interference. `<LivingHinge>` makes bendable

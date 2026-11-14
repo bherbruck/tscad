@@ -1211,7 +1211,7 @@ function hintFor(tag: string, prop: string): string | undefined {
 
 /** Components in `tscad/parts` (capitalised): lowercase tags that name one get pointed there. */
 export const PARTS_COMPONENTS = [
-  "Hole", "CounterboreHole", "CountersinkHole", "TapHole", "NutTrap", "HeatSetInsert", "Standoff",
+  "Hole", "CounterboreHole", "CountersinkHole", "TapHole", "NutTrap", "HeatSetInsert", "Standoff", "Board", "BoardCase",
   "BoltPattern", "MountHoles", "Extrusion2020", "HexPrism", "FingerJointBox", "LivingHinge",
 ];
 

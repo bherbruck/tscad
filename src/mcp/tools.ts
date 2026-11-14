@@ -640,7 +640,7 @@ async function docsTool(args: Record<string, any>): Promise<ToolResult> {
   }
   const topic = String(args.topic ?? "guide");
   const n = referenceNames();
-  const constraint = new Set(["point", "line", "arc", "spline", "dimension", "distance", "angle", "coincident", "equal", "parallel", "perpendicular", "tangent", "collinear", "concentric", "horizontal", "vertical", "symmetric", "midpoint", "onCurve", "fix"]);
+  const constraint = new Set(["point", "line", "arc", "spline", "dimension", "distance", "angle", "coincident", "equal", "parallel", "perpendicular", "tangent", "collinear", "concentric", "horizontal", "vertical", "symmetric", "midpoint", "onCurve", "fix", "mirrorEntities", "circularPattern"]);
   const index = `\n## Element index\nModelling: ${n.elements.filter((e) => !constraint.has(e)).map((e) => `<${e}>`).join(" ")}\nConstraint sketch (inside <sketch>): ${n.elements.filter((e) => constraint.has(e)).map((e) => `<${e}>`).join(" ")}\nParts library (import from "tscad/parts"): ${n.components.map((e) => `<${e}>`).join(" ")}\nCall tscad_docs with {"element": "<name>"} (or a list) for exact props, or {"topic": "elements"} for all.`;
   const text =
     topic === "elements" ? elementsMarkdown() : topic === "parts" ? partsMarkdown() : topic === "all" ? `${GUIDE}\n${elementsMarkdown()}\n\n${partsMarkdown()}` : GUIDE + index;

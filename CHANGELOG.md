@@ -65,7 +65,9 @@ The first release: CAD as TSX.
   heat-set insert pockets, standoffs, mounting patterns (Raspberry Pi 4 and Zero, Arduino Uno,
   NEMA 17/23), 2020 extrusion, hex prisms, and the `metric` data table. Laser-cut generators:
   `<FingerJointBox>` (finger joints, kerf, lid, dividers, flat or assembled) and
-  `<LivingHinge>`. Drawings take a `layer` (CUT and ENGRAVE in DXF and SVG).
+  `<LivingHinge>`. Drawings take a `layer` (CUT and ENGRAVE in DXF and SVG). Board models
+  (`boards.*`: Raspberry Pi 5/4/Zero 2 W/Pico, Arduino Uno, ESP32-DevKitC) with connector
+  anchors, and generated enclosures (`<BoardCase>`).
 - **`tscad/check`:** overhangs per triangle and face, wall thickness by BVH ray casting, bed
   fit, interference between parts, watertightness.
 - **`tscad/testing`:** `evaluateModel`; the matchers `toEvaluate`, `toHaveVolume`, `toFitIn`,

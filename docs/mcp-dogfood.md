@@ -162,9 +162,10 @@ Typical slips went through `tscad_evaluate` to see how the errors read:
   - `<fillet radius={8}>` on a 10 mm cube returns `ok` (962 mm³) instead of refusing a radius
     larger than the faces allow.
   - 24 small cylinder cuts take about 4 s.
-- **Parts, as a backlog:** board models with connector frames (Raspberry Pi 4/5 USB-C,
-  micro-HDMI, USB/Ethernet, GPIO; Arduino USB-B and barrel jack) as anchors, so cases can cut
-  ports from data instead of from memory.
+- ~~**Parts, as a backlog:** board models with connector frames~~ **Done since:** `boards.*`
+  holds every connector as data, `<Board>` anchors them, and `<BoardCase>` cuts the ports from
+  that data. [`examples/pi5-case-auto.tsx`](../examples/pi5-case-auto.tsx) replaces the
+  hand-placed Pi 5 case; its port openings line up with the connector anchors to within 0.01 mm.
 - **Bun upstream:** JSX `source` information (`jsxDEV` gets `undefined`) would give every
   element an exact location, including ones returned directly by a component.
 - **Render:** the default light background with white or natural PLA is low-contrast. Agents
