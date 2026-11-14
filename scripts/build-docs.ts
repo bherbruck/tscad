@@ -44,6 +44,7 @@ const docPages: DocPage[] = [
   { path: "docs/guide.html", title: "Guide", src: join(DOCS, "guide.md") },
   { path: "docs/sketch.html", title: "Constraint sketches", src: join(DOCS, "sketch.md") },
   { path: "docs/selectors.html", title: "Selectors", src: join(CONTENT, "selectors.md") },
+  { path: "docs/checks.html", title: "Checks & testing", src: join(DOCS, "checks.md") },
   { path: "docs/mcp.html", title: "MCP server (AI agents)", src: join(DOCS, "mcp.md") },
   { path: "docs/kernel.html", title: "Kernel notes", src: join(DOCS, "KERNEL_ISSUES.md") },
   { path: "docs/architecture.html", title: "Architecture", src: join(DOCS, "ARCHITECTURE.md") },
@@ -51,7 +52,7 @@ const docPages: DocPage[] = [
 
 const examples = existsSync(EXAMPLES)
   ? readdirSync(EXAMPLES)
-      .filter((f) => f.endsWith(".tsx"))
+      .filter((f) => f.endsWith(".tsx") && !/\.test\.tsx$/.test(f))
       .sort()
       .map((f) => {
         const name = f.replace(/\.tsx$/, "");
@@ -103,7 +104,7 @@ const sidebar: NavGroup[] = [
       { title: "API", href: "reference/api.html" },
     ],
   },
-  { title: "More", items: [...docPages.filter((p) => ["docs/mcp.html", "docs/kernel.html", "docs/architecture.html"].includes(p.path)).map((p) => ({ title: p.title, href: p.path })), { title: "Gallery", href: "gallery/index.html" }] },
+  { title: "More", items: [...docPages.filter((p) => ["docs/checks.html", "docs/mcp.html", "docs/kernel.html", "docs/architecture.html"].includes(p.path)).map((p) => ({ title: p.title, href: p.path })), { title: "Gallery", href: "gallery/index.html" }] },
 ];
 
 // ---------------------------------------------------------------------------------------------
@@ -112,6 +113,7 @@ const sidebar: NavGroup[] = [
 const DOC_LINKS: Record<string, string> = {
   "guide.md": "docs/guide.html",
   "mcp.md": "docs/mcp.html",
+  "checks.md": "docs/checks.html",
   "sketch.md": "docs/sketch.html",
   "KERNEL_ISSUES.md": "docs/kernel.html",
   "ARCHITECTURE.md": "docs/architecture.html",

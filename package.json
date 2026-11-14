@@ -33,7 +33,9 @@
     "./parts": "./src/parts/index.ts",
     "./render": "./src/render/index.ts",
     "./drawing": "./src/drawing/index.ts",
-    "./mcp": "./src/mcp/index.ts"
+    "./mcp": "./src/mcp/index.ts",
+    "./check": "./src/check/index.ts",
+    "./testing": "./src/testing/index.ts"
   },
   "files": [
     "src",

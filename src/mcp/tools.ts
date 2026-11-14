@@ -424,7 +424,7 @@ const EXAMPLES = join(PKG_ROOT, "examples");
 function exampleList(): { name: string; summary: string }[] {
   if (!existsSync(EXAMPLES)) return [];
   return readdirSync(EXAMPLES)
-    .filter((f) => f.endsWith(".tsx"))
+    .filter((f) => f.endsWith(".tsx") && !f.endsWith(".test.tsx"))
     .sort()
     .map((f) => {
       const src = readFileSync(join(EXAMPLES, f), "utf8");
