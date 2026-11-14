@@ -12,6 +12,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFile
 import { join, resolve } from "node:path";
 import { buildApp, PKG_ROOT, SRC, WASM_DIR } from "../src/cli/bundle";
 import { extractExports, extractIntrinsics, extractMaterials, extractSelectorMethods } from "../src/playground/extract";
+import { textImports } from "../src/playground/transform";
 
 const args = process.argv.slice(2);
 const dev = args.includes("--dev");
@@ -24,6 +25,8 @@ export interface Example {
   title: string;
   description: string;
   source: string;
+  /** Files it imports as text (`"./assets/logo.svg"` → contents). */
+  files?: Record<string, string>;
 }
 
 /** Title and description from an example's leading doc comment ("Title: description…"). */
@@ -69,7 +72,11 @@ async function build() {
   const dir = join(PKG_ROOT, "examples");
   const examples: Example[] = [];
   for (const f of readdirSync(dir).filter((f) => f.endsWith(".tsx") && !f.endsWith(".test.tsx")).sort()) {
-    examples.push(describeExample(f.replace(/\.tsx$/, ""), await Bun.file(join(dir, f)).text()));
+    const ex = describeExample(f.replace(/\.tsx$/, ""), await Bun.file(join(dir, f)).text());
+    const files: Record<string, string> = {};
+    for (const spec of textImports(ex.source)) files[spec] = await Bun.file(join(dir, spec)).text();
+    if (Object.keys(files).length) ex.files = files;
+    examples.push(ex);
   }
   examples.sort((a, b) => (a.name === "bracket" ? -1 : b.name === "bracket" ? 1 : a.title.localeCompare(b.title)));
   writeFileSync(join(OUT, "examples.json"), JSON.stringify(examples));

@@ -16,4 +16,14 @@ if (new URLSearchParams(location.search).has("embed") && window.parent !== windo
   document.documentElement.classList.add("embedded");
 }
 
+// `tscad dev <folder>`: a way back to the gallery.
+if ((config as any).gallery) {
+  const back = document.createElement("a");
+  back.href = (config as any).gallery;
+  back.className = "btn";
+  back.title = "All models in this folder";
+  back.textContent = "← Gallery";
+  config.topbarExtras = [back];
+}
+
 mountViewer(document.getElementById("app")!, config);

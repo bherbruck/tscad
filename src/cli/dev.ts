@@ -8,6 +8,7 @@ import type { Server, ServerWebSocket } from "bun";
 import { rmSync } from "node:fs";
 import { APP_PREFIX, type Asset, buildApp, buildUser, BundleError, type BuildMessage, mime, SRC, WASM_DIR } from "./bundle";
 import { EvalSession } from "./eval-server";
+import { discoverModels, ThumbnailCache } from "./gallery";
 import { type DiagnosticItem, DiagnosticsRunner } from "./diagnostics";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
@@ -21,7 +22,7 @@ export interface DevOptions {
   port?: number;
   host?: string;
   /** Called on every rebuild (for logging). */
-  onBuild?: (e: { ok: true; millis: number; version: number } | { ok: false; errors: BuildMessage[] }) => void;
+  onBuild?: (e: { ok: true; millis: number; version: number; file?: string } | { ok: false; errors: BuildMessage[] }) => void;
   quiet?: boolean;
   /**
    * Where models are evaluated: `"server"` (in this bun process, native kernel, meshes streamed
@@ -33,6 +34,8 @@ export interface DevOptions {
   root?: string;
   /** Evaluate after every rebuild and publish problems (`/__diagnostics`, `diagnostics` socket messages). */
   diagnostics?: boolean;
+  /** `file` is a folder: serve a gallery of every model in it (thumbnails rendered in the background). */
+  gallery?: boolean;
 }
 
 export interface DevServer {
@@ -53,19 +56,22 @@ type State =
   | { type: "building" };
 
 export async function startDev(opts: DevOptions): Promise<DevServer> {
-  let entry = resolve(opts.file);
-  const root = resolve(opts.root ?? dirname(entry));
+  const galleryRoot = opts.gallery ? resolve(opts.file) : undefined;
+  const firstModel = galleryRoot ? discoverModels(galleryRoot)[0]?.file : undefined;
+  // In gallery mode the viewer shows whichever model was opened last (initially the first one).
+  let entry = galleryRoot ? (firstModel ?? join(galleryRoot, "index.tsx")) : resolve(opts.file);
+  const root = resolve(opts.root ?? galleryRoot ?? dirname(entry));
   const labelOf = (f: string) => {
     const fromRoot = opts.root ? relative(root, f) : relative(process.cwd(), f);
     return fromRoot && !fromRoot.startsWith("..") ? fromRoot : basename(f);
   };
   let fileLabel = labelOf(entry);
 
-  let [app, html] = await Promise.all([buildApp(), Bun.file(resolve(SRC, "viewer/index.html")).text()]);
+  let [app, html] = await Promise.all([buildApp({ entries: ["viewer/main.ts", "viewer/gallery.ts"] }), Bun.file(resolve(SRC, "viewer/index.html")).text()]);
   const evalMode = await chooseEvalMode(opts.evaluate ?? "auto");
   const makePage = () => html.replace(
     "<!--TSCAD_CONFIG-->",
-    `<script>window.__TSCAD__ = ${JSON.stringify({ file: fileLabel, ws: "/__ws", wasmUrl: "/wasm/tscad_wasm_bg.wasm", glueUrl: "/wasm/tscad_wasm.js", workerUrl: `${APP_PREFIX}viewer/worker.js`, ...(evalMode === "server" ? { remoteEval: "/__eval" } : {}) })};</script>`,
+    `<script>window.__TSCAD__ = ${JSON.stringify({ file: fileLabel, ws: "/__ws", wasmUrl: "/wasm/tscad_wasm_bg.wasm", glueUrl: "/wasm/tscad_wasm.js", workerUrl: `${APP_PREFIX}viewer/worker.js`, ...(evalMode === "server" ? { remoteEval: "/__eval" } : {}), ...(galleryRoot ? { gallery: "/" } : {}) })};</script>`,
   );
   let page = makePage();
 
@@ -110,7 +116,7 @@ export async function startDev(opts: DevOptions): Promise<DevServer> {
       state = { type: "bundle", url: `/__user/bundle.js?v=${version}`, file: fileLabel, version, millis: b.millis };
       watched = new Set(b.inputs.filter((p) => !p.includes("/node_modules/")));
       if (bb) runner?.update(bb, entry);
-      opts.onBuild?.({ ok: true, millis: b.millis, version });
+      opts.onBuild?.({ ok: true, millis: b.millis, version, file: fileLabel });
     } catch (e) {
       const errors: BuildMessage[] = e instanceof BundleError ? e.messages : [{ message: String((e as Error)?.message ?? e) }];
       state = { type: "bundle-error", errors };
@@ -139,7 +145,18 @@ export async function startDev(opts: DevOptions): Promise<DevServer> {
         if (server.upgrade(req, { data: { kind: "dev" } })) return undefined;
         return new Response("expected a websocket", { status: 400 });
       }
-      if (path === "/" || path === "/index.html") return new Response(page, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache" } });
+      const html200 = (body: string) => new Response(body, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache" } });
+      if (galleryRoot) {
+        if (path === "/" || path === "/index.html") return html200(galleryPage(basename(galleryRoot)));
+        if (path.startsWith("/view/")) return openModel(path.slice("/view/".length)).then((ok) => (ok ? html200(page) : notFound()));
+        if (path === "/__gallery") return galleryList();
+        if (path.startsWith("/__thumb/")) {
+          const name = path.slice("/__thumb/".length);
+          if (!/^[\w.-]+\.png$/.test(name)) return notFound();
+          return new Response(Bun.file(join(thumbs!.dir, name)), { headers: { "content-type": "image/png", "cache-control": "max-age=31536000, immutable" } });
+        }
+      }
+      if (path === "/" || path === "/index.html") return html200(page);
       if (path.startsWith(APP_PREFIX)) {
         const a = app.get(path.slice(APP_PREFIX.length));
         return a ? assetResponse(a) : notFound();
@@ -200,6 +217,36 @@ export async function startDev(opts: DevOptions): Promise<DevServer> {
     },
   });
 
+  // ── gallery mode
+  const thumbs = galleryRoot ? new ThumbnailCache(galleryRoot) : undefined;
+  if (thumbs) thumbs.onUpdate = (file, info) => broadcast({ type: "gallery", rel: relative(galleryRoot!, file).split("\\").join("/"), info });
+
+  /** Show `rel` (a model under the gallery root) in the viewer. */
+  async function openModel(rel: string): Promise<boolean> {
+    const file = resolve(galleryRoot!, decodeURIComponent(rel));
+    if (!file.startsWith(galleryRoot!) || !(await Bun.file(file).exists())) return false;
+    if (file !== entry) {
+      entry = file;
+      fileLabel = labelOf(entry);
+      await rebuild();
+      addWatchers();
+    }
+    return true;
+  }
+
+  /** The models with whatever thumbnail is cached; missing ones are rendered in the background. */
+  async function galleryList(): Promise<Response> {
+    const models = discoverModels(galleryRoot!);
+    const items = await Promise.all(
+      models.map(async (m) => {
+        const c = await thumbs!.cached(m.file);
+        if (!c.info) void thumbs!.get(m.file); // queued; a `gallery` socket message announces it
+        return { ...m, file: undefined, thumb: c.info ?? null };
+      }),
+    );
+    return Response.json({ root: galleryRoot, evalMode, items });
+  }
+
   async function switchModel(req: Request): Promise<Response> {
     const body = (await req.json().catch(() => ({}))) as { file?: string };
     if (!body.file) return Response.json({ error: "file is required" }, { status: 400 });
@@ -235,7 +282,8 @@ export async function startDev(opts: DevOptions): Promise<DevServer> {
     return Response.json({ path: out, bytes });
   }
 
-  await rebuild();
+  if (!galleryRoot || firstModel) await rebuild();
+  else state = { type: "bundle-error", errors: [{ message: "no models in this folder yet" }] };
 
   // Watch the model's directory; rebuild when a file the bundle used changes (debounced).
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -259,6 +307,26 @@ export async function startDev(opts: DevOptions): Promise<DevServer> {
     }
   };
   addWatchers();
+
+  // Gallery: any .tsx edit may change thumbnails (a model or something it imports): re-check them.
+  if (galleryRoot) {
+    let gTimer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      watchers.push(
+        watch(galleryRoot, { recursive: true }, (_e, name) => {
+          const n = String(name ?? "");
+          if (!/\.(tsx?|jsx?|svg|dxf|txt|csv|json)$/.test(n) || /(^|[\\/])(node_modules|\.tscad|\.git)[\\/]/.test(n)) return;
+          clearTimeout(gTimer);
+          gTimer = setTimeout(() => {
+            broadcast({ type: "gallery-changed" });
+            for (const m of discoverModels(galleryRoot)) void thumbs!.get(m.file);
+          }, 300);
+        }),
+      );
+    } catch {
+      /* no recursive watch: refresh the page to update */
+    }
+  }
 
   // Hacking on tscad itself (not installed under node_modules): live-reload the viewer too.
   if (!SRC.includes("/node_modules/") && process.env.TSCAD_SELF_RELOAD !== "0") {
@@ -346,4 +414,14 @@ async function chooseEvalMode(want: "auto" | "server" | "browser"): Promise<"ser
   } catch {
     return "browser";
   }
+}
+
+/** The gallery page: the app's styles, and the gallery script (src/viewer/gallery.ts). */
+function galleryPage(title: string): string {
+  return `<!doctype html>
+<html lang="en" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${title.replace(/[<&]/g, "")} · tscad</title>
+<link rel="stylesheet" href="${APP_PREFIX}viewer/styles.css">
+<script>try { document.documentElement.dataset.theme = localStorage.getItem("tscad.theme") || "dark" } catch {}</script>
+</head><body><div id="gallery"></div><script type="module" src="${APP_PREFIX}viewer/gallery.js"></script></body></html>`;
 }

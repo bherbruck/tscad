@@ -15,6 +15,8 @@ export interface RenderCliOptions {
   background?: string;
   ortho?: boolean;
   edges?: boolean;
+  /** Print `{ out, parts: [{ name, ok, volume }] }` on stdout (for the gallery). */
+  json?: boolean;
 }
 
 const VIEWS = ["iso", "front", "back", "top", "bottom", "right", "left"];
@@ -55,8 +57,10 @@ export async function render(opts: RenderCliOptions): Promise<number> {
     const mesh = await kernel.mesh(p.name);
     if (mesh) parts.push({ name: p.name, color: colors.get(p.name), mesh });
   }
+  const summary = () => JSON.stringify({ out: opts.out, parts: result.parts.map((p) => ({ name: p.name, ok: p.ok, volume: p.volume })) });
   if (!parts.length) {
     console.error(`${sym.err} nothing to render`);
+    if (opts.json) console.log(summary());
     return 1;
   }
   const t1 = performance.now();
@@ -71,6 +75,7 @@ export async function render(opts: RenderCliOptions): Promise<number> {
   const out = resolve(opts.out ?? `${basename(opts.file).replace(/\.[jt]sx?$/, "")}.png`);
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, png);
-  console.log(`${sym.ok} ${c.bold(rel(out))} ${c.gray(`${fmtBytes(png.byteLength)} · kernel ${fmtMs(run.timings.kernel)} · render ${fmtMs(performance.now() - t1)} · total ${fmtMs(performance.now() - t0)}`)}`);
+  if (opts.json) console.log(summary());
+  (opts.json ? console.error : console.log)(`${sym.ok} ${c.bold(rel(out))} ${c.gray(`${fmtBytes(png.byteLength)} · kernel ${fmtMs(run.timings.kernel)} · render ${fmtMs(performance.now() - t1)} · total ${fmtMs(performance.now() - t0)}`)}`);
   return failed.length ? 1 : 0;
 }

@@ -127,7 +127,8 @@ export async function buildUser(entry: string, root = dirname(entry)): Promise<U
       {
         name: "tscad-track-inputs",
         setup(build) {
-          build.onLoad({ filter: /\.[cm]?[jt]sx?$/ }, async (args) => {
+          // Code and text-imported assets (`<svg data>`, `<dxf data>`): edits to either rebuild.
+          build.onLoad({ filter: /\.([cm]?[jt]sx?|svg|dxf|txt|csv|json)$/ }, async (args) => {
             inputs.add(args.path);
             return undefined as any;
           });

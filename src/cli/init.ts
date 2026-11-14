@@ -74,7 +74,7 @@ export function files(name: string): Record<string, string> {
       2,
     ) + "\n",
     "index.tsx": STARTER,
-    ".gitignore": "node_modules/\nout/\n*.stl\n*.step\n*.3mf\n*.glb\n.DS_Store\n",
+    ".gitignore": "node_modules/\nout/\n.tscad/\n*.stl\n*.step\n*.3mf\n*.glb\n.DS_Store\n",
     "README.md": `# ${name}\n\nA parametric model made with [tscad](https://github.com/bherbruck/tscad) — CAD as TSX.\n\n\`\`\`sh\nbun install\nbun run dev     # live viewer at http://localhost:3333\nbun run build   # out/model.stl + out/model.step\n\`\`\`\n`,
   };
 }

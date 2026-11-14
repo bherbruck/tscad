@@ -16,14 +16,25 @@ export interface TransformError {
   column?: number;
 }
 
+/** `import name from "./x.svg" with { type: "text" }` (Bun text imports), for inlining. */
+const TEXT_IMPORT = /^([ \t]*)import\s+([\w$]+)\s+from\s*(["'])([^"']+)\3\s*(?:with|assert)\s*\{\s*type\s*:\s*(["'])text\5\s*\}\s*;?/gm;
+
+/** Local files a model imports as text (relative specifiers). */
+export function textImports(source: string): string[] {
+  return [...source.matchAll(TEXT_IMPORT)].map((m) => m[4]!).filter((s) => s.startsWith("."));
+}
+
 /**
  * Compile `source` (a .tsx model). `runtime` maps a `tscad` specifier to the URL of its bundle
- * (`tscad` → `.../lib/index.js`, `tscad/jsx-runtime` → `.../lib/jsx-runtime.js`).
+ * (`tscad` → `.../lib/index.js`, `tscad/jsx-runtime` → `.../lib/jsx-runtime.js`). Text imports of
+ * files in `files` (`"./assets/logo.svg"` → contents) are inlined as string constants.
  */
-export function transformModel(source: string, file: string, runtime: (specifier: string) => string | undefined): Transformed {
+export function transformModel(source: string, file: string, runtime: (specifier: string) => string | undefined, files: Record<string, string> = {}): Transformed {
+  // Same line, so line numbers stay put.
+  const inlined = source.replace(TEXT_IMPORT, (m, indent: string, name: string, _q, spec: string) => (spec in files ? `${indent}const ${name} = ${JSON.stringify(files[spec])};` : m));
   let out;
   try {
-    out = sucrase(source, {
+    out = sucrase(inlined, {
       transforms: ["typescript", "jsx"],
       jsxRuntime: "automatic",
       jsxImportSource: "tscad",

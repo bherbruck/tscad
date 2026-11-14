@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /** The `tscad` command line: init, dev, build, info. */
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { parseArgs, parseParams, list, str, type Parsed } from "./args";
 import { c, logo, sym, fmtMs } from "./ui";
 import pkg from "../../package.json" with { type: "json" };
@@ -10,12 +10,12 @@ ${logo()} ${c.gray(`v${pkg.version}`)} — CAD as TSX
 
 ${c.bold("Usage")}
   ${c.accent("tscad init")} ${c.gray("[dir]")}                 scaffold a model project
-  ${c.accent("tscad dev")} ${c.gray("[file]")}                 live viewer with hot reload
+  ${c.accent("tscad dev")} ${c.gray("[file|dir]")}             live viewer; a folder: a gallery
   ${c.accent("tscad build")} ${c.gray("[file] -o out.step")}   export STEP/STL/3MF/GLB/OBJ/DXF/SVG
   ${c.accent("tscad info")} ${c.gray("[file]")}                params and part stats
-  ${c.accent("tscad render")} ${c.gray("[file] -o out.png")}   a PNG of the model
+  ${c.accent("tscad render")} ${c.gray("[file|dir] -o out")}   PNGs of a model or a folder
   ${c.accent("tscad convert")} ${c.gray("in.scad")}            OpenSCAD → tscad TSX
-  ${c.accent("tscad mcp")}                         MCP server for AI agents
+  ${c.accent("tscad mcp")}                        MCP server for AI agents
   ${c.gray("[file] defaults to index.tsx")}
 
 ${c.bold("dev")}
@@ -118,10 +118,12 @@ export async function main(argv: string[]): Promise<number> {
       return info({ file, params, json: !!f.json });
     }
     case "render": {
+      const arg = args.positionals[0];
+      if (arg && existsSync(arg) && statSync(arg).isDirectory()) return renderFolder(arg, f);
       if (!needFile()) return 1;
       const { render } = await import("./render");
       const num = (v: unknown) => (str(v) === undefined ? undefined : Number(str(v)));
-      return render({ file, out: str(f.out), params, view: str(f.view), width: num(f.width), height: num(f.height), background: str(f.background), ortho: !!f.ortho, edges: f.edges !== false });
+      return render({ file, out: str(f.out), params, view: str(f.view), width: num(f.width), height: num(f.height), background: str(f.background), ortho: !!f.ortho, edges: f.edges !== false, json: !!f.json });
     }
     case "convert": {
       const src = args.positionals[0];
@@ -139,6 +141,10 @@ export async function main(argv: string[]): Promise<number> {
       return 0;
     }
     case "dev": {
+      // A folder (or no file and no index.tsx here): the gallery of every model in it.
+      const arg = args.positionals[0];
+      const folder = arg ? existsSync(arg) && statSync(arg).isDirectory() : !existsSync("index.tsx");
+      if (folder) return dev(arg ?? ".", f, true);
       if (!needFile()) return 1;
       return dev(file, f);
     }
@@ -146,7 +152,37 @@ export async function main(argv: string[]): Promise<number> {
   return 0;
 }
 
-async function dev(file: string, f: Parsed["flags"]): Promise<number> {
+/** `tscad render <dir> -o <dir>`: a PNG of every model, several at a time, cached between runs. */
+async function renderFolder(dir: string, f: Parsed["flags"]): Promise<number> {
+  const { renderAll } = await import("./gallery");
+  const { table, fmtMs } = await import("./ui");
+  const out = str(f.out) ?? "renders";
+  if (/\.png$/i.test(out)) {
+    console.error(`${sym.err} rendering a folder: -o is a folder, not ${out}`);
+    return 2;
+  }
+  const num = (v: unknown) => (str(v) === undefined ? undefined : Number(str(v)));
+  const t = performance.now();
+  const results = await renderAll({ dir, out, width: num(f.width), height: num(f.height), view: str(f.view), background: str(f.background), log: (l) => console.error(c.gray(l)) });
+  if (!results.length) {
+    console.error(`${sym.warn} no models in ${dir} (a model is a .tsx that imports tscad and has a default export)`);
+    return 1;
+  }
+  const { relative } = await import("node:path");
+  console.log(
+    "\n" +
+      table(
+        ["model", "parts", "png", ""],
+        results.map((r) => [relative(dir, r.file), String(r.info.parts), r.png ? relative(process.cwd(), r.png) : "—", r.info.ok ? c.green("ok") : c.red(r.info.error ?? "failed")]),
+        ["l", "r", "l", "l"],
+      ),
+  );
+  const failed = results.filter((r) => !r.info.ok).length;
+  console.log(c.gray(`\n  ${results.length - failed}/${results.length} rendered in ${fmtMs(performance.now() - t)} ${c.gray("(unchanged models come from .tscad/cache)")}`));
+  return failed ? 1 : 0;
+}
+
+async function dev(file: string, f: Parsed["flags"], gallery = false): Promise<number> {
   const { startDev } = await import("./dev");
   const t = performance.now();
   const wanted = Number(str(f.port) ?? process.env.PORT ?? 3333);
@@ -155,6 +191,7 @@ async function dev(file: string, f: Parsed["flags"]): Promise<number> {
     try {
       server = await startDev({
         file,
+        gallery,
         port,
         host: str(f.host),
         evaluate: f["browser-eval"] ? "browser" : f["server-eval"] ? "server" : "auto",
@@ -162,7 +199,7 @@ async function dev(file: string, f: Parsed["flags"]): Promise<number> {
         diagnostics: !!f.diagnostics,
         onBuild: (e) => {
           const time = new Date().toLocaleTimeString([], { hour12: false });
-          if (e.ok) console.log(`${c.gray(time)} ${sym.ok} bundled ${c.bold(file)} ${c.gray(`in ${fmtMs(e.millis)}`)}${e.version > 1 ? c.gray(` · reload #${e.version - 1}`) : ""}`);
+          if (e.ok) console.log(`${c.gray(time)} ${sym.ok} bundled ${c.bold(e.file ?? file)} ${c.gray(`in ${fmtMs(e.millis)}`)}${e.version > 1 ? c.gray(` · reload #${e.version - 1}`) : ""}`);
           else {
             console.log(`${c.gray(time)} ${sym.err} ${c.red("build failed")}`);
             for (const m of e.errors) console.log(`  ${m.file ? c.cyan(`${m.file}:${m.line}:${m.column}`) + " " : ""}${m.message}${m.lineText ? `\n    ${c.gray(m.lineText)}` : ""}`);
@@ -187,7 +224,7 @@ async function dev(file: string, f: Parsed["flags"]): Promise<number> {
         : `wasm, in the browser ${c.gray(`(no native kernel for ${process.platform}-${process.arch})`)}`;
   const arrow = c.gray(sym.arrow.includes("➜") ? "➜" : "->");
   console.log(`  ${sym.arrow}  ${c.bold("Viewer")}  ${c.accent(c.underline(server.url))}`);
-  console.log(`  ${arrow}  ${c.gray("Model")}   ${file}`);
+  console.log(`  ${arrow}  ${c.gray(gallery ? "Folder" : "Model")}   ${gallery ? `${file} ${c.gray("(a gallery of every model in it)")}` : file}`);
   console.log(`  ${arrow}  ${c.gray("Kernel")}  ${kernel}`);
   console.log(`  ${arrow}  ${c.gray("Stop")}    ${c.bold("Ctrl+C")}\n`);
   if (f.open) openBrowser(server.url);

@@ -17,6 +17,8 @@ interface Example {
   title: string;
   description: string;
   source: string;
+  /** Files it imports as text (`"./assets/logo.svg"` → contents). */
+  files?: Record<string, string>;
 }
 
 const FILE = "model.tsx";
@@ -70,25 +72,38 @@ async function main() {
   // Which source to start with: a shared link, an example link, the last draft, or the default example.
   const hash = new URLSearchParams(location.hash.slice(1));
   let source = STARTER;
+  /** Text-imported files of the current model (examples' SVGs…); shared links carry them. */
+  let files: Record<string, string> = {};
   let current = "";
   const shared = hash.get("code");
   const exampleName = hash.get("example");
   if (shared) {
     try {
       source = decodeSource(shared);
+      const f = hash.get("files");
+      if (f) files = JSON.parse(decodeSource(f));
     } catch {
       /* corrupt link: fall through */
     }
   } else if (exampleName && examples.some((e) => e.name === exampleName)) {
     current = exampleName;
     source = examples.find((e) => e.name === exampleName)!.source;
+    files = examples.find((e) => e.name === exampleName)!.files ?? {};
   } else {
     const draft = safeGet(DRAFT_KEY);
     const first = examples.find((e) => e.name === "bracket") ?? examples[0];
-    if (draft) source = draft;
+    if (draft) {
+      source = draft;
+      try {
+        files = JSON.parse(safeGet(`${DRAFT_KEY}.files`) ?? "{}");
+      } catch {
+        files = {};
+      }
+    }
     else if (first) {
       current = first.name;
       source = first.source;
+      files = first.files ?? {};
     }
   }
 
@@ -136,7 +151,7 @@ async function main() {
     file: FILE,
     topbarExtras: [h("div", { class: "pg-extras" }, exampleWrap, importBtn, shareBtn, codeBtn)],
     sidePane: pane,
-    hashKeep: ["code", "example"],
+    hashKeep: ["code", "example", "files"],
     onSourceClick: (loc, target) => {
       if (!sameFile(loc.file)) return void viewer.toast(`${loc.file}:${loc.line}`);
       document.body.classList.remove("pg-code-hidden");
@@ -162,9 +177,10 @@ async function main() {
     clearTimeout(timer);
     const text = editor?.getValue() ?? source;
     safeSet(DRAFT_KEY, text);
+    safeSet(`${DRAFT_KEY}.files`, JSON.stringify(files));
     const t = performance.now();
     try {
-      const out = transformModel(text, FILE, (spec) => RUNTIME[spec]);
+      const out = transformModel(text, FILE, (spec) => RUNTIME[spec], files);
       const url = URL.createObjectURL(new Blob([out.code], { type: "text/javascript" }));
       const prev = lastUrl;
       lastUrl = url;
@@ -204,6 +220,7 @@ async function main() {
         notes = out.notes;
         select.value = "";
         resetParams = true;
+        files = {};
         editor!.setValue(out.text);
         history.replaceState(null, "", location.pathname + location.search);
         run();
@@ -221,6 +238,7 @@ async function main() {
     const ex = examples.find((e) => e.name === select.value);
     if (!ex) return;
     resetParams = true;
+    files = ex.files ?? {};
     editor!.setValue(ex.source);
     // A fresh model: drop the old params and code from the hash.
     history.replaceState(null, "", `#example=${encodeURIComponent(ex.name)}`);
@@ -233,6 +251,8 @@ async function main() {
     const q = new URLSearchParams(location.hash.slice(1));
     q.delete("example");
     q.set("code", encodeSource(editor!.getValue()));
+    if (Object.keys(files).length) q.set("files", encodeSource(JSON.stringify(files)));
+    else q.delete("files");
     const url = `${location.origin}${location.pathname}#${q.toString()}`;
     history.replaceState(null, "", `#${q.toString()}`);
     if (await copyText(url)) viewer.toast(`Link copied (${(url.length / 1024).toFixed(1)} kB) — opens this code with these parameters`);

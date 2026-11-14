@@ -5,7 +5,7 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { extractExports, extractIntrinsics, extractMaterials, extractSelectorMethods } from "../src/playground/extract";
 import { decodeSource, encodeSource } from "../src/playground/share";
-import { rewriteImports, transformModel } from "../src/playground/transform";
+import { rewriteImports, textImports, transformModel } from "../src/playground/transform";
 import { describeExample } from "../scripts/build-playground";
 import { renderModule } from "../src";
 
@@ -52,6 +52,14 @@ describe("playground transform", () => {
     expect(out.code).toContain('"https://esm.sh/chroma-js"');
   });
 
+  test("text imports of known files are inlined on the same line", () => {
+    const src = `import { edges } from "tscad"\nimport logo from "./a.svg" with { type: "text" }\nexport default () => <box size={logo.length} />\n`;
+    expect(textImports(src)).toEqual(["./a.svg"]);
+    const out = transformModel(src, "m.tsx", (s) => `https://x/${s}.js`, { "./a.svg": "<svg/>" });
+    expect(out.code.split("\n")[1]).toContain('const logo = "<svg/>";');
+    expect(() => transformModel(src, "m.tsx", () => "x")).toThrow(/single file/);
+  });
+
   test("rewriteImports handles every import form", () => {
     const code = `import a from "a"\nimport { b } from 'b'\nimport "c"\nexport { d } from "d"\nconst e = import("e")\nexport * from "f"`;
     expect(rewriteImports(code, (s) => s.toUpperCase())).toBe(`import a from "A"\nimport { b } from 'B'\nimport "C"\nexport { d } from "D"\nconst e = import("E")\nexport * from "F"`);
@@ -60,7 +68,8 @@ describe("playground transform", () => {
   for (const f of EXAMPLES) {
     test(`example ${f} compiles in-browser style and renders`, async () => {
       const source = readFileSync(join(ROOT, "examples", f), "utf8");
-      const out = transformModel(source, f, localRuntime);
+      const files = Object.fromEntries(textImports(source).map((s) => [s, readFileSync(join(ROOT, "examples", s), "utf8")]));
+      const out = transformModel(source, f, localRuntime, files);
       const dir = mkdtempSync(join(tmpdir(), "tscad-pg-"));
       const file = join(dir, f.replace(/\.tsx$/, ".mjs"));
       writeFileSync(file, out.code);
