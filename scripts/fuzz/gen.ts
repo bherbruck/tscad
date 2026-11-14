@@ -1,6 +1,6 @@
 /**
  * Seeded random IR generator for the kernel fuzzer. Every tree it makes is *valid input*: positive
- * sizes, simple (non-self-intersecting) closed profiles, proper rigid transforms — so a kernel
+ * sizes, simple (non-self-intersecting) closed profiles, proper rigid transforms. So a kernel
  * error on a boolean/primitive/sweep is a kernel failure, not bad input. It deliberately favours
  * the configurations kernels find hard: touching, coplanar, tangent, coincident and
  * near-coincident operands, mirrored and rotated placements.

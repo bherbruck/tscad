@@ -26,6 +26,8 @@ const WORKERS = arg("--workers", 6);
 const SEED0 = arg("--seed", 1);
 const REPLAY = argv.includes("--replay") ? arg("--replay", 0) : undefined;
 const REPLAY_FINDINGS = argv.includes("--replay-findings");
+/** Only re-render docs/FUZZ.md from the saved findings and stats (no evaluation). */
+const REPORT_ONLY = argv.includes("--report");
 const BIAS = (() => {
   const i = argv.indexOf("--bias");
   return i >= 0 ? argv[i + 1] ?? "" : "";
@@ -358,9 +360,9 @@ function writeReport(final: boolean) {
   L.push("# Kernel fuzzing", "");
   L.push("`scripts/fuzz/fuzz.ts` generates seeded random IR trees (primitives with random sizes and rigid/mirrored placements; booleans arranged to overlap, touch, share planes, contain, coincide, nearly coincide or be tangent; extrudes of star polygons, rounded rectangles and circles, with draft; revolves; lofts; fillets/chamfers with random selectors and radii; shells), evaluates them on solidcore in worker sessions and checks:", "");
   L.push("| Oracle | Bug when |", "|---|---|");
-  L.push("| `panic` | the kernel panics (wasm trap) |", "| `eval-error` | a boolean, primitive, sweep or transform fails — the generator only makes valid input |", "| `bad-volume` | `ok` but volume ≤ 0 or NaN |", "| `mesh-volume` | divergence-theorem volume of the export mesh differs from the kernel's by > 2% |", "| `open-mesh` | the export mesh is not closed (an edge not shared by exactly two triangles after welding) |", "| `mesh-error` / `warning` | meshing fails, or evaluation reports warnings |", "| `identity-union` / `identity-difference` | vol(A∪B)+vol(A∩B) ≠ vol(A)+vol(B), or vol(A−B) ≠ vol(A)−vol(A∩B) (0.2%) |", "| `slow` / `hang` | one evaluation takes > 30 s / > 120 s |", "");
+  L.push("| `panic` | the kernel panics (wasm trap) |", "| `eval-error` | a boolean, primitive, sweep or transform fails (the generator only makes valid input) |", "| `bad-volume` | `ok` but volume ≤ 0 or NaN |", "| `mesh-volume` | divergence-theorem volume of the export mesh differs from the kernel's by > 2% |", "| `open-mesh` | the export mesh is not closed (an edge not shared by exactly two triangles after welding) |", "| `mesh-error` / `warning` | meshing fails, or evaluation reports warnings |", "| `identity-union` / `identity-difference` | vol(A∪B)+vol(A∩B) ≠ vol(A)+vol(B), or vol(A−B) ≠ vol(A)−vol(A∩B) (0.2%) |", "| `slow` / `hang` | one evaluation takes > 30 s / > 120 s |", "");
   L.push("Fillet/chamfer/shell errors are counted as **refusals** (often legitimate: radius too large) and tallied below. Every bug is delta-minimized (hoist children, drop operands, simplify transforms, selectors and numbers) while it keeps the same (oracle, op, message) signature, and deduplicated by that signature.", "");
-  L.push("Run a campaign: `bun scripts/fuzz/fuzz.ts --minutes 25 --workers 8 --seed 1 [--bias no-torus]` (findings accumulate across campaigns and are deduplicated against earlier ones). Replay one case: `--replay <seed>`. Re-check every saved minimal repro against the current wasm: `--replay-findings` (fills the Status column and writes `fuzz/regressions.json`). Findings: `fuzz/findings/<id>.json` (minimal + original IR, seeds).", "");
+  L.push("Run a campaign: `bun scripts/fuzz/fuzz.ts --minutes 25 --workers 8 --seed 1 [--bias no-torus]` (findings accumulate across campaigns and are deduplicated against earlier ones). Replay one case: `--replay <seed>`. Re-check every saved minimal repro against the current wasm: `--replay-findings` (fills the Status column and writes `fuzz/regressions.json`). Re-render this page from the saved findings only: `--report`. Findings: `fuzz/findings/<id>.json` (minimal + original IR, seeds).", "");
   L.push("## Campaigns", "", "| Started (UTC) | Seed | Workers | Bias | Cases | Identity checks | Clean | Empty | Refusals | Bug hits | New findings | Eval p50 / p99 / max |", "|---|---|---|---|---|---|---|---|---|---|---|---|");
   for (const r of runs) L.push(`| ${r.started.slice(0, 16).replace("T", " ")}${r === current && !final ? " (running)" : ""} | ${r.seed0} | ${r.workers} | ${r.bias ?? "none"} | ${r.cases} | ${r.identity} | ${r.ok} | ${r.empty} | ${r.refused} | ${r.bugs} | ${r.newFindings ?? "–"} | ${r.p50 ?? "–"} / ${r.p99 ?? "–"} / ${r.max ?? "–"} s |`);
   const by = (st: string) => sorted.filter((f) => (f.status ?? "unchecked") === st).length;
@@ -370,8 +372,8 @@ function writeReport(final: boolean) {
   sorted.forEach((f, i) => {
     const min = f.minimal ? docOf(f.minimal) : docOf(f.original);
     const json = JSON.stringify(min.parts.length === 1 ? min.parts[0]!.node : { A: min.parts[0]!.node, B: min.parts[1]!.node });
-    const msg = `${f.message}${f.minimalDetail ?? f.detail ? ` — ${f.minimalDetail ?? f.detail}` : ""}`.replace(/\|/g, "\\|").replace(/\n/g, " ");
-    const status = f.status === "fixed" ? "✅ fixed" : f.status === "changed" ? `⚠️ changed: ${(f.statusDetail ?? "").replace(/\|/g, "\\|").slice(0, 160)}` : f.status === "still failing" ? "❌ failing" : "–";
+    const msg = `${f.message}${f.minimalDetail ?? f.detail ? `: ${f.minimalDetail ?? f.detail}` : ""}`.replace(/\|/g, "\\|").replace(/\n/g, " ");
+    const status = f.status === "fixed" ? "✅ fixed" : f.status === "changed" ? `⚠️ changed: ${(f.statusDetail ?? "").replace(/ \u2014 /g, ": ").replace(/\|/g, "\\|").slice(0, 160)}` : f.status === "still failing" ? "❌ failing" : "–";
     L.push(`| ${i + 1} | ${status} | \`${f.oracle}\` | ${f.op} | ${f.count} | ${msg} | [${f.id}](../fuzz/findings/${f.id}.json): \`${json.length > 900 ? json.slice(0, 900) + "…" : json}\` |`);
   });
   if (!sorted.length) L.push("| – | – | – | – | – | none | – |");
@@ -402,6 +404,11 @@ if (REPLAY !== undefined) {
 
 loadState();
 
+if (REPORT_ONLY) {
+  writeReport(true);
+  process.exit(0);
+}
+
 if (REPLAY_FINDINGS) {
   const list = [...findings.values()];
   const slots = Array.from({ length: Math.min(WORKERS, list.length) }, () => new Slot());
@@ -419,10 +426,10 @@ if (REPLAY_FINDINGS) {
           f.statusDetail = v.refusal ? `now a refusal: ${v.refusal}` : v.empty ? "evaluates (empty result)" : "evaluates cleanly";
         } else if (signature(v) === f.signature) {
           f.status = "still failing";
-          f.statusDetail = `${v.message ?? ""}${v.detail ? ` — ${v.detail}` : ""}`;
+          f.statusDetail = `${v.message ?? ""}${v.detail ? `: ${v.detail}` : ""}`;
         } else {
           f.status = "changed";
-          f.statusDetail = `${v.oracle}/${v.op}: ${v.message ?? ""}${v.detail ? ` — ${v.detail}` : ""}`;
+          f.statusDetail = `${v.oracle}/${v.op}: ${v.message ?? ""}${v.detail ? `: ${v.detail}` : ""}`;
         }
         f.checked = new Date().toISOString();
         save(f);
