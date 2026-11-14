@@ -31,7 +31,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
       - name: Build wasm (release)
-        run: bun run build:wasm
+        run: bun scripts/build-wasm.ts --ci
       - name: Build playground
         run: bun scripts/build-playground.ts
       - name: Smoke-test the static build

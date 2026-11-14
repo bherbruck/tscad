@@ -1,10 +1,14 @@
 #!/usr/bin/env bun
 // Builds crates/tscad-wasm to wasm32 and runs the pinned wasm-bindgen CLI into wasm/.
-// Usage: bun scripts/build-wasm.ts [--dev]
+// Usage: bun scripts/build-wasm.ts [--dev | --ci]
+//   (default) release profile: fat LTO, smallest/fastest, needs lots of RAM and ~10 min
+//   --ci      wasm-dev profile (no LTO) + wasm-opt: same speed in practice, fits CI runners
+//   --dev     wasm-dev profile, no wasm-opt: fastest to build
 import { $ } from "bun";
 
 const WASM_BINDGEN = "0.2.130"; // must equal the wasm-bindgen crate pin in crates/tscad-wasm/Cargo.toml
 const dev = process.argv.includes("--dev");
+const ci = process.argv.includes("--ci");
 const root = new URL("..", import.meta.url).pathname;
 const out = `${root}wasm`;
 const tmp = `${root}wasm.tmp`;
@@ -15,9 +19,9 @@ if (!have.includes(WASM_BINDGEN)) {
   await $`cargo install wasm-bindgen-cli --version ${WASM_BINDGEN} --locked`;
 }
 
-const profile = dev ? "wasm-dev" : "release";
+const profile = dev || ci ? "wasm-dev" : "release";
 await $`cargo build -p tscad-wasm --target wasm32-unknown-unknown --profile ${profile}`.cwd(root);
-const dir = dev ? "wasm-dev" : "release";
+const dir = dev || ci ? "wasm-dev" : "release";
 const wasm = `${root}target/wasm32-unknown-unknown/${dir}/tscad_wasm.wasm`;
 await $`rm -rf ${tmp} && mkdir -p ${tmp}`;
 await $`wasm-bindgen ${wasm} --out-dir ${tmp} --target web --typescript --out-name tscad_wasm`;

@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -22,7 +26,7 @@ jobs:
       - name: Kernel tests (native)
         run: cargo test -p tscad-wasm
       - name: Build wasm
-        run: bun run build:wasm
+        run: bun scripts/build-wasm.ts --ci
       - name: Typecheck
         run: bun run typecheck
       - name: Tests
