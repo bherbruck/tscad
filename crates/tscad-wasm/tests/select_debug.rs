@@ -87,3 +87,19 @@ fn sphere_bbox_is_exact() {
         assert!((lo[i] + 2.0).abs() < 1e-6 && (hi[i] - 2.0).abs() < 1e-6, "{lo:?} {hi:?}");
     }
 }
+
+#[test]
+fn many_holes_batched() {
+    let mut holes = Vec::new();
+    for i in 0..6 {
+        for j in 0..4 {
+            holes.push(format!(r#"{{"type":"transform","matrix":[1,0,0,{}, 0,1,0,{}, 0,0,1,0, 0,0,0,1],"children":[{{"type":"cylinder","radius":2,"height":20,"center":true}}]}}"#, -25.0 + 10.0 * f64::from(i), -15.0 + 10.0 * f64::from(j)));
+        }
+    }
+    let node = format!(r#"{{"type":"difference","children":[{{"type":"box","size":[70,50,5],"center":true}},{}]}}"#, holes.join(","));
+    let t = std::time::Instant::now();
+    let v = vol(&node).unwrap();
+    println!("24 holes: {:?}", t.elapsed());
+    let e = 70.0 * 50.0 * 5.0 - 24.0 * std::f64::consts::PI * 4.0 * 5.0;
+    assert!((v - e).abs() < 1e-3, "{v} {e}");
+}
