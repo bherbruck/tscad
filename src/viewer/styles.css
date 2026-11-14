@@ -1766,3 +1766,78 @@ kbd {
 .fmt-svg {
   background: linear-gradient(135deg, #a78bfa, #7c5ad9);
 }
+
+.tool.dim {
+  opacity: 0.4;
+}
+
+.sketch-row {
+  width: calc(100% + 0px);
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sketch-swatch {
+  display: grid;
+  place-items: center;
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px #5eead4;
+  color: #5eead4;
+  border-radius: 5px;
+}
+
+.sk-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 99px;
+  font-size: 10.5px;
+  font-weight: 650;
+}
+
+.sk-chip.ok {
+  color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 13%, transparent);
+}
+
+.sk-chip.under {
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+}
+
+.sk-chip.bad {
+  color: var(--err);
+  background: color-mix(in srgb, var(--err) 14%, transparent);
+}
+
+.dim-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding: 1px 6px;
+  border-radius: 5px;
+  border: 1px solid rgba(147, 180, 255, 0.45);
+  background: rgba(12, 16, 28, 0.82);
+  color: #cfe0ff;
+  font: 600 11px/1.4 var(--mono);
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.dim-label:hover {
+  background: #5b7cfa;
+  border-color: #93b4ff;
+  color: #fff;
+}
+
+:root[data-theme="light"] .dim-label {
+  background: rgba(255, 255, 255, 0.9);
+  color: #2747b8;
+  border-color: rgba(70, 100, 220, 0.4);
+}

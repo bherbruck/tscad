@@ -61,6 +61,7 @@ const PATHS: Record<string, string> = {
   link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
   flip: '<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
   info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
+  sketch: '<path d="M3 21l3.5-1L18 8.5 15.5 6 4 17.5z"/><path d="m13.5 8 2.5 2.5"/><path d="M14 21h7M17 18v6" opacity=".0"/><path d="M13 21h8"/><circle cx="18.5" cy="4.5" r="1.5"/>',
   cursor: '<path d="m4 4 7.07 17 2.51-7.39L21 11.07z"/>',
   file: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/>',
   panel: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/>',

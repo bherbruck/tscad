@@ -6,6 +6,8 @@ import { copyText, escapeHtml, h, icon, LOGO } from "./dom";
 import { hashToValues, ParamsPanel, valuesToHash } from "./params";
 import type { CodeFrame, EvalData, ExportFormat, FromWorker, Loc, ParamSchemaData, ParamValuesData, PartData, StageError, ToWorker } from "./protocol";
 import { fmtNum, PALETTE, type Hit, type SectionAxis, type ViewName, Viewport } from "./scene";
+import { SketchOverlay } from "./sketch-overlay";
+import type { SketchData, SketchDimensionData } from "./protocol";
 import { describe, selectorAttr } from "./selectors";
 import type { PickInfo } from "../ir";
 
@@ -26,6 +28,11 @@ export interface ViewerConfig {
   onErrors?: (error: StageError | undefined, bundleErrors: BundleError[], data?: EvalData) => void;
   /** Hash keys the viewer must leave alone (besides params). */
   hashKeep?: string[];
+  /**
+   * A sketch chip or dimension label was clicked: reveal `loc` in the code. Default: show
+   * file:line and copy it.
+   */
+  onSourceClick?: (loc: Loc, target: { kind: "sketch"; sketch: SketchData } | { kind: "dimension"; sketch: SketchData; dimension: SketchDimensionData }) => void;
   /** Expose `window.__tscadViewer` (tests). Default true. */
   debugGlobal?: boolean;
 }
@@ -98,6 +105,16 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
   app.classList.add("tscad-app");
   const stage = h("div", { class: "stage" });
   const viewport = new Viewport(stage);
+  const sketches = new SketchOverlay(viewport);
+  /** The user's choice for the sketch overlay (undefined: on when the model has sketches). */
+  let sketchPref: boolean | undefined = (() => {
+    const v = localStorage.getItem("tscad.sketches");
+    return v === null ? undefined : v === "1";
+  })();
+  sketches.onDimensionClick = (sk, dim) => {
+    if (dim.loc) sourceClick(dim.loc, { kind: "dimension", sketch: sk, dimension: dim });
+    else toast(`${dim.text} (${dim.kind}) — no source location`);
+  };
 
   const statusPill = h("div", { class: "status" });
   const fileLabel = h("div", { class: "file" }, icon("file", 14), h("span", null, state.file));
@@ -177,6 +194,7 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
     xray: tool("xray", "X-ray (T)", () => toggleXray()),
     section: tool("section", "Section (X)", () => toggleSection()),
     measure: tool("ruler", "Measure (M)", () => toggleMeasure()),
+    sketch: tool("sketch", "Sketch overlay (K)", () => toggleSketches()),
   };
   tb.edges.classList.add("active");
   const sectionPop = buildSectionPopover();
@@ -187,7 +205,7 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
     h("div", { class: "tool-sep" }),
     h("div", { class: "tool-group" }, tb.fit, tb.ortho),
     h("div", { class: "tool-sep" }),
-    h("div", { class: "tool-group" }, tb.edges, tb.wire, tb.xray, tb.section, tb.measure),
+    h("div", { class: "tool-group" }, tb.edges, tb.wire, tb.xray, tb.section, tb.measure, tb.sketch),
   );
   const exportMenu = buildExportMenu();
   const helpPop = buildHelp();
@@ -330,6 +348,8 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
     state.error = failed.length ? kernelError(failed[0]!) : undefined;
     params.update(data.schema, data.values);
     viewport.setDrawings(data.drawings ?? []);
+    sketches.set(data.sketches ?? []);
+    applySketchVisibility();
     viewport.setParts(
       data.parts.map((p, i) => ({ name: p.name, color: state.colors[p.name] ?? p.color ?? PALETTE[i % PALETTE.length], mesh: p.mesh, failed: !p.ok })),
     );
@@ -486,6 +506,24 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
       el.addEventListener("mouseleave", () => el.classList.remove("hover"));
       el.title = p.bbox ? `${p.name}\nbbox ${p.bbox[0].map((v) => fmtNum(v)).join(", ")} → ${p.bbox[1].map((v) => fmtNum(v)).join(", ")}\n${p.counts ? `${p.counts[0]} faces, ${p.counts[1]} edges, ${p.counts[2]} vertices` : ""}\n${fmtMs(p.millis)}` : p.name;
       partsList.append(el);
+    });
+    (d.sketches ?? []).forEach((sk, i) => {
+      const status = sk.status === "ok" ? "ok" : sk.status === "under" ? "under" : "bad";
+      const chip =
+        status === "ok"
+          ? h("span", { class: "sk-chip ok", title: "Fully constrained" }, icon("check", 11), "constrained")
+          : status === "under"
+            ? h("span", { class: "sk-chip under", title: `Still free:\n${sk.free.join("\n")}` }, icon("alert", 11), `${sk.dof} DOF`)
+            : h("span", { class: "sk-chip bad", title: sk.free.join("\n") || sk.status }, icon("x", 11), "conflict");
+      const where = sk.loc ? `${shortFile(sk.loc.file)}:${sk.loc.line}` : sk.path;
+      const row = h(
+        "button",
+        { class: "part sketch-row", title: sk.loc ? `Sketch ${i + 1} — click to show it in the code (${where})` : `Sketch ${i + 1}` },
+        h("span", { class: "swatch sketch-swatch" }, icon("sketch", 12)),
+        h("div", { class: "part-main" }, h("div", { class: "part-name" }, `Sketch ${i + 1}`, chip), h("div", { class: "part-meta" }, `${sk.part ?? "part"} · ${sk.entities.length} curves · ${sk.dimensions.length} dims · ${where}`)),
+      );
+      row.addEventListener("click", () => sk.loc && sourceClick(sk.loc, { kind: "sketch", sketch: sk }));
+      partsList.append(row);
     });
     for (const dr of d.drawings ?? []) {
       const v = viewport.drawings.get(dr.name);
@@ -766,6 +804,33 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
 
   // ───────────────────────── toolbar actions ─────────────────────────
 
+  function applySketchVisibility() {
+    const has = sketches.count > 0;
+    const on = has && (sketchPref ?? true);
+    sketches.setVisible(on);
+    tb.sketch.classList.toggle("active", on);
+    tb.sketch.classList.toggle("dim", !has);
+    tb.sketch.title = has ? "Sketch overlay (K)" : "Sketch overlay (K) — this model has no constraint sketches";
+  }
+
+  function toggleSketches() {
+    if (!sketches.count) return void toast("This model has no constraint sketches");
+    sketchPref = !sketches.visible;
+    try {
+      localStorage.setItem("tscad.sketches", sketchPref ? "1" : "0");
+    } catch {
+      /* private mode */
+    }
+    applySketchVisibility();
+  }
+
+  function sourceClick(loc: Loc, target: Parameters<NonNullable<ViewerConfig["onSourceClick"]>>[1]) {
+    if (cfg.onSourceClick) return cfg.onSourceClick(loc, target);
+    const where = `${shortFile(loc.file)}:${loc.line}:${loc.column}`;
+    void copyText(where);
+    toast(`${target.kind === "dimension" ? `${target.dimension.text} — ` : ""}${where} (copied)`);
+  }
+
   function toggleOrtho() {
     viewport.setOrtho(!viewport.isOrtho);
     tb.ortho.classList.toggle("active", viewport.isOrtho);
@@ -895,6 +960,7 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
       ["T", "X-ray"],
       ["X", "Section plane"],
       ["M", "Measure"],
+      ["K", "Sketch overlay"],
       ["Click", "Select face / edge → selectors"],
       ["Double-click", "Fit (on empty space)"],
       ["Esc", "Clear selection / measure"],
@@ -936,6 +1002,8 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
         return toggleXray();
       case "x":
         return toggleSection();
+      case "k":
+        return toggleSketches();
       case "m":
         return toggleMeasure();
       case "?":

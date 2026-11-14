@@ -11,7 +11,7 @@ import { renderModule } from "../src";
 
 const ROOT = resolve(import.meta.dir, "..");
 const SRC = join(ROOT, "src");
-const EXAMPLES = readdirSync(join(ROOT, "examples")).filter((f) => f.endsWith(".tsx"));
+const EXAMPLES = readdirSync(join(ROOT, "examples")).filter((f) => f.endsWith(".tsx") && !f.endsWith(".test.tsx"));
 
 /** In bun, point the playground's runtime specifiers at the library sources. */
 const localRuntime = (spec: string) =>

@@ -68,7 +68,7 @@ async function build() {
   // Examples (bracket first, then alphabetical).
   const dir = join(PKG_ROOT, "examples");
   const examples: Example[] = [];
-  for (const f of readdirSync(dir).filter((f) => f.endsWith(".tsx")).sort()) {
+  for (const f of readdirSync(dir).filter((f) => f.endsWith(".tsx") && !f.endsWith(".test.tsx")).sort()) {
     examples.push(describeExample(f.replace(/\.tsx$/, ""), await Bun.file(join(dir, f)).text()));
   }
   examples.sort((a, b) => (a.name === "bracket" ? -1 : b.name === "bracket" ? 1 : a.title.localeCompare(b.title)));

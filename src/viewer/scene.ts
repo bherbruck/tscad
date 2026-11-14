@@ -197,8 +197,10 @@ export class Viewport {
     this.#needsRender = false;
     this.#updateGrid();
     this.#updateLabels();
+    for (const f of this.beforeRender) f();
     this.renderer.render(this.scene, this.camera);
     this.#updateMeasureLabel();
+    for (const f of this.afterRender) f();
   };
 
   setTheme(dark: boolean) {
@@ -444,6 +446,25 @@ export class Viewport {
     this.model.add(group);
     this.#applyPartStyle(view);
     return view;
+  }
+
+  /** A screen-space line material kept in sync with the viewport size (for overlays). */
+  lineMaterial(color: THREE.ColorRepresentation, width: number): LineMaterial {
+    return this.#lineMat(new THREE.Color(color), width, true);
+  }
+
+  /** Release a material from {@link lineMaterial}. */
+  releaseLineMaterial(m: LineMaterial) {
+    this.#dropLineMat(m);
+  }
+
+  /** Called after every rendered frame (overlay labels). */
+  readonly afterRender: (() => void)[] = [];
+  /** Called before every rendered frame (overlay fading). */
+  readonly beforeRender: (() => void)[] = [];
+
+  get size(): THREE.Vector2 {
+    return this.#size;
   }
 
   #lineMat(color: THREE.Color, width: number, highlight = false) {

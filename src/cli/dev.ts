@@ -143,7 +143,7 @@ export async function startDev(opts: DevOptions): Promise<DevServer> {
   addWatchers();
 
   // Hacking on tscad itself (not installed under node_modules): live-reload the viewer too.
-  if (!SRC.includes("/node_modules/")) {
+  if (!SRC.includes("/node_modules/") && process.env.TSCAD_SELF_RELOAD !== "0") {
     let appTimer: ReturnType<typeof setTimeout> | undefined;
     const rebuildApp = async () => {
       try {

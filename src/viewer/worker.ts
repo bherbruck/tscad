@@ -10,7 +10,7 @@ import { exportModel } from "../export";
 import type { Document, PartResult } from "../ir";
 import type { EvalData, FromWorker, Loc, ParamSchemaData, ParamValuesData, PartData, StageError, ToWorker } from "./protocol";
 import { codeFrame, parseStack, SourceMap, stripQuery } from "./sourcemap";
-import type { DrawingData } from "./protocol";
+import type { DrawingData, SketchData } from "./protocol";
 import { flattenNurbs } from "../drawing/common";
 import { polylineLoops, section, toDXF, toSVG } from "../drawing";
 
@@ -202,6 +202,7 @@ async function run() {
   const data: EvalData = {
     parts,
     drawings,
+    sketches: await sketchesOf(rendered, docParts),
     schema: lastSchema,
     values: rendered.values ?? values,
     warnings: (rendered.warnings as string[]) ?? [],
@@ -232,6 +233,30 @@ function drawingSegments(loops: any[][]): Float32Array {
     }
   }
   return new Float32Array(out);
+}
+
+/** The render's constraint sketches with their source locations mapped to the TSX. */
+async function sketchesOf(rendered: any, docParts: { name?: string }[]): Promise<SketchData[]> {
+  const out: SketchData[] = [];
+  for (const s of (rendered.sketches as any[] | undefined) ?? []) {
+    const partIndex = Number(String(s.path).split("/")[1]);
+    const dims = [];
+    for (const d of s.dimensions ?? []) dims.push({ kind: d.kind, value: d.value, text: d.text, points: d.points, loc: (await locate(normalizeLoc(d.loc))).loc });
+    out.push({
+      path: s.path,
+      plane: s.plane,
+      loc: (await locate(normalizeLoc(s.loc))).loc,
+      status: s.status,
+      dof: s.dof,
+      free: s.free ?? [],
+      residual: s.residual ?? 0,
+      points: s.points ?? [],
+      entities: s.entities ?? [],
+      dimensions: dims,
+      part: docParts[partIndex]?.name,
+    });
+  }
+  return out;
 }
 
 function schemaOf(m: any): ParamSchemaData {

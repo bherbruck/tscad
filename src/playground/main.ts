@@ -18,6 +18,18 @@ interface Example {
 }
 
 const FILE = "model.tsx";
+
+/** The props a sketch dimension may come from, by kind (for selecting it in the code). */
+const DIMENSION_PROPS: Record<string, string[]> = {
+  length: ["length"],
+  radius: ["radius", "r"],
+  diameter: ["diameter", "d"],
+  angle: ["angle", "value"],
+  sweep: ["angle"],
+  distance: ["distance", "value"],
+  dx: ["dx"],
+  dy: ["dy"],
+};
 const DRAFT_KEY = "tscad.playground.draft";
 const abs = (p: string) => new URL(p, document.baseURI).href;
 
@@ -114,6 +126,13 @@ async function main() {
     topbarExtras: [h("div", { class: "pg-extras" }, exampleWrap, shareBtn, codeBtn)],
     sidePane: pane,
     hashKeep: ["code", "example"],
+    onSourceClick: (loc, target) => {
+      if (!sameFile(loc.file)) return void viewer.toast(`${loc.file}:${loc.line}`);
+      document.body.classList.remove("pg-code-hidden");
+      const props = target.kind === "dimension" ? DIMENSION_PROPS[target.dimension.kind] : undefined;
+      editor?.revealSource(loc.line, loc.column, props);
+      if (target.kind === "dimension") viewer.toast(`${target.dimension.text} — line ${loc.line}`);
+    },
     onErrors: (err, bundleErrors) => {
       const problems: EditorProblem[] = [];
       for (const b of bundleErrors) if (b.line) problems.push({ line: b.line, column: b.column, message: b.message });

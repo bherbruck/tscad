@@ -68,9 +68,40 @@ export interface DrawingData {
   segments: Float32Array;
 }
 
+export interface SketchDimensionData {
+  kind: "distance" | "length" | "dx" | "dy" | "radius" | "diameter" | "angle" | "sweep";
+  value: number;
+  text: string;
+  points: [number, number][];
+  loc?: Loc;
+}
+
+/** A solved constraint sketch (core's `SketchInfo`, locations mapped to the TSX). */
+export interface SketchData {
+  path: string;
+  /** Row-major 4×4: sketch (x, y, 0, 1) → model space. */
+  plane: number[];
+  loc?: Loc;
+  status: "ok" | "under" | (string & {});
+  dof: number;
+  free: string[];
+  residual: number;
+  points: { id: string; x: number; y: number; free: boolean }[];
+  entities: (
+    | { kind: "line"; id?: string; from: [number, number]; to: [number, number]; construction: boolean }
+    | { kind: "arc"; id?: string; center: [number, number]; from: [number, number]; to: [number, number]; radius: number; ccw: boolean; construction: boolean }
+    | { kind: "circle"; id?: string; center: [number, number]; radius: number; construction: boolean }
+    | { kind: "spline"; id?: string; points: [number, number][]; degree: number; construction: boolean }
+  )[];
+  dimensions: SketchDimensionData[];
+  /** The part it belongs to (from `path`). */
+  part?: string;
+}
+
 export interface EvalData {
   parts: PartData[];
   drawings: DrawingData[];
+  sketches: SketchData[];
   schema: ParamSchemaData;
   values: ParamValuesData;
   warnings: string[];

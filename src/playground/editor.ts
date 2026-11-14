@@ -10,6 +10,7 @@ import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import { crosshairCursor, drawSelection, dropCursor, EditorView, highlightActiveLine, highlightActiveLineGutter, highlightSpecialChars, keymap, lineNumbers, rectangularSelection } from "@codemirror/view";
 import { tags as t } from "@lezer/highlight";
 import type { NamedDoc, TagInfo } from "./extract";
+import { tagRange } from "./source-range";
 
 export interface CompletionData {
   tags: TagInfo[];
@@ -147,7 +148,13 @@ export interface Editor {
   getValue(): string;
   setValue(text: string): void;
   setProblems(problems: EditorProblem[]): void;
+  /**
+   * Select the JSX element starting at `line`:`column` (1-based) — or just its `prop={...}`
+   * when one of `props` is on it — scroll it into view and focus the editor.
+   */
+  revealSource(line: number, column: number, props?: string[]): boolean;
 }
+
 
 export function createEditor(parent: HTMLElement, opts: { doc: string; completions?: CompletionData; onChange: (text: string) => void; onRun: () => void }): Editor {
   const runKey = { key: "Mod-s", preventDefault: true, run: () => (opts.onRun(), true) };
@@ -191,6 +198,16 @@ export function createEditor(parent: HTMLElement, opts: { doc: string; completio
     getValue: () => view.state.doc.toString(),
     setValue(text: string) {
       view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } });
+    },
+    revealSource(line: number, column: number, props?: string[]) {
+      const doc = view.state.doc;
+      if (!(line >= 1 && line <= doc.lines)) return false;
+      const l = doc.line(line);
+      const pos = l.from + Math.min(Math.max(0, column - 1), l.length);
+      const range = tagRange(doc.toString(), pos, props) ?? { from: pos, to: pos };
+      view.dispatch({ selection: { anchor: range.from, head: range.to }, effects: EditorView.scrollIntoView(range.from, { y: "center" }) });
+      view.focus();
+      return true;
     },
     setProblems(problems: EditorProblem[]) {
       const doc = view.state.doc;
