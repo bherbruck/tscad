@@ -151,16 +151,30 @@ fn eval_uncached(node: &Node, path: &str, cache: &mut Cache) -> R<Solid> {
             Ok(acc)
         }
         Node::Transform { matrix, children } => {
-            let Some(b) = union(children, path, cache)? else { return Ok(None) };
-            // The IR is column-vector (p' = M p, translation in the last column); the kernel
-            // is row-vector (p' = p A + t, translation in row 3): its matrix is the transpose.
-            let mut m = [[0.0; 4]; 4];
-            for (i, row) in m.iter_mut().enumerate() {
-                for (j, x) in row.iter_mut().enumerate() {
-                    *x = matrix[j * 4 + i];
+            // Compose a chain of single-child transforms into one matrix.
+            let mut m = *matrix;
+            let mut kids = children;
+            while let [Node::Transform { matrix: inner, children: next }] = kids.as_slice() {
+                m = matmul(&m, inner);
+                kids = next;
+            }
+            // solidcore leaves a moved torus with a non-finite tolerance (docs/KERNEL_ISSUES.md
+            // #7): build it in place instead, as a circle revolved about the moved axis.
+            if let [Node::Torus { major_radius, minor_radius }] = kids.as_slice() {
+                if let Some(t) = torus_in_place(&m, *major_radius, *minor_radius) {
+                    return eval_uncached(&t, path, cache);
                 }
             }
-            kernel(path, "transform", b.transform(&m))?;
+            let Some(b) = union(kids, path, cache)? else { return Ok(None) };
+            // The IR is column-vector (p' = M p, translation in the last column); the kernel
+            // is row-vector (p' = p A + t, translation in row 3): its matrix is the transpose.
+            let mut k = [[0.0; 4]; 4];
+            for (i, row) in k.iter_mut().enumerate() {
+                for (j, x) in row.iter_mut().enumerate() {
+                    *x = m[j * 4 + i];
+                }
+            }
+            kernel(path, "transform", b.transform(&k))?;
             Ok(Some(b))
         }
         Node::Extrude { profile, direction, distance, draft } => {
@@ -568,4 +582,53 @@ impl ops::pcurve::Trims for KernelTrims {
             .collect::<std::result::Result<_, _>>()?;
         ops::pcurve::pcurves_within(surface, &loops, face.tolerance, Some(face.domain)).map_err(|e| format!("pcurves: {e}"))
     }
+}
+
+fn matmul(a: &[f64; 16], b: &[f64; 16]) -> [f64; 16] {
+    let mut out = [0.0; 16];
+    for i in 0..4 {
+        for j in 0..4 {
+            out[i * 4 + j] = (0..4).map(|k| a[i * 4 + k] * b[k * 4 + j]).sum();
+        }
+    }
+    out
+}
+
+/// The torus about +Z with radii `r_major`, `r_minor` moved by `m`, as a revolve node, when `m`
+/// is a similarity (rotation, mirror, uniform scale, translation).
+fn torus_in_place(m: &[f64; 16], r_major: f64, r_minor: f64) -> Option<Node> {
+    let lin = |v: [f64; 3]| -> [f64; 3] {
+        [
+            m[0] * v[0] + m[1] * v[1] + m[2] * v[2],
+            m[4] * v[0] + m[5] * v[1] + m[6] * v[2],
+            m[8] * v[0] + m[9] * v[1] + m[10] * v[2],
+        ]
+    };
+    let at = |p: [f64; 3]| -> [f64; 3] {
+        let l = lin(p);
+        [l[0] + m[3], l[1] + m[7], l[2] + m[11]]
+    };
+    let (x, y, z) = (lin([1.0, 0.0, 0.0]), lin([0.0, 1.0, 0.0]), lin([0.0, 0.0, 1.0]));
+    let k = dot(x, x).sqrt();
+    let similar = k > 1e-12
+        && [dot(y, y).sqrt(), dot(z, z).sqrt()].iter().all(|l| (l - k).abs() <= 1e-9 * k)
+        && [dot(x, y), dot(y, z), dot(x, z)].iter().all(|d| d.abs() <= 1e-9 * k * k)
+        && m[12] == 0.0 && m[13] == 0.0 && m[14] == 0.0 && m[15] == 1.0;
+    if !similar {
+        return None;
+    }
+    let tau = std::f64::consts::TAU;
+    Some(Node::Revolve {
+        profile: vec![Curve::Arc {
+            center: at([r_major, 0.0, 0.0]),
+            axis: norm(lin([0.0, -1.0, 0.0])),
+            reference: norm(x),
+            radius: r_minor * k,
+            start: 0.0,
+            end: tau,
+        }],
+        origin: at([0.0; 3]),
+        axis: norm(z),
+        angle: tau,
+    })
 }

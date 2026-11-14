@@ -46,6 +46,9 @@ These have NOT been filed upstream.
   Rotations fail the same way, and a rotated torus then fails tessellation
   ("pcurve is 3.6 mm off the edge").
 - Repro: `crates/tscad-wasm/tests/fuzz_triage.rs`.
+- Workaround: a `transform` directly over a `torus` (after composing nested transforms) is
+  built in place as a circle revolved about the moved axis, which has no such problem and also
+  fixes #8 for that case. A torus inside a moved union is still affected.
 
 ## 8. Boolean of a rotated torus with itself is wrong
 - `difference(T, T)` with T = torus(20, 3) rotated 30° about X returns all of T (3553 mm³)
