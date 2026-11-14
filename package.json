@@ -36,7 +36,8 @@
     "./mcp": "./src/mcp/index.ts",
     "./check": "./src/check/index.ts",
     "./testing": "./src/testing/index.ts",
-    "./convert": "./src/convert/index.ts"
+    "./convert": "./src/convert/index.ts",
+    "./plate": "./src/plate/index.ts"
   },
   "files": [
     "src",

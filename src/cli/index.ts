@@ -14,6 +14,7 @@ ${c.bold("Usage")}
   ${c.accent("tscad build")} ${c.gray("[file] -o out.step")}   export STEP/STL/3MF/GLB/OBJ/DXF/SVG
   ${c.accent("tscad info")} ${c.gray("[file]")}                params and part stats
   ${c.accent("tscad render")} ${c.gray("[file|dir] -o out")}   PNGs of a model or a folder
+  ${c.accent("tscad plate")} ${c.gray("[file] -o p.3mf")}      print plates: oriented, packed
   ${c.accent("tscad convert")} ${c.gray("in.scad")}            OpenSCAD → tscad TSX
   ${c.accent("tscad mcp")}                        MCP server for AI agents
   ${c.gray("[file] defaults to index.tsx")}
@@ -42,6 +43,13 @@ ${c.bold("render")}
   --width, --height     pixels ${c.gray("(default 1200 × 800)")}
   --background <bg>     dark | light | transparent | <css colour>
   --ortho, --no-edges   orthographic; hide edge lines
+
+${c.bold("plate")}
+  -o, --out <file>      .3mf ${c.gray("(names, colours, notes)")} or .stl; -2, -3… per plate
+  --bed <WxD>           bed size in mm ${c.gray("(default 256x256)")}
+  --spacing <mm>        gap between parts ${c.gray("(default 5)")}
+  --copies <part=n>     print n of a part ${c.gray("(repeat, or a=2,b=4)")}
+  --orient auto|keep    least-overhang orientation, or as modelled
 
 ${c.bold("convert")}
   -o, --out <file.tsx>  output ${c.gray("(default next to the .scad; - for stdout)")}
@@ -124,6 +132,17 @@ export async function main(argv: string[]): Promise<number> {
       const { render } = await import("./render");
       const num = (v: unknown) => (str(v) === undefined ? undefined : Number(str(v)));
       return render({ file, out: str(f.out), params, view: str(f.view), width: num(f.width), height: num(f.height), background: str(f.background), ortho: !!f.ortho, edges: f.edges !== false, json: !!f.json });
+    }
+    case "plate": {
+      if (!needFile()) return 1;
+      const sp = str(f.spacing);
+      if (sp !== undefined && !(Number(sp) >= 0)) {
+        console.error(`${sym.err} --spacing must be a number of mm ≥ 0`);
+        return 2;
+      }
+      const tol = str(f.tolerance);
+      const { plate } = await import("./plate");
+      return plate({ file, out: str(f.out), params, bed: str(f.bed), spacing: sp === undefined ? undefined : Number(sp), copies: list(f.copies), orient: str(f.orient), tolerance: tol ? Number(tol) : undefined, json: !!f.json });
     }
     case "convert": {
       const src = args.positionals[0];

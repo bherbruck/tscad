@@ -2155,3 +2155,31 @@ button.err-loc:hover {
   text-align: center;
   padding: 60px 0;
 }
+
+.plate-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.plate-row > span:first-child {
+  width: 56px;
+}
+
+.plate-dl {
+  width: 100%;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.plate-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font: 600 11px var(--font);
+  color: #93b4ff;
+  pointer-events: none;
+}

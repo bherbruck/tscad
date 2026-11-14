@@ -15,6 +15,8 @@ import type { EvalData, FromWorker, Loc, ParamSchemaData, ParamValuesData, PartD
 import { codeFrame, parseStack, SourceMap, stripQuery } from "./sourcemap";
 import type { AssemblyData, DiffData, DrawingData, MateData, SketchData } from "./protocol";
 import { diffDocument, summarize, type PartStats } from "./diff";
+import { orientationNote, plate3MF, plateParts, transformMesh } from "../plate";
+import type { PlateData } from "./protocol";
 import { flattenNurbs } from "../drawing/common";
 import { polylineLoops, section, toDXF, toSVG } from "../drawing";
 
@@ -173,6 +175,37 @@ self.onmessage = async (e: MessageEvent<ToWorker | { type: "child-init"; module?
         pinned = msg.pin ? current : undefined;
         if (diffOn) void runDiff();
         break;
+      case "plate": {
+        try {
+          if (!lastDoc || !pool) throw new Error("no model yet");
+          const parts = [];
+          const colors = new Map((lastDoc.parts ?? []).map((p) => [p.name ?? "", p.color]));
+          for (const [name, st] of current?.stats ?? []) {
+            if (st.volume === undefined) continue; // failed or empty
+            parts.push({ name, color: colors.get(name), mesh: await pool.meshAt(name, msg.download ? 0.01 : 0.05), copies: msg.copies?.[name] ?? 1 });
+          }
+          const r = plateParts(parts, { bed: msg.bed, spacing: msg.spacing, orient: msg.orient });
+          const result: PlateData = {
+            plates: r.plates,
+            bed: r.bed,
+            items: r.items.map((it) => ({ name: it.name, copy: it.copy, plate: it.plate, transform: it.transform, bottom: it.orientation.label, overhang: it.orientation.overhangFraction, overhangArea: it.orientation.overhangArea, height: it.orientation.height, rect: it.rect, rotated90: it.rotated90 })),
+          };
+          let files: Uint8Array[] | undefined;
+          if (msg.download) {
+            const meshes = new Map(parts.map((p) => [p.name, p.mesh]));
+            files = [];
+            for (let n = 0; n < r.plates; n++) {
+              const on = r.items.filter((it) => it.plate === n);
+              const many = (name: string) => (msg.copies?.[name] ?? 1) > 1;
+              files.push(plate3MF(on.map((it) => ({ name: many(it.name) ? `${it.name} #${it.copy}` : it.name, color: it.color, mesh: transformMesh(meshes.get(it.name)!, it.transform) })), on.map(orientationNote), r.bed));
+            }
+          }
+          post({ type: "plate", id: msg.id, result, files }, (files ?? []).map((f) => f.buffer as ArrayBuffer));
+        } catch (err) {
+          post({ type: "plate", id: msg.id, error: String((err as Error)?.message ?? err) });
+        }
+        break;
+      }
       case "sketch-drag": {
         try {
           const raw = lastRaw?.sketches?.[msg.sketch];
@@ -379,7 +412,7 @@ async function run() {
   const data: EvalData = {
     parts,
     drawings,
-    sketches: await sketchesOf(rendered, docParts),
+    sketches: await sketchesOf(rendered, docParts, (result as any).frames),
     assembly: await assemblyOf(rendered),
     schema: lastSchema,
     values: rendered.values ?? values,
@@ -476,8 +509,16 @@ async function assemblyOf(rendered: any): Promise<AssemblyData | undefined> {
   return { parts: a.parts, mates, anchors };
 }
 
+/** Row-major 4×4 product. */
+function mul4rm(a: number[], b: number[]): number[] {
+  const o = new Array(16).fill(0);
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) for (let k = 0; k < 4; k++) o[r * 4 + c] += a[r * 4 + k]! * b[k * 4 + c]!;
+  return o;
+}
+
 /** The render's constraint sketches with their source locations mapped to the TSX. */
-async function sketchesOf(rendered: any, docParts: { name?: string }[]): Promise<SketchData[]> {
+async function sketchesOf(rendered: any, docParts: { name?: string }[], frames?: Map<string, number[]> | Record<string, number[]>): Promise<SketchData[]> {
+  const frameOf = (path: string) => (frames instanceof Map ? frames.get(path) : frames?.[path]);
   const out: SketchData[] = [];
   for (const s of (rendered.sketches as any[] | undefined) ?? []) {
     const partIndex = Number(String(s.path).split("/")[1]);
@@ -485,7 +526,8 @@ async function sketchesOf(rendered: any, docParts: { name?: string }[]): Promise
     for (const d of s.dimensions ?? []) dims.push({ kind: d.kind, value: d.value, text: d.text, points: d.points, loc: (await locate(normalizeLoc(d.loc))).loc });
     out.push({
       path: s.path,
-      plane: s.plane,
+      // A sketch on a face: its plane is relative to the face frame the kernel used.
+      plane: s.onFace && frameOf(s.onFace) ? mul4rm(frameOf(s.onFace)!, s.plane) : s.plane,
       loc: (await locate(normalizeLoc(s.loc))).loc,
       status: s.status,
       dof: s.dof,

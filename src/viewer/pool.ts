@@ -210,6 +210,7 @@ export class Pool {
     const byIndex: PartResult[] = new Array(parts.length);
     const meshes = new Map<string, MeshArrays>();
     let hits = 0, misses = 0, size = 0;
+    const frames = new Map<string, number[]>();
     for (const o of outs) {
       if (!o) continue;
       o.r.result.parts.forEach((pr, k) => {
@@ -219,6 +220,11 @@ export class Pool {
         byIndex[i] = pr;
       });
       for (const [name, m] of o.r.meshes) meshes.set(name, m);
+      // Face frames are keyed by IR path: renumber the sub-document's part index too.
+      const fr = (o.r.result as any).frames as Map<string, number[]> | Record<string, number[]> | undefined;
+      for (const [k, v] of fr instanceof Map ? fr : Object.entries(fr ?? {})) {
+        frames.set(k.replace(/^parts\/(\d+)/, (_m, i) => `parts/${o.g[Number(i)]}`), v);
+      }
       hits += o.r.result.cacheHits;
       misses += o.r.result.cacheMisses;
       size += o.r.result.cacheSize;
@@ -231,7 +237,8 @@ export class Pool {
       cacheMisses: misses,
       cacheSize: size,
       millis: performance.now() - t,
-    };
+      frames,
+    } as EvalResult;
     return { result, meshes };
   }
 

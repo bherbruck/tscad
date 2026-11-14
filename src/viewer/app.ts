@@ -11,6 +11,8 @@ import { AssemblyOverlay } from "./assembly-overlay";
 import { RemoteWorker } from "./remote";
 import { CheckOverlay, type CheckMode } from "./check-overlay";
 import { DiffOverlay } from "./diff-overlay";
+import { PlateOverlay } from "./plate-overlay";
+import type { PlateData } from "./protocol";
 import type { DiffData } from "./protocol";
 import type { InterferenceData, PrintabilityData } from "./protocol";
 import type { MateData, SketchChange, SketchData, SketchDimensionData, SketchDragData } from "./protocol";
@@ -130,6 +132,24 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
   const viewport = new Viewport(stage);
   const sketches = new SketchOverlay(viewport);
   const diffView = new DiffOverlay(viewport);
+  const plateView = new PlateOverlay(viewport);
+  const plateState = {
+    on: false,
+    bed: (() => {
+      try {
+        const v = JSON.parse(localStorage.getItem("tscad.bed") ?? "null");
+        return Array.isArray(v) && v.length === 2 ? (v as [number, number]) : ([256, 256] as [number, number]);
+      } catch {
+        return [256, 256] as [number, number];
+      }
+    })(),
+    spacing: 5,
+    orient: "auto" as "auto" | "keep",
+    data: undefined as PlateData | undefined,
+    busy: false,
+    again: false,
+    error: "",
+  };
   const diffState = { on: false, pinned: false, data: undefined as DiffData | undefined };
   const assembly = new AssemblyOverlay(viewport);
   assembly.setShowAnchors(localStorage.getItem("tscad.anchors") !== "0");
@@ -203,7 +223,10 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
   const pinBtn = h("button", { class: "icon-btn sm", title: "Pin this version as the baseline (A/B compare)", onclick: () => togglePin() }, icon("pin", 14));
   const diffCard = card("Diff", "diff", diffBody, [pinBtn, h("button", { class: "icon-btn sm", title: "Close (D)", onclick: () => toggleDiff() }, icon("x", 14))]);
   diffCard.classList.add("hidden");
-  const right = h("aside", { class: "side right" }, inspectorCard, diffCard, statsCard);
+  const plateBody = h("div", { class: "plate" });
+  const plateCard = card("Plate", "plate", plateBody, [h("button", { class: "icon-btn sm", title: "Close (P)", onclick: () => togglePlate() }, icon("x", 14))]);
+  plateCard.classList.add("hidden");
+  const right = h("aside", { class: "side right" }, inspectorCard, diffCard, plateCard, statsCard);
 
   /** Tell the viewport which screen edges the floating panels cover, so models centre in the gap. */
   function updateInsets() {
@@ -239,6 +262,7 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
     measure: tool("ruler", "Measure (M)", () => toggleMeasure()),
     sketch: tool("sketch", "Sketch overlay (K)", () => toggleSketches()),
     anchors: tool("anchor", "Anchors & joints (A)", () => toggleAnchors()),
+    plate: tool("plate", "Plate: print orientation and bed layout (P)", () => togglePlate()),
     diff: tool("diff", "Diff: what the last change added / removed (D)", () => toggleDiff()),
     checks: tool("shield", "Checks: overhangs, thin walls, interference (C)", () => checksPop.classList.toggle("hidden")),
   };
@@ -255,7 +279,7 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
     h("div", { class: "tool-sep" }),
     h("div", { class: "tool-group" }, tb.fit, tb.ortho),
     h("div", { class: "tool-sep" }),
-    h("div", { class: "tool-group" }, tb.edges, tb.wire, tb.xray, tb.section, tb.measure, tb.sketch, tb.anchors, tb.diff, tb.checks),
+    h("div", { class: "tool-group" }, tb.edges, tb.wire, tb.xray, tb.section, tb.measure, tb.sketch, tb.anchors, tb.diff, tb.plate, tb.checks),
   );
   const exportMenu = buildExportMenu();
   const helpPop = buildHelp();
@@ -345,6 +369,7 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
       case "export":
       case "check":
       case "sketch-drag":
+      case "plate":
         pending.get(m.id)?.(m);
         pending.delete(m.id);
         break;
@@ -437,6 +462,7 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
       diffView.clear(false);
       renderDiff();
     }
+    if (plateState.on) queueMicrotask(() => void runPlate());
     assembly.values = data.values;
     assembly.set(data.assembly);
     assembly.refresh();
@@ -801,6 +827,12 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
     hoverFrame = requestAnimationFrame(() => {
       hoverFrame = 0;
       const ev = lastMove!;
+      if (plateState.on) {
+        viewport.setHover(undefined);
+        hoverTip.classList.add("hidden");
+        viewport.canvas.style.cursor = "";
+        return;
+      }
       const sp = !state.measure ? sketches.pickPoint(ev.clientX, ev.clientY) : undefined;
       if (sp) {
         viewport.setHover(undefined);
@@ -917,6 +949,7 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
       if (res) toast(`Distance ${fmtNum(res.a.distanceTo(res.b), 3)} mm`);
       return;
     }
+    if (plateState.on) return;
     select(viewport.hitTest(e.clientX, e.clientY));
   });
   viewport.canvas.addEventListener("dblclick", (e) => {
@@ -1068,6 +1101,106 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
     const where = `${shortFile(loc.file)}:${loc.line}:${loc.column}`;
     void copyText(where);
     toast(`${target.kind === "dimension" ? `${target.dimension.text} — ` : ""}${where} (copied)`);
+  }
+
+  function togglePlate() {
+    plateState.on = !plateState.on;
+    tb.plate.classList.toggle("active", plateState.on);
+    plateCard.classList.toggle("hidden", !plateState.on);
+    viewport.clearHover();
+    if (plateState.on) {
+      // Joints and sketches belong to the assembled model, not the plate.
+      assembly.root.visible = false;
+      sketches.setVisible(false);
+      void runPlate();
+    } else {
+      plateView.clear(true, [...viewport.parts.keys()]);
+      plateState.data = undefined;
+      assembly.root.visible = assembly.showAnchors;
+      applySketchVisibility();
+      viewport.fit();
+    }
+    renderPlate();
+    queueMicrotask(updateInsets);
+  }
+
+  /** Orient + pack the current parts in the worker, then show the beds (latest wins). */
+  async function runPlate(download = false) {
+    if (!plateState.on) return;
+    if (plateState.busy && !download) return void (plateState.again = true);
+    plateState.busy = true;
+    renderPlate();
+    const res = await request<{ result?: PlateData; files?: Uint8Array[]; error?: string }>({ type: "plate", bed: plateState.bed, spacing: plateState.spacing, orient: plateState.orient, download });
+    plateState.busy = false;
+    if (!plateState.on) return;
+    plateState.error = res.error ?? "";
+    if (res.result) {
+      const first = !plateState.data;
+      plateState.data = res.result;
+      plateView.show(res.result, [...viewport.parts.keys()]);
+      if (first) viewport.setView("iso");
+    }
+    if (download && res.files) {
+      const base = state.file.replace(/^.*\//, "").replace(/\.[jt]sx?$/, "");
+      res.files.forEach((f, i) => {
+        const a = h("a", { href: URL.createObjectURL(new Blob([f as BlobPart], { type: "model/3mf" })), download: `${base}-plate${res.files!.length > 1 ? `-${i + 1}` : ""}.3mf` });
+        a.click();
+      });
+      toast(`${res.files.length} plate${res.files.length > 1 ? "s" : ""} saved as 3MF`);
+    }
+    renderPlate();
+    if (plateState.again) {
+      plateState.again = false;
+      void runPlate();
+    }
+  }
+
+  function renderPlate() {
+    plateBody.replaceChildren();
+    const num = (value: number, step: number, set: (v: number) => void) => {
+      const i = h("input", { type: "number", value: String(value), step: String(step), min: "1", class: "num" }) as HTMLInputElement;
+      i.addEventListener("change", () => {
+        const v = Number(i.value);
+        if (v > 0) {
+          set(v);
+          try {
+            localStorage.setItem("tscad.bed", JSON.stringify(plateState.bed));
+          } catch {
+            /* private */
+          }
+          void runPlate();
+        }
+      });
+      return h("div", { class: "num-wrap sm" }, i, h("span", { class: "unit" }, "mm"));
+    };
+    const orient = h(
+      "div",
+      { class: "segmented sm" },
+      ...(["auto", "keep"] as const).map((o) => h("button", { class: plateState.orient === o ? "active" : "", title: o === "auto" ? "Least overhang" : "As modelled", onclick: () => { plateState.orient = o; void runPlate(); } }, o === "auto" ? "Best" : "As modelled")),
+    );
+    plateBody.append(
+      h("div", { class: "plate-row" }, h("span", null, "Bed"), num(plateState.bed[0], 1, (v) => (plateState.bed = [v, plateState.bed[1]])), h("span", { class: "muted" }, "×"), num(plateState.bed[1], 1, (v) => (plateState.bed = [plateState.bed[0], v]))),
+      h("div", { class: "plate-row" }, h("span", null, "Spacing"), num(plateState.spacing, 0.5, (v) => (plateState.spacing = v)), orient),
+    );
+    if (plateState.error) plateBody.append(h("div", { class: "warning" }, icon("alert", 12), plateState.error));
+    const d = plateState.data;
+    if (!d) {
+      plateBody.append(h("div", { class: "skeleton" }));
+      return;
+    }
+    plateBody.append(h("div", { class: "diff-head muted" }, `${d.plates} plate${d.plates === 1 ? "" : "s"}${plateState.busy ? " · updating…" : ""}`));
+    for (const it of d.items) {
+      plateBody.append(
+        h(
+          "div",
+          { class: "diff-row" },
+          h("div", { class: "diff-name" }, it.name, d.plates > 1 ? h("span", { class: "chip" }, `plate ${it.plate + 1}`) : null),
+          h("div", { class: "diff-nums" }, h("span", null, `bottom ${it.bottom}`), h("span", { class: it.overhangArea < 1 ? "add" : "rem" }, it.overhangArea < 1 ? "no overhang" : `${(it.overhang * 100).toFixed(1)}% overhang`)),
+          h("div", { class: "diff-size muted" }, `height ${fmtNum(it.height, 1)} mm${it.rotated90 ? " · turned 90°" : ""}`),
+        ),
+      );
+    }
+    plateBody.append(h("button", { class: "btn primary plate-dl", onclick: () => void runPlate(true) }, icon("download", 14), h("span", null, d.plates > 1 ? `Download ${d.plates} plates (3MF)` : "Download plate (3MF)")));
   }
 
   function toggleDiff() {
@@ -1429,6 +1562,7 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
       ["M", "Measure"],
       ["K", "Sketch overlay"],
       ["D", "Diff with the previous / pinned version"],
+      ["P", "Plate: print orientation and bed layout"],
       ["A", "Anchors & joints (drag a joint to drive it)"],
       ["C", "Checks: overhang, thin walls, interference"],
       ["Click", "Select face / edge → selectors"],
@@ -1476,6 +1610,8 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
         return toggleSketches();
       case "d":
         return toggleDiff();
+      case "p":
+        return togglePlate();
       case "a":
         return toggleAnchors();
       case "c":

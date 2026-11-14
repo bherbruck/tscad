@@ -191,6 +191,8 @@ export type ToWorker =
   | { type: "diff"; on: boolean }
   /** Pin the current evaluation as the diff baseline (or unpin: back to "previous"). */
   | { type: "diff-pin"; pin: boolean }
+  /** Print plates of the current model (orient + pack); `download` also returns each plate as 3MF. */
+  | { type: "plate"; id: number; bed: [number, number]; spacing: number; orient: "auto" | "keep"; copies?: Record<string, number>; download?: boolean }
   /** Re-solve sketch `sketch` (index in the last result's `sketches`) with `point` dragged to `target` (sketch coords). */
   | { type: "sketch-drag"; id: number; sketch: number; point: string; target: [number, number]; changeDimensions: boolean }
   | { type: "pick"; id: number; kind: "edge" | "face"; part: string; index: number }
@@ -235,7 +237,14 @@ export type FromWorker =
   | { type: "export"; id: number; data?: Uint8Array | string; error?: string }
   | { type: "check"; id: number; printability?: PrintabilityData[]; interference?: InterferenceData; error?: string }
   | { type: "diff"; data: DiffData }
-  | { type: "sketch-drag"; id: number; result?: SketchDragData; error?: string };
+  | { type: "sketch-drag"; id: number; result?: SketchDragData; error?: string }
+  | { type: "plate"; id: number; result?: PlateData; files?: Uint8Array[]; error?: string };
+
+export interface PlateData {
+  plates: number;
+  bed: [number, number];
+  items: { name: string; copy: number; plate: number; transform: number[]; bottom: string; overhang: number; overhangArea: number; height: number; rect: [number, number, number, number]; rotated90: boolean }[];
+}
 
 /** A sketch re-solved with one point dragged (core's `dragSolve`), locations mapped to the TSX. */
 export interface SketchDragData {

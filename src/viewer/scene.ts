@@ -527,6 +527,36 @@ export class Viewport {
     this.#needsRender = true;
   }
 
+  /**
+   * Show a part placed by a full transform (plate preview: row-major 4×4), or back as modelled
+   * (undefined). Picking is meant to be off while transforms are set.
+   */
+  setPartMatrix(name: string, m: number[] | undefined) {
+    const v = this.parts.get(name);
+    if (!v) return;
+    if (!m) {
+      v.group.matrixAutoUpdate = true;
+      v.group.matrix.identity();
+      v.group.position.set(0, 0, 0);
+      v.group.quaternion.identity();
+      v.group.scale.set(1, 1, 1);
+    } else {
+      v.group.matrixAutoUpdate = false;
+      v.group.matrix.set(m[0]!, m[1]!, m[2]!, m[3]!, m[4]!, m[5]!, m[6]!, m[7]!, m[8]!, m[9]!, m[10]!, m[11]!, m[12] ?? 0, m[13] ?? 0, m[14] ?? 0, m[15] ?? 1);
+    }
+    v.group.matrixWorldNeedsUpdate = true;
+    this.#needsRender = true;
+  }
+
+  /** Bounds to frame and size the grid by (the plate preview's beds). */
+  setBoundsOverride(box: THREE.Box3 | undefined) {
+    this.#boundsOverride = box?.clone();
+    this.#refreshBounds();
+    this.#needsRender = true;
+  }
+
+  #boundsOverride?: THREE.Box3;
+
   /** Move a part's display (explode view); picking and highlights follow. */
   setPartOffset(name: string, offset: THREE.Vector3) {
     const v = this.parts.get(name);
@@ -598,6 +628,7 @@ export class Viewport {
     const box = new THREE.Box3();
     for (const v of this.parts.values()) if (v.mesh.geometry.boundingBox) box.union(v.mesh.geometry.boundingBox);
     for (const d of this.drawings.values()) box.union(d.box);
+    if (this.#boundsOverride) box.copy(this.#boundsOverride);
     if (!box.isEmpty()) this.#bounds.copy(box);
     // Keep the key light's shadow camera snug around the model.
     const s = this.#bounds.getBoundingSphere(new THREE.Sphere());
@@ -624,6 +655,7 @@ export class Viewport {
     const box = new THREE.Box3();
     for (const v of this.parts.values()) if (v.visible && v.mesh.geometry.boundingBox) box.union(v.mesh.geometry.boundingBox);
     for (const d of this.drawings.values()) if (d.visible) box.union(d.box);
+    if (this.#boundsOverride) box.copy(this.#boundsOverride);
     if (box.isEmpty()) box.copy(this.#bounds);
     return box.getBoundingSphere(new THREE.Sphere());
   }
