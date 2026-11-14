@@ -24,3 +24,10 @@ codegen-units = 16
 [profile.wasm-small]
 inherits = "release"
 opt-level = "s"
+
+# Native library for bun:ffi (`bun scripts/build-native.ts`): panics unwind so they can be caught.
+[profile.native]
+inherits = "release"
+panic = "unwind"
+lto = "thin"
+codegen-units = 16

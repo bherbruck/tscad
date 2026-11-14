@@ -68,8 +68,30 @@ function isTrap(e: unknown): boolean {
   return e instanceof WebAssembly.RuntimeError;
 }
 
-/** A kernel session that rebuilds itself after a panic. */
-export class KernelHost {
+/** A kernel session: the wasm one ({@link WasmKernelHost}) or, in bun, the native one. */
+export interface KernelHost {
+  /** The kernel crate's version. */
+  readonly version: string;
+  /** Panics recovered from so far. */
+  readonly panics: number;
+  /** Evaluate every part (unchanged subtrees come from the last evaluation's cache). */
+  evaluate(document: Document, options?: EvalOptions): Promise<EvalResult>;
+  /** The display mesh of `part` from the last evaluation. */
+  mesh(part: string): Promise<MeshArrays | undefined>;
+  /** The mesh of `part` at chord tolerance `tolerance` mm (finer for export). */
+  meshAt(part: string, tolerance: number): Promise<MeshArrays>;
+  /** STEP AP242 text of the named parts (all when none). */
+  step(parts?: string[]): Promise<string>;
+  pickEdge(part: string, index: number): Promise<PickInfo>;
+  pickFace(part: string, index: number): Promise<PickInfo>;
+  partNames(): Promise<string[]>;
+  clearCache(): Promise<void>;
+  /** Free the session. */
+  dispose(): void;
+}
+
+/** A wasm kernel session that rebuilds itself after a panic. */
+export class WasmKernelHost implements KernelHost {
   #glue: typeof Glue;
   #kernel: Glue.Kernel;
   #module: WebAssembly.Module;
@@ -85,9 +107,9 @@ export class KernelHost {
   }
 
   /** @internal */
-  static async create(source?: WasmSource, glueUrl = GLUE_URL): Promise<KernelHost> {
+  static async create(source?: WasmSource, glueUrl = GLUE_URL): Promise<WasmKernelHost> {
     const module = await compile(source);
-    return new KernelHost(await instantiate(module, glueUrl), module, glueUrl);
+    return new WasmKernelHost(await instantiate(module, glueUrl), module, glueUrl);
   }
 
   /** The kernel crate's version. */
@@ -174,11 +196,37 @@ function arrays(m: Glue.Mesh): MeshArrays {
 
 let shared: Promise<KernelHost> | undefined;
 
+/** Whether the native kernel may be used: in bun, unless `TSCAD_NATIVE=0`. */
+function nativeAllowed(): boolean {
+  const g = globalThis as any;
+  return typeof g.Bun !== "undefined" && g.process?.env?.TSCAD_NATIVE !== "0";
+}
+
+async function createDefault(): Promise<KernelHost> {
+  if (nativeAllowed()) {
+    try {
+      const { loadNativeKernel } = await import("./native");
+      const native = await loadNativeKernel();
+      if (native) return native;
+    } catch {
+      // no native library for this platform: the wasm kernel
+    }
+  }
+  return WasmKernelHost.create();
+}
+
 /**
- * Load the kernel. Without arguments the session is shared (loaded once per process/page);
- * with a `source` a new session is made from it.
+ * Load the kernel. Without arguments the session is shared (loaded once per process/page):
+ * in bun the native library when one is built for this platform (`bun scripts/build-native.ts`,
+ * 2–3x faster; `TSCAD_NATIVE=0` turns it off), else the wasm. With a `source` a new wasm
+ * session is made from it.
  */
 export function loadKernel(source?: WasmSource, glueUrl?: string): Promise<KernelHost> {
-  if (source !== undefined || glueUrl !== undefined) return KernelHost.create(source, glueUrl);
-  return (shared ??= KernelHost.create());
+  if (source !== undefined || glueUrl !== undefined) return WasmKernelHost.create(source, glueUrl);
+  return (shared ??= createDefault());
+}
+
+/** A new kernel session of its own (not the shared one): native in bun when available. */
+export function createKernel(): Promise<KernelHost> {
+  return createDefault();
 }
