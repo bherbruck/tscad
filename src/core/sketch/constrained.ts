@@ -1412,7 +1412,12 @@ function dimInfo(s: Spec, x: Float64Array): SketchDimensionInfo {
 // ---------------------------------------------------------------------------------------------
 // Profile: curves → closed loops
 
-function profile(sol: Solved): Loop2[] {
+/**
+ * The non-construction curves as segments: `"loops"` → closed loops (a profile); `"path"` →
+ * one chain, open or closed, starting at the free end of the earliest-declared curve (a sweep
+ * path), returned as a single-element list.
+ */
+function profile(sol: Solved, mode: "loops" | "path" = "loops"): Loop2[] {
   const { m, x } = sol;
   const tol = 1e-7 * Math.max(1, ...sol.info.points.map((p) => Math.max(Math.abs(p.x), Math.abs(p.y))));
   const nodes: Vec2[] = [];
@@ -1481,6 +1486,7 @@ function profile(sol: Solved): Loop2[] {
     const p = [...nodeOf].find(([, v]) => v === n)?.[0];
     return p ? `"${p.name}"` : `(${fmt(nodes[n]![0])}, ${fmt(nodes[n]![1])})`;
   };
+  if (mode === "path") return [pathChain(m, edges, at, loops, nodeName)];
   for (const [n, list] of at) {
     if (list.length === 1) {
       const c = edges[list[0]!]!.c;
@@ -1518,12 +1524,54 @@ function profile(sol: Solved): Loop2[] {
   return loops;
 }
 
+/** One chain through every edge (a sweep path). */
+function pathChain(m: Model, edges: { c: Curve; s: number; e: number; seg: Seg2 }[], at: Map<number, number[]>, closed: Loop2[], nodeName: (n: number) => string): Seg2[] {
+  if (closed.length) {
+    if (closed.length === 1 && !edges.length) return closed[0]!;
+    m.fail(m.sketch, "a sweep path must be one chain of curves, but it has a separate closed curve", "mark the extra curves construction");
+  }
+  if (!edges.length) m.fail(m.sketch, "the sweep path has no curves: every curve is construction");
+  for (const [n, list] of at)
+    if (list.length > 2) {
+      const c = edges[list[2]!]!.c;
+      m.fail(c.host, `branching sweep path: ${list.length} curves meet at point ${nodeName(n)}`, "a path is a simple chain: mark the extra curves construction");
+    }
+  const ends = [...at].filter(([, l]) => l.length === 1).map(([n]) => n);
+  if (ends.length !== 0 && ends.length !== 2) m.fail(m.sketch, `the sweep path falls apart into ${ends.length / 2} pieces`, "every curve must continue from the previous one's end");
+  // start: the free end of the earliest curve that has one (else the first curve's start)
+  let start = edges[0]!.s;
+  if (ends.length) {
+    const firstEnd = edges.findIndex((ed) => ends.includes(ed.s) || ends.includes(ed.e));
+    const ed = edges[firstEnd]!;
+    start = ends.includes(ed.s) ? ed.s : ed.e;
+  }
+  const used = new Set<number>();
+  const chain: Seg2[] = [];
+  let cur = start;
+  for (;;) {
+    const next = (at.get(cur) ?? []).find((j) => !used.has(j));
+    if (next === undefined) break;
+    used.add(next);
+    const ed = edges[next]!;
+    if (ed.s === cur) {
+      chain.push(ed.seg);
+      cur = ed.e;
+    } else {
+      chain.push(reverseSeg(ed.seg));
+      cur = ed.s;
+    }
+  }
+  if (used.size !== edges.length) m.fail(m.sketch, "the sweep path falls apart into several pieces", "every curve must continue from the previous one's end");
+  return chain;
+}
+
 // ---------------------------------------------------------------------------------------------
 // Compiler integration
 
 /** Solve a constraint `<sketch>` host: its closed loops (sketch coords) and the unsolved children. */
-export function solveSketch(sketch: Host, outer: SolveHooks): { loops: Loop2[]; rest: Host[]; info: SolvedSketch } {
-  const key = cacheKey(sketch);
+export function solveSketch(sketch: Host, outer: SolveHooks, mode: "loops" | "path" = "loops"): { loops: Loop2[]; rest: Host[]; info: SolvedSketch } {
+  const k0 = cacheKey(sketch);
+  const key = k0 === undefined ? undefined : `${mode}\n${k0}`;
   const cached = key !== undefined ? cache.get(key) : undefined;
   const rest = sketch.children.filter((c) => !isSolvedTag(c.tag));
   if (cached) {
@@ -1540,7 +1588,7 @@ export function solveSketch(sketch: Host, outer: SolveHooks): { loops: Loop2[]; 
       outer.warn(h, display(msg));
     },
   };
-  const r = solveUncached(sketch, hooks);
+  const r = solveUncached(sketch, hooks, mode);
   if (key !== undefined) {
     cache.set(key, { loops: r.loops, info: r.info, warnings });
     if (cache.size > CACHE_SIZE) cache.delete(cache.keys().next().value!);
@@ -1599,11 +1647,11 @@ function cacheKey(sketch: Host): string | undefined {
   return ok ? parts.join("\n") : undefined;
 }
 
-function solveUncached(sketch: Host, hooks: SolveHooks): { loops: Loop2[]; info: SolvedSketch } {
+function solveUncached(sketch: Host, hooks: SolveHooks, mode: "loops" | "path"): { loops: Loop2[]; info: SolvedSketch } {
   let sol: Solved, loops: Loop2[];
   try {
     sol = solve(sketch, hooks);
-    loops = profile(sol);
+    loops = profile(sol, mode);
   } catch (e) {
     if (e instanceof TscadError && (e.detail.includes(REF_MARK) || e.hint?.includes(REF_MARK))) {
       throw new TscadError(display(e.detail), { ...(e.loc ? { loc: e.loc } : {}), ...(e.hint ? { hint: display(e.hint) } : {}) });
@@ -1614,7 +1662,7 @@ function solveUncached(sketch: Host, hooks: SolveHooks): { loops: Loop2[]; info:
   sol.info.free = sol.info.free.map(display);
   for (const e of sol.info.entities) if (e.id) e.id = display(e.id);
   for (const e of sol.info.entities) if (e.kind === "line") (e.fromId = display(e.fromId)), (e.toId = display(e.toId));
-  const hit = crossing(loops);
+  const hit = mode === "loops" ? crossing(loops) : undefined;
   if (hit) {
     hooks.warn(sketch, `the profile crosses itself near (${fmt(Number(hit[0].toFixed(4)))}, ${fmt(Number(hit[1].toFixed(4)))}): a constraint probably solved to its other branch (an unsigned length or distance flipped)`);
   }
@@ -1672,6 +1720,16 @@ export class SketchRecorder {
     const { loops, rest, info } = solveSketch(sketch, hooks);
     this.pending.push({ info, affine, parent });
     return { loops: loops.map((l) => ({ loop: transformLoop(l, affine), host: sketch })), rest };
+  }
+
+  /**
+   * Solve `sketch` as a sweep path (one chain, open or closed) placed by `affine` on `frame`
+   * (its 3D plane), for `parent`.
+   */
+  solvePath(sketch: Host, affine: Affine2, parent: Host, frame: Frame, hooks: SolveHooks): Seg2[] {
+    const { loops, info } = solveSketch(sketch, hooks, "path");
+    this.pending.push({ info, affine, parent, frame });
+    return transformLoop(loops[0]!, affine);
   }
 
   /**

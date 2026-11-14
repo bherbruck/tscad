@@ -270,3 +270,47 @@ reduce to point sites and arc sites, where an arc only supports directions withi
 its end points are separate point sites. Each change of active site happens at an exact angle,
 found in closed form where the two supports are equal. An active arc site contributes an arc,
 and each change contributes the common tangent segment. A flat (zero-area) input is an error.
+
+## Sketch-driven sweeps: `<sweepPath>`
+
+Draw a sweep's path in 2D, on a plane, as a constraint sketch or SVG path data. The
+`<sweep>`'s other children are the profile, which is placed square to the path's start
+automatically:
+
+```tsx
+<sweep>
+  <sweepPath plane="YZ">                       {/* sketch x → Y, sketch y → Z */}
+    <sketch>
+      <point id="o" x={0} y={20} fixed />
+      <line id="out" from="o" to="knee" horizontal length={35} />
+      <arc id="curl" from="knee" to="tip" tangent="out" radius={14} angle={75} />
+    </sketch>
+  </sweepPath>
+  <circle d={8} />
+</sweep>
+```
+
+- `plane` is `"XY"` (the default), `"XZ"` or `"YZ"`, as for `<extrude>`. `offset` shifts the
+  plane along its normal, and `x`/`y`/`rotate`/`mirror` place the path in the plane.
+- Children are a constraint `<sketch>` and/or `<path d="M ...">` pieces. A constraint sketch
+  used as a path is one chain of non-construction curves: open, or closed (a single
+  `<circle>` or loop makes a ring). Pieces are joined end to end, and a piece drawn backwards
+  is flipped. A gap is an error.
+- Lines and arcs stay exact IR lines and arcs. The kernel sweeps exactly piece by piece along
+  tangent-continuous lines and arcs, so **sharp corners warn**: join lines with tangent arcs.
+- The path sketch shows up in `CompileResult.sketches` with its own plane, so the viewer can
+  overlay it.
+
+Checked against closed forms: a circle swept round a closed circle (Pappus), line + tangent
+arc + line paths from SVG data and from a constraint sketch. See
+`examples/sketch-coat-hook.tsx`.
+
+## Lofts through constraint sketches
+
+`<loft>` sections can be constraint sketches: give each `<sketch z={...}>`, or wrap it in
+`<section z={...}>`. Each section's metadata carries its own plane. Sections with the same
+structure (the same lines and arcs in the same order) loft cleanly. See
+`examples/sketch-vase.tsx`: three rounded squares (four lines and four tangent arcs, sized by
+params) at the foot, belly and neck, smoothly lofted and shelled. That sketch has rough point
+positions so the solver starts on the intended branch; that is the usual CAD workflow for
+closed sketches made of tangent arcs.

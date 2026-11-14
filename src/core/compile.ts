@@ -18,6 +18,7 @@ import { layoutText, loadFont } from "./text/font";
 import { toSelector, type SelectorLike } from "./select";
 import { offsetLoops, OffsetError } from "./sketch/offset";
 import { hullLoops, HullError } from "./sketch/hull";
+import { sweepPathOf } from "./sketch/sweep-path";
 import { CONSTRAINT_TAGS, isConstrainedSketch, SketchRecorder, type SketchInfo } from "./sketch/constrained";
 import { AssemblyRecorder, ASSEMBLY_TAGS, type AssemblyInfo } from "./assembly";
 import { parsePath, PathSyntaxError } from "./sketch/path";
@@ -138,7 +139,7 @@ const SOLID_TAGS = new Set([
   "linearPattern", "gridPattern", "polarPattern", "fillet", "chamfer", "shell", "draft", "pushPull", "offsetFaces", "split",
 ]);
 const SHAPE_TAGS = new Set(["text", "rect", "roundedRect", "circle", "ellipse", "polygon", "regularPolygon", "slot", "path", "star"]);
-const SKETCH_TAGS = new Set([...SHAPE_TAGS, "sketch", "section", "offset", "hull"]);
+const SKETCH_TAGS = new Set([...SHAPE_TAGS, "sketch", "section", "offset", "hull", "sweepPath"]);
 const CONTAINER_TAGS = new Set(["part", "assembly", "drawing"]);
 const ALL_TAGS = [...SOLID_TAGS, ...SKETCH_TAGS, ...CONTAINER_TAGS, ...CONSTRAINT_TAGS, ...ASSEMBLY_TAGS];
 /** Tags whose x/y/z mean something else (no universal placement). */
@@ -171,7 +172,10 @@ class Compiler {
   }
 
   fail(h: Host | undefined, message: string, hint?: string, cause?: unknown): never {
-    throw new TscadError(message, { ...(h?.loc ? { loc: h.loc } : {}), ...(hint ? { hint } : {}), ...(cause ? { cause } : {}) });
+    // without a source location (e.g. the element a component returns directly), say which
+    // element it is so the error can still be found
+    const where = h && !h.loc ? ` (in ${snippet(h)})` : "";
+    throw new TscadError(message + where, { ...(h?.loc ? { loc: h.loc } : {}), ...(hint ? { hint } : {}), ...(cause ? { cause } : {}) });
   }
 
   warn(h: Host | undefined, message: string): void {
@@ -199,7 +203,15 @@ class Compiler {
   vec3(h: Host, name: string, v: unknown): Vec3 | undefined {
     if (v === undefined || v === null) return undefined;
     if (!Array.isArray(v) || v.length !== 3 || !v.every((x) => typeof x === "number" && Number.isFinite(x))) {
-      this.fail(h, `${name} must be [x, y, z] numbers (got ${show(v)})`);
+      const hint =
+        name === "rotate" && typeof v === "number"
+          ? `rotate takes three angles: rotate={[0, 0, ${v}]}, or use rotateZ={${v}} (also rotateX, rotateY)`
+          : name === "at" && Array.isArray(v) && v.length === 2
+            ? `at={[${v.join(", ")}, 0]} — 3D positions need z (2D sketch shapes take at={[x, y]})`
+            : name === "size" && Array.isArray(v) && v.length === 2
+              ? `a box needs three sizes: size={[${v.join(", ")}, h]}; for a 2D rectangle use <rect w h> inside <extrude>`
+              : undefined;
+      this.fail(h, `${name} must be [x, y, z] numbers (got ${show(v)})`, hint);
     }
     return [v[0], v[1], v[2]];
   }
@@ -404,7 +416,7 @@ class Compiler {
   }
 
   solid(h: Host): Node | null {
-    if (SHAPE_TAGS.has(h.tag) || h.tag === "sketch" || h.tag === "section" || h.tag === "offset" || h.tag === "hull") {
+    if (SHAPE_TAGS.has(h.tag) || h.tag === "sketch" || h.tag === "section" || h.tag === "offset" || h.tag === "hull" || h.tag === "sweepPath") {
       this.fail(h, `<${h.tag}> is a 2D sketch shape and can't stand alone as a solid`, `put it inside <extrude height={...}>, <revolve>, <loft> or <sweep>`);
     }
     if (h.tag === "anchor") return null;
@@ -417,7 +429,7 @@ class Compiler {
     }
     if (!SOLID_TAGS.has(h.tag)) {
       const guess = closest(h.tag, ALL_TAGS);
-      this.fail(h, `unknown element <${h.tag}>`, guess ? `did you mean <${guess}>?` : undefined);
+      this.fail(h, `unknown element <${h.tag}>`, unknownHint(h.tag, guess));
     }
     const r = this.local(h);
     if (!r) return null;
@@ -767,7 +779,7 @@ class Compiler {
     if (c === undefined) return dflt;
     if (typeof c === "boolean") return [c, c, c];
     if (Array.isArray(c) && c.length === 3 && c.every((x) => typeof x === "boolean")) return [c[0] === true, c[1] === true, c[2] === true];
-    return this.fail(h, `center must be a boolean or [bx, by, bz] (got ${show(c)})`);
+    return this.fail(h, `center must be a boolean or [bx, by, bz] (got ${show(c)})`, `center (all axes), center={false}, or per axis, e.g. center={[true, true, false]}`);
   }
 
   selector(h: Host, name: string, v: unknown): Selector {
@@ -808,6 +820,11 @@ class Compiler {
         out.push(...loops.map((loop) => ({ loop, host: c })));
         continue;
       }
+      if (c.tag === "sweepPath") {
+        // a sweep's path, not part of its profile
+        if (parent.tag !== "sweep") this.fail(c, "<sweepPath> only goes inside <sweep>", "<sweep><sweepPath plane=\"XZ\">...path...</sweepPath><circle r={2} /></sweep>");
+        continue;
+      }
       if (c.tag === "hull") {
         // the exact convex hull of the children (circles and arcs stay exact)
         const inner = this.sketch(c.children, mul2(m, this.place2(c)), parent);
@@ -835,7 +852,7 @@ class Compiler {
         }
         if (CONSTRAINT_TAGS.has(c.tag)) this.fail(c, `<${c.tag}> belongs in a constraint <sketch>`, `wrap the points, lines, arcs and constraints in <sketch>...</sketch>`);
         const guess = closest(c.tag, ALL_TAGS);
-        this.fail(c, `unknown element <${c.tag}>`, guess ? `did you mean <${guess}>?` : undefined);
+        this.fail(c, `unknown element <${c.tag}>`, unknownHint(c.tag, guess));
       }
       const mm = mul2(m, this.place2(c));
       for (const loop of this.shape(c)) out.push({ loop: transformLoop(loop, mm), host: c });
@@ -1099,8 +1116,18 @@ class Compiler {
     const p = h.props;
     let path: Path3;
     const raw = p.path;
-    if (!Array.isArray(raw) || raw.length === 0) this.fail(h, "needs a path", "<sweep path={helix({ radius: 10, pitch: 2, turns: 3 })}>");
-    if (raw.every((q: unknown) => Array.isArray(q))) {
+    const drawn = h.children.filter((c) => c.tag === "sweepPath");
+    if (drawn.length > 1) this.fail(drawn[1], "a <sweep> takes one <sweepPath>", "put every piece of the path in the same <sweepPath>");
+    if (drawn.length && raw !== undefined) this.fail(h, "give the path either as path={...} or as a <sweepPath> child, not both");
+    if (drawn.length) {
+      path = sweepPathOf(drawn[0]!, h, {
+        place2: (x) => this.place2(x),
+        recorder: this.sketchRec,
+        warn: (x, msg) => this.warn(x, msg),
+        fail: (x, msg, hint) => this.fail(x, msg, hint),
+      }).curves as Path3;
+    } else if (!Array.isArray(raw) || raw.length === 0) this.fail(h, "needs a path", "<sweep path={helix({ radius: 10, pitch: 2, turns: 3 })}> or a <sweepPath> child");
+    else if (raw.every((q: unknown) => Array.isArray(q))) {
       try {
         path = polyline3(raw as Vec3[]);
       } catch (e) {
@@ -1147,6 +1174,26 @@ function hintFor(tag: string, prop: string): string | undefined {
     circle: "<circle r={5} />",
   };
   return examples[tag] ? `e.g. ${examples[tag]}` : prop ? undefined : undefined;
+}
+
+/** Components in `tscad/parts` (capitalised): lowercase tags that name one get pointed there. */
+export const PARTS_COMPONENTS = [
+  "Hole", "CounterboreHole", "CountersinkHole", "TapHole", "NutTrap", "HeatSetInsert", "Standoff",
+  "BoltPattern", "MountHoles", "Extrusion2020", "HexPrism", "FingerJointBox", "LivingHinge",
+];
+
+function unknownHint(tag: string, guess: string | undefined): string | undefined {
+  const part = PARTS_COMPONENTS.find((c) => c.toLowerCase() === tag.toLowerCase());
+  if (part) return `<${part}> is a component from the parts library: import { ${part} } from "tscad/parts", then <${part} ... />`;
+  return guess ? `did you mean <${guess}>?` : undefined;
+}
+
+/** `<tag a={1} b="x">` for messages (props abbreviated). */
+function snippet(h: Host): string {
+  const props = Object.entries(h.props)
+    .slice(0, 5)
+    .map(([k, v]) => `${k}={${typeof v === "string" ? JSON.stringify(v) : (() => { try { const j = JSON.stringify(v); return j && j.length < 30 ? j : "…"; } catch { return "…"; } })()}}`);
+  return `<${h.tag}${props.length ? ` ${props.join(" ")}` : ""}>`;
 }
 
 function closest(word: string, candidates: string[]): string | undefined {

@@ -544,9 +544,31 @@ export interface LoftProps extends Placement, SketchChildren {
  * to it: sketch y is the up direction (+Z projected onto that plane, or +Y for a vertical
  * start), sketch x completes a right-handed frame with the path's direction.
  */
+/**
+ * A `<sweep>`'s path drawn in 2D on a plane: a constraint `<sketch>` (lines, arcs, splines —
+ * open, or closed for a ring) or `<path d="M ...">` data. Keep it tangent-continuous (join
+ * lines with tangent arcs): the sweep is exact along lines and arcs, and sharp corners warn.
+ * @example
+ * <sweep>
+ *   <sweepPath plane="XZ"><path d="M0 0 V40 A15 15 0 0 0 30 40" /></sweepPath>
+ *   <circle r={3} />
+ * </sweep>
+ */
+export interface SweepPathProps extends Placement2D {
+  /** The plane the path is drawn on (as `<extrude plane>`). Default `"XY"`. */
+  plane?: "XY" | "XZ" | "YZ";
+  /** Shift the plane along its normal, mm. */
+  offset?: number;
+  /** A constraint `<sketch>` and/or `<path d>` pieces, end to end. */
+  children?: Children;
+}
+
 export interface SweepProps extends Placement, SketchChildren {
-  /** The path: `helix({...})`, `polyline3([...])`, `arc3({...})`, or IR curves. */
-  path: Path3 | readonly Vec3[];
+  /**
+   * The path: `helix({...})`, `polyline3([...])`, `arc3({...})`, or IR curves. Or draw it in
+   * 2D with a `<sweepPath>` child instead.
+   */
+  path?: Path3 | readonly Vec3[];
   /**
    * `"follow"` (default) turns the profile with the path; `"translate"` keeps its
    * orientation (no twist — for threads along a helix, follow is usually right).
@@ -772,6 +794,8 @@ export interface IntrinsicElements extends ConstraintSketchElements, AssemblyEle
   revolve: RevolveProps;
   /** Loft through 2D sections along Z. */
   loft: LoftProps;
+  /** A sweep's path drawn in 2D (inside `<sweep>`). */
+  sweepPath: SweepPathProps;
   /** Sweep a 2D profile along a 3D path. */
   sweep: SweepProps;
 

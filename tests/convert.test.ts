@@ -273,7 +273,7 @@ describe("geometric equivalence (kernel volumes)", () => {
 
 describe("examples/converted", () => {
   const dir = new URL("../examples/converted/", import.meta.url);
-  for (const name of ["box-with-lid", "knob", "hex-key-holder", "rounded-tag", "cam", "enclosure", "cable-comb"]) {
+  for (const name of ["box-with-lid", "knob", "hex-key-holder", "rounded-tag", "cam", "enclosure", "cable-comb", "grid-bin"]) {
     test(`${name}: up to date with the converter, evaluates in < 10 s`, async () => {
       const scad = readFileSync(new URL(`${name}.scad`, dir), "utf8");
       const pascal = name.replace(/(^|-)(\w)/g, (_, __, c: string) => c.toUpperCase());
@@ -324,14 +324,12 @@ describe("corpus of realistic models", () => {
     near(volume, t * (w * h - (4 - PI) - n * cut));
   }, 30_000);
 
-  test("grid bin: converts and compiles (3D hull of stacked extrusions stays a warning)", async () => {
-    const { tsx, warnings } = convertScad(src("grid-bin.scad"));
+  test("grid bin: base pads (3D hull of stacked extrusions is unioned, with a warning) and a hollow body", async () => {
+    const { volume, warnings } = await run(src("grid-bin.scad"));
     expect(warnings.map((w) => w.line)).toEqual([18]);
-    const file = new URL(`m${++n}.tsx`, TMP);
-    writeFileSync(file, tsx);
-    const r = renderModule(await import(file.href));
-    expect(r.document.parts!.length).toBe(1);
-    // kernel evaluation skipped: union of the stacked rounded plates with the bin trips a kernel
-    // bug (reported: three extruded roundedRects, disjoint then touching → "not a closed solid")
-  });
+    const rr = (w: number, d: number, r: number) => w * d - (4 - PI) * r * r;
+    const pad = rr(37.2, 37.2, 1.6) * 0.8 + rr(41.5, 41.5, 4) * 2.4;
+    const body = rr(83.5, 41.5, 4) * 21 - rr(81.1, 39.1, 2.8) * 19.8;
+    near(volume, 2 * pad + body);
+  }, 30_000);
 });
