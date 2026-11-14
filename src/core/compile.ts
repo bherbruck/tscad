@@ -14,6 +14,7 @@ import { resolveParams, type ParamIssue, type ParamSchema, type ParamValues } fr
 import type { Path3 } from "./paths";
 import { polyline3 } from "./paths";
 import { render, type Host } from "./render";
+import { layoutText, loadFont } from "./text/font";
 import { toSelector, type SelectorLike } from "./select";
 import { parsePath, PathSyntaxError } from "./sketch/path";
 import { ccw, frame, frameAcross, pathStart, PLANES, regions, toCurves, type Frame, type PlaneName } from "./sketch/place";
@@ -107,7 +108,7 @@ const SOLID_TAGS = new Set([
   "union", "difference", "subtract", "intersection", "intersect", "extrude", "revolve", "loft", "sweep",
   "linearPattern", "gridPattern", "polarPattern", "fillet", "chamfer", "shell",
 ]);
-const SHAPE_TAGS = new Set(["rect", "roundedRect", "circle", "ellipse", "polygon", "regularPolygon", "slot", "path", "star"]);
+const SHAPE_TAGS = new Set(["text", "rect", "roundedRect", "circle", "ellipse", "polygon", "regularPolygon", "slot", "path", "star"]);
 const SKETCH_TAGS = new Set([...SHAPE_TAGS, "sketch", "section"]);
 const CONTAINER_TAGS = new Set(["part", "assembly"]);
 const ALL_TAGS = [...SOLID_TAGS, ...SKETCH_TAGS, ...CONTAINER_TAGS];
@@ -657,6 +658,8 @@ class Compiler {
     const p = h.props;
     if (h.children.length) this.warn(h, `children are ignored on <${h.tag}>`);
     switch (h.tag) {
+      case "text":
+        return this.text(h);
       case "rect":
       case "roundedRect": {
         let size: [number, number] | undefined;
@@ -723,6 +726,37 @@ class Compiler {
       }
     }
     return this.fail(h, `unknown 2D shape <${h.tag}>`);
+  }
+
+  text(h: Host): Loop2[] {
+    const p = h.props;
+    const str = h.text ?? "";
+    if (!str.trim()) {
+      this.warn(h, "has no text");
+      return [];
+    }
+    const size = this.num(h, "size", p.size, { positive: true }) ?? 10;
+    const align = p.align ?? "left";
+    if (!["left", "center", "right"].includes(align)) this.fail(h, `align must be "left", "center" or "right" (got ${show(align)})`);
+    const valign = p.valign ?? "baseline";
+    if (!["baseline", "top", "middle", "bottom"].includes(valign)) this.fail(h, `valign must be "baseline", "top", "middle" or "bottom" (got ${show(valign)})`);
+    let font;
+    try {
+      font = loadFont(p.font);
+    } catch (e) {
+      this.fail(h, `can't read the font: ${(e as Error).message}`, "pass the bytes of a .ttf/.otf/.woff file (ArrayBuffer or Uint8Array)", e);
+    }
+    const r = layoutText(str, font, {
+      size,
+      align,
+      valign,
+      spacing: this.num(h, "spacing", p.spacing, { positive: true }) ?? 1,
+      lineHeight: this.num(h, "lineHeight", p.lineHeight, { positive: true }) ?? 1.2,
+      kerning: p.kerning !== false,
+      ligatures: p.ligatures !== false,
+    });
+    if (r.missing.length) this.warn(h, `the font has no glyph for ${r.missing.map((c) => JSON.stringify(c)).join(", ")}; skipped`);
+    return r.loops;
   }
 
   /** Loops of a sketch-consuming element, checked closed and given a CCW winding. */

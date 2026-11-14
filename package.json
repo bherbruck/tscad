@@ -20,7 +20,7 @@
     "./export": "./src/export/index.ts",
     "./ir": "./src/ir.ts"
   },
-  "files": ["src", "wasm", "README.md", "LICENSE-MIT", "LICENSE-APACHE"],
+  "files": ["src", "wasm", "assets", "README.md", "LICENSE-MIT", "LICENSE-APACHE"],
   "scripts": {
     "build:wasm": "bun scripts/build-wasm.ts",
     "build:wasm:dev": "bun scripts/build-wasm.ts --dev",
@@ -33,6 +33,7 @@
   },
   "dependencies": {
     "fflate": "^0.8.3",
+    "opentype.js": "^2.0.0",
     "three": "^0.187.0"
   },
   "devDependencies": {

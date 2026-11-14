@@ -13,6 +13,15 @@ export interface Host {
   children: Host[];
   loc?: SourceLoc;
   key: string | number | bigint | null;
+  /** `<text>` only: its string children, joined. */
+  text?: string;
+}
+
+function textOf(node: Children, loc: SourceLoc | undefined): string {
+  if (node === null || node === undefined || typeof node === "boolean") return "";
+  if (typeof node === "string" || typeof node === "number" || typeof node === "bigint") return String(node);
+  if (Array.isArray(node)) return node.map((c) => textOf(c, loc)).join("");
+  throw new TscadError("<text> takes only strings and numbers as children", loc ? { loc } : {});
 }
 
 export interface RenderState {
@@ -88,6 +97,12 @@ function walk(
   const { children, ...props } = (el.props ?? {}) as Record<string, any>;
   const host: Host = { tag: type, props, children: [], key: el.key };
   if (loc) host.loc = { ...loc, tag: type, ...(component ? { component } : {}) };
+  if (type === "text") {
+    // <text> keeps its string children as the text to draw
+    host.text = textOf(children as Children, host.loc);
+    out.push(host);
+    return;
+  }
   walk(children as Children, host.children, state, loc, component, depth + 1);
   out.push(host);
 }

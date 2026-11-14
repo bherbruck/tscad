@@ -371,6 +371,43 @@ export interface StarProps extends Placement2D {
   r2: number;
 }
 
+/**
+ * Text outlines, for embossing (`<extrude>`) or engraving (`<difference>`). Glyph holes
+ * (o, a, e...) are handled like any nested loop. By default the first baseline starts at the
+ * position (`align="left"`, `valign="baseline"`); `\n` starts a new line.
+ * @example <extrude height={1}><text size={8} align="center" valign="middle">tscad</text></extrude>
+ */
+export interface TextProps extends Placement2D {
+  /** The text: strings and numbers (`<text>v{version}</text>`). */
+  children?: string | number | bigint | boolean | null | undefined | readonly (string | number | bigint | boolean | null | undefined)[];
+  /**
+   * Font size (em), mm. Default 10. In the default font capitals are about 0.73 × size tall
+   * and lowercase x about 0.55 × size.
+   */
+  size?: number;
+  /**
+   * A TTF/OTF/WOFF font's bytes (e.g. `import f from "./Font.ttf" with { type: "file" }` then
+   * read it, or `await Bun.file(...).arrayBuffer()`), or an opentype.js `Font`. Default: the
+   * built-in DejaVu Sans (Latin, Greek and common symbols such as ° ± × µ ⌀ Ø).
+   */
+  font?: ArrayBuffer | Uint8Array | object;
+  /** Horizontal alignment of each line about the position. Default `"left"`. */
+  align?: "left" | "center" | "right";
+  /**
+   * Vertical alignment of the block: `"baseline"` (default: first baseline at the position),
+   * `"top"` (ascender), `"middle"` (centre of the capitals), `"bottom"` (last descender).
+   */
+  valign?: "baseline" | "top" | "middle" | "bottom";
+  /** Letter advance multiplier (1 = the font's own spacing; 1.2 = 20 % looser). */
+  spacing?: number;
+  /** Line pitch as a multiple of `size`. Default 1.2. */
+  lineHeight?: number;
+  /** Apply the font's kerning. Default true. */
+  kerning?: boolean;
+  /** Apply standard ligatures (fi, fl...). Default true. */
+  ligatures?: boolean;
+}
+
 /** Groups 2D shapes to place them together. */
 export interface SketchProps extends Placement2D, SketchChildren {}
 
@@ -591,6 +628,8 @@ export interface IntrinsicElements {
   path: PathProps;
   /** 2D: star. */
   star: StarProps;
+  /** 2D: text outlines (emboss / engrave). */
+  text: TextProps;
   /** 2D: groups shapes to place them together. */
   sketch: SketchProps;
   /** 2D: one loft section at height `z`. */

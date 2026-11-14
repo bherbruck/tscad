@@ -49,3 +49,6 @@ export type * from "./core/intrinsics";
 
 // IR
 export type { Axis, Curve, Document, Node, Part, Selector } from "./ir";
+
+// text
+export { getDefaultFont, layoutText, loadFont, type FontSource, type TextLayout, type TextResult } from "./core/text/font";
