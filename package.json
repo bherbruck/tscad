@@ -8,7 +8,18 @@
     "type": "git",
     "url": "git+https://github.com/bherbruck/tscad.git"
   },
-  "keywords": ["cad", "jsx", "tsx", "brep", "step", "stl", "3d-printing", "parametric", "solid-modeling", "wasm"],
+  "keywords": [
+    "cad",
+    "jsx",
+    "tsx",
+    "brep",
+    "step",
+    "stl",
+    "3d-printing",
+    "parametric",
+    "solid-modeling",
+    "wasm"
+  ],
   "bin": {
     "tscad": "./src/cli/index.ts"
   },
@@ -18,9 +29,18 @@
     "./jsx-dev-runtime": "./src/jsx-dev-runtime.ts",
     "./kernel": "./src/kernel/index.ts",
     "./export": "./src/export/index.ts",
-    "./ir": "./src/ir.ts"
+    "./ir": "./src/ir.ts",
+    "./parts": "./src/parts/index.ts",
+    "./render": "./src/render/index.ts"
   },
-  "files": ["src", "wasm", "assets", "README.md", "LICENSE-MIT", "LICENSE-APACHE"],
+  "files": [
+    "src",
+    "wasm",
+    "assets",
+    "README.md",
+    "LICENSE-MIT",
+    "LICENSE-APACHE"
+  ],
   "scripts": {
     "build:wasm": "bun scripts/build-wasm.ts",
     "build:wasm:dev": "bun scripts/build-wasm.ts --dev",

@@ -1,0 +1,20 @@
+/**
+ * `tscad/parts`: a standard library of parametric components — fastener holes with ISO
+ * metric data, hardware pockets, mounting patterns and stock profiles. Each is a plain
+ * function component built from tscad's intrinsic elements, with placement props.
+ *
+ * @example
+ * import { CounterboreHole, BoltPattern, mountPatterns } from "tscad/parts"
+ * <difference>
+ *   <box size={[60, 60, 6]} />
+ *   <BoltPattern pattern={mountPatterns.nema17} z={6}><CounterboreHole size="M3" depth={6} /></BoltPattern>
+ * </difference>
+ */
+export { metric, metricData, metricSizes, type HoleFit, type MetricData, type MetricSize } from "./metric";
+export {
+  CounterboreHole, CountersinkHole, Hole, TapHole,
+  type CounterboreHoleProps, type CountersinkHoleProps, type HoleProps, type TapHoleProps,
+} from "./holes";
+export { HeatSetInsert, NutTrap, Standoff, type HeatSetInsertProps, type NutTrapProps, type StandoffProps } from "./hardware";
+export { BoltPattern, MountHoles, mountPatterns, type BoltPatternProps, type MountHolesProps, type MountPattern } from "./patterns";
+export { Extrusion2020, extrusion2020Outline, HexPrism, type Extrusion2020Props, type HexPrismProps } from "./profiles";

@@ -487,13 +487,13 @@ class Compiler {
         return [this.emit({ type: "step", data: p.data, ...(solid !== undefined ? { solid } : {}) } as Node, h)];
       }
       case "extrude":
-        return [this.extrude(h)];
       case "revolve":
-        return [this.revolve(h)];
+      case "sweep": {
+        const n = h.tag === "extrude" ? this.extrude(h) : h.tag === "revolve" ? this.revolve(h) : this.sweep(h);
+        return n ? [n] : null;
+      }
       case "loft":
         return [this.loft(h)];
-      case "sweep":
-        return [this.sweep(h)];
 
       case "linearPattern": {
         const count = this.req(h, "count", this.num(h, "count", p.count, { int: true, min: 1 }));
@@ -762,7 +762,10 @@ class Compiler {
   /** Loops of a sketch-consuming element, checked closed and given a CCW winding. */
   loops(h: Host, allowSection = false): SketchLoop[] {
     const loops = this.sketch(h.children, ID2, h, allowSection);
-    if (loops.length === 0) this.fail(h, "has no 2D shapes", `<${h.tag} ...><rect w={20} h={10} /></${h.tag}>`);
+    if (loops.length === 0) {
+      if (h.children.length === 0) this.fail(h, "has no 2D shapes", `<${h.tag} ...><rect w={20} h={10} /></${h.tag}>`);
+      this.warn(h, "its 2D shapes draw nothing (empty text?); skipped");
+    }
     for (const l of loops) {
       const { gap } = closureGap(l.loop);
       if (gap > 1e-7 * Math.max(1, loopSize(l.loop))) this.fail(l.host, `open sketch loop (gap ${gap.toPrecision(3)} mm)`);
@@ -772,7 +775,8 @@ class Compiler {
   }
 
   /** Build each region (outer minus holes) with `make`, unioning disjoint regions. */
-  regionsOf(h: Host, loops: SketchLoop[], make: (l: SketchLoop, hole: boolean) => Node): Node {
+  regionsOf(h: Host, loops: SketchLoop[], make: (l: SketchLoop, hole: boolean) => Node): Node | null {
+    if (loops.length === 0) return null;
     const rs = regions(loops, (l) => l.loop);
     const nodes = rs.map((r) => {
       const outer = make(r.outer, false);
@@ -785,7 +789,7 @@ class Compiler {
     return nodes.length === 1 ? nodes[0]! : this.emit({ type: "union", children: nodes } as Node, h);
   }
 
-  extrude(h: Host): Node {
+  extrude(h: Host): Node | null {
     const p = h.props;
     const height = this.alias(h, ["height", "h", "distance"], { nonZero: true });
     if (height === undefined) this.fail(h, "missing height", "<extrude height={5}>...</extrude>");
@@ -806,7 +810,7 @@ class Compiler {
     });
   }
 
-  revolve(h: Host): Node {
+  revolve(h: Host): Node | null {
     const angle = this.num(h, "angle", h.props.angle) ?? 360;
     if (!(angle > 0 && angle <= 360)) this.fail(h, `angle must be in (0, 360] degrees (got ${angle})`);
     const loops = this.loops(h);
@@ -843,7 +847,7 @@ class Compiler {
     return this.emit({ type: "loft", sections, ...(h.props.ruled ? { ruled: true } : {}) }, h);
   }
 
-  sweep(h: Host): Node {
+  sweep(h: Host): Node | null {
     const p = h.props;
     let path: Path3;
     const raw = p.path;

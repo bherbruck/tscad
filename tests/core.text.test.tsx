@@ -36,7 +36,9 @@ describe("<text> IR", () => {
   test("missing glyphs warn; empty text warns", () => {
     const r = compile(<extrude height={1}><text>a漢</text></extrude>);
     expect(r.warnings.some((w) => w.includes("no glyph for \"漢\""))).toBe(true);
-    expect(() => compile(<extrude height={1}><text>{" "}</text></extrude>)).toThrow(/no 2D shapes/);
+    const empty = compile(<union><box size={1} /><extrude height={1}><text>{" "}</text></extrude></union>);
+    expect(empty.warnings.some((w) => w.includes("draw nothing"))).toBe(true);
+    expect(empty.document.parts![0]!.node).toMatchObject({ type: "transform" }); // just the box
   });
   test("bad props", () => {
     // @ts-expect-error not an alignment
