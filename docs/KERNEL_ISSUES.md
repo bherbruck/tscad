@@ -76,6 +76,13 @@ These have NOT been filed upstream.
 - Workaround (core): consecutive glyph Béziers are joined into one C0 B-spline (same curve,
   fewer edges).
 
+## 12. solidcore-ops serialises every operation process-wide
+- `solidcore_ops::session` holds one `static KERNEL: Mutex<Option<Kernel>>`; every op locks it,
+  so two threads evaluating different bodies in one process run one after the other (measured
+  in tscad's dev server: two native part evaluations on two bun threads took 3.1 s and 4.0 s
+  vs 1.9 s alone). The kernel crate itself is "one Kernel per thread"; the ops layer is not.
+- Workaround: parallelism across processes (or wasm instances), not threads.
+
 ## Notes (tscad bugs found and fixed, not kernel bugs)
 - `solidcore_ops::blend` takes the kernel's *native* edge order, not record order (its
   `SetBack` docs say so; the function's own docs read as record indices). tscad now uses
