@@ -252,10 +252,12 @@ class Compiler {
       }
       if (h.tag === "assembly") {
         const mm = mul(m, this.placement(h));
+        this.asm.enter(h);
         for (const c of h.children) {
-          if (c.tag === "mate") this.asm.mate(c, h);
+          if (c.tag === "mate" || c.tag === "gear") this.asm.mate(c, h);
           else visit(c, mm);
         }
+        this.asm.exit();
         return;
       }
       const node = this.solid(h);
@@ -400,7 +402,7 @@ class Compiler {
       this.fail(h, `<${h.tag}> is a 2D sketch shape and can't stand alone as a solid`, `put it inside <extrude height={...}>, <revolve>, <loft> or <sweep>`);
     }
     if (h.tag === "anchor") return null;
-    if (h.tag === "mate") this.fail(h, "<mate> belongs directly inside an <assembly>", `<assembly><part name="a">...</part><part name="b">...</part><mate a="a.x" b="b.y" /></assembly>`);
+    if (h.tag === "mate" || h.tag === "gear") this.fail(h, `<${h.tag}> belongs directly inside an <assembly>`, `<assembly><part name="a">...</part><part name="b">...</part><mate a="a.x" b="b.y" /></assembly>`);
     if (CONSTRAINT_TAGS.has(h.tag)) {
       this.fail(h, `<${h.tag}> belongs in a constraint <sketch>`, `<extrude height={5}><sketch>...points, lines, arcs, constraints...</sketch></extrude>`);
     }

@@ -55,7 +55,39 @@ Giving `angle`/`offset` on a joint drives that freedom (a revolute with `angle` 
 `angle` turns `b` about `a`'s axis by the right-hand rule.
 
 **Grounding.** Parts with `fixed` never move. If no part is `fixed`, the first part is grounded.
-Parts in no mate stay where they are.
+Parts in no mate stay where they are. Grounding is per assembly (see nesting).
+
+**Limits.** `limits={[min, max]}` gives a joint's allowed range: degrees of `angle` for
+revolute/cylindrical/planar joints, mm of `offset` for a slider. When the solved position is
+outside it (driven, or through a gear), a warning is emitted at the mate.
+
+## `<gear>`: coupled joints
+
+Give joints an `id`, then couple their angles: `b`'s angle = `ratio` × `a`'s angle + `phase`.
+A negative ratio turns the other way, as meshing spur gears do.
+
+```tsx
+<mate id="drive"  a="frame.a" b="pinion.hub" type="revolute" angle={p.turn} />
+<mate id="driven" a="frame.b" b="wheel.hub"  type="revolute" />
+<gear a="drive" b="driven" ratio={-teethPinion / teethWheel} />
+```
+
+`a` and `b` must name revolute or cylindrical mates of the same assembly. A joint's angle is
+measured as the rotation of `b`'s x direction about `a`'s axis (`atan2(xB·yA, xB·xA)`).
+
+## Nested assemblies
+
+Mates are scoped to the `<assembly>` they're written in, and inner assemblies are solved first:
+
+1. Each inner assembly solves its own mates, with its own grounded part.
+2. In the parent, the solved inner assembly is one **rigid group**: its anchors are addressed
+   `"sub.part.anchor"` (`sub` = the inner `<assembly name>`), or just `"part.anchor"` when that
+   is unambiguous. A mate moves the whole group.
+3. A mate can't reach outside its assembly: `no anchor "table.top" in this assembly`.
+
+`<assembly fixed>` grounds a sub-assembly in its parent, and `<assembly name>` names it.
+So a component can be a whole mechanism (say, a gripper with its own joints) that is placed
+as a unit.
 
 ## Referencing anchors: strings or typed handles
 
@@ -70,6 +102,10 @@ const A = assemblyRefs<{ motor: "shaft" | "mount"; pulley: "bore" }>()
 `"part.anchor"` strings work everywhere too, and the two styles mix.
 
 ## Solver
+
+**Cache.** Each assembly level's solve is cached (LRU, 64 entries) by its units' anchor frames,
+names and locations and its mates' props. A param change that leaves the mates alone (a
+size, a colour) skips the solve and replays its warnings. `clearAssemblyCache()` empties it.
 
 The sketch solver (`src/core/sketch/solver`) is reused. Each moving part has 7 unknowns: a
 translation and a quaternion, kept unit by a residual. Each mate adds residual equations
@@ -103,13 +139,18 @@ interface AssemblyInfo {
   parts: {
     name: string;
     transform: number[];  // 4×4 row-major rigid motion applied on top of the declared placement
-    dof: number;          // remaining freedom relative to ground (0 = fully placed)
+    dof: number;          // remaining freedom relative to ground (0 = fully placed); for a part in
+                          // a sub-assembly, its own level plus its group's freedom in the parents
     grounded: boolean;
   }[];
   mates: {
     a: string; b: string;           // "part.anchor"
     type: "fastened" | "revolute" | "slider" | "cylindrical" | "planar" | "ball";
-    angle?: number; offset?: number; flip: boolean;
+    id?: string;                    // the mate's id (for gears)
+    angle?: number; offset?: number; flip: boolean;  // driven values, as given
+    value: { angle: number; offset: number };        // solved joint position: degrees about a's
+                                                     // axis, mm along it (for gizmos and limits)
+    limits?: [number, number];
     residual: number;               // mm, at the solution
     ok: boolean;
     loc?: SourceLoc;
@@ -130,6 +171,7 @@ transform when there is one, otherwise the root is wrapped in a new transform.
 ## Examples
 
 - `examples/assembly-hinge-box.tsx`: shelled box and lid on a revolute hinge, `open` param,
-  typed handles.
+  typed handles, limits. The hinge anchors sit on the shared back edge (the box's top, the
+  lid's bottom), so the lid is flush when closed and pivots on that edge.
 - `examples/assembly-arm.tsx`: base, turntable, upper arm and forearm components with joint
   anchors, posed by `yaw` / `shoulder` / `elbow` params.

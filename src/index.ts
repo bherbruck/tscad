@@ -56,7 +56,7 @@ export {
 // assemblies: anchors & mates
 export {
   anchorRef, assemblyRefs, isAnchorRef,
-  type AnchorProps, type AnchorRef, type AssemblyInfo, type Direction, type MateProps, type MateType, type PartRef,
+  type AnchorProps, type AnchorRef, type AssemblyInfo, type Direction, type GearProps, type MateProps, type MateType, type PartRef,
 } from "./core/assembly";
 
 // element prop types

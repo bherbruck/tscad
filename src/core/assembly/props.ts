@@ -63,6 +63,30 @@ export interface MateProps {
   angle?: number;
   /** Axes opposed instead of aligned (face-to-face). */
   flip?: boolean;
+  /** Name, for `<gear>`s relating this joint to another. */
+  id?: string;
+  /**
+   * Allowed range of the joint, `[min, max]`: degrees for revolute/cylindrical/planar
+   * (the angle), mm for a slider (the offset). Out-of-range positions warn.
+   */
+  limits?: [number, number];
+  key?: Key;
+}
+
+/**
+ * Couples two revolute (or cylindrical) joints: `b`'s angle = `ratio` × `a`'s angle + `phase`.
+ * Negative ratios turn the other way (meshing spur gears).
+ * @example <gear a="motor" b="wheel" ratio={-0.5} />
+ */
+export interface GearProps {
+  /** `id` of the driving mate. */
+  a: string;
+  /** `id` of the driven mate. */
+  b: string;
+  /** b's angle per degree of a's. */
+  ratio: number;
+  /** Angle offset, degrees. */
+  phase?: number;
   key?: Key;
 }
 
@@ -71,4 +95,6 @@ export interface AssemblyElements {
   anchor: AnchorProps;
   /** A joint between two anchors (inside `<assembly>`). */
   mate: MateProps;
+  /** Couples two joints' angles (inside `<assembly>`). */
+  gear: GearProps;
 }

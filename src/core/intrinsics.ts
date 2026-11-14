@@ -71,6 +71,8 @@ export interface AssemblyProps extends Placement, SolidChildren {
   allowFree?: boolean;
   /** Mates must fix every part (free parts are errors) and redundant mates are reported. */
   strict?: boolean;
+  /** As a sub-assembly: ground it in the parent assembly's mates. */
+  fixed?: boolean;
   /** Assembly name (used as a prefix for loose solids' part name). */
   name?: string;
 }

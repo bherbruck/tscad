@@ -216,16 +216,23 @@ describe("mated assemblies in the kernel", () => {
 });
 
 describe("assembly examples", () => {
-  test("hinge box: the lid swings about the hinge (bbox at 90°)", async () => {
+  test("hinge box: closed is flush, open swings about the shared back edge", async () => {
     const { renderModule } = await import("tscad");
-    const r = renderModule(await import("../examples/assembly-hinge-box.tsx"), { open: 90 });
-    expect(r.warnings).toEqual([]);
-    const e = await k.evaluate(r.document, { noMesh: true });
-    const lid = e.parts.find((p) => p.name === "lid")!;
-    expect(lid.ok).toBe(true);
-    const [min, max] = lid.bbox!;
-    close(min, [-40, 28, 33], 1e-6);
-    close(max, [40, 34, 83], 1e-6);
+    const mod = await import("../examples/assembly-hinge-box.tsx");
+    const bbox = async (open: number) => {
+      const r = renderModule(mod, { open });
+      expect(r.warnings).toEqual([]);
+      const e = await k.evaluate(r.document, { noMesh: true });
+      const lid = e.parts.find((p) => p.name === "lid")!, base = e.parts.find((p) => p.name === "base")!;
+      expect(lid.ok && base.ok).toBe(true);
+      return { lid: lid.bbox!, base: base.bbox! };
+    };
+    const shut = await bbox(0);
+    close(shut.lid[0], [-40, -25, 30], 1e-6); // lid bottom on the box top
+    expect(shut.lid[0][2]).toBeCloseTo(shut.base[1][2], 9);
+    const up = await bbox(90);
+    close(up.lid[0], [-40, 25, 30], 1e-6);
+    close(up.lid[1], [40, 31, 80], 1e-6);
   }, 30_000);
 
   test("arm: the forearm tip follows forward kinematics", async () => {
@@ -253,4 +260,109 @@ test("moved parts keep source locations on the new wrapper", () => {
   expect(r.document.parts![1]!.node.type).toBe("transform");
   expect(r.sourceMap["parts/1"]?.tag).toBe("part");
   expect(r.sourceMap["parts/1/0"]?.tag).toBe("sphere");
+});
+
+describe("nested assemblies, gears, limits, cache", () => {
+  /** A sub-assembly: a bracket with an arm hinged on it, exposing the bracket's foot. */
+  function Hinged({ name, angle }: { name: string; angle: number }) {
+    return (
+      <assembly name={name}>
+        <part name={`${name}-bracket`}>
+          <box size={[10, 10, 10]} />
+          <anchor id="foot" />
+          <anchor id="pin" at={[0, 0, 10]} />
+        </part>
+        <part name={`${name}-arm`}>
+          <box size={[20, 2, 2]} center={[false, true, false]} />
+          <anchor id="pin" />
+          <anchor id="end" at={[20, 0, 0]} />
+        </part>
+        <mate a={`${name}-bracket.pin`} b={`${name}-arm.pin`} type="revolute" angle={angle} />
+      </assembly>
+    );
+  }
+
+  test("inner assemblies are solved first, then placed as rigid groups", () => {
+    const r = compile(
+      <assembly>
+        <part name="table" fixed>
+          <box size={[100, 100, 5]} />
+          <anchor id="left" at={[-30, 0, 5]} />
+          <anchor id="right" at={[30, 0, 5]} />
+        </part>
+        <Hinged name="h1" angle={90} />
+        <Hinged name="h2" angle={0} />
+        <mate a="table.left" b="h1.h1-bracket.foot" />
+        <mate a="table.right" b="h2-bracket.foot" angle={180} />
+      </assembly>,
+    );
+    expect(r.warnings).toEqual([]);
+    close(origin(frame(r, "h1-arm", "end")), [-30, 20, 15]);
+    close(origin(frame(r, "h2-arm", "end")), [10, 0, 15]);
+    expect(r.assembly!.parts.every((p) => p.dof === 0)).toBe(true);
+  });
+
+  test("an inner mate can't reach outside its assembly", () => {
+    expect(() =>
+      compile(
+        <assembly>
+          <part name="table" fixed><box size={5} /><anchor id="top" /></part>
+          <assembly name="sub">
+            <part name="x"><box size={1} /><anchor id="p" /></part>
+            <part name="y"><box size={1} /><anchor id="p" /></part>
+            <mate a="table.top" b="x.p" />
+          </assembly>
+        </assembly>,
+      ),
+    ).toThrow(/no anchor "table.top" in this assembly/);
+  });
+
+  test("gear couples two revolute joints", () => {
+    const r = compile(
+      <assembly>
+        <part name="frame" fixed>
+          <box size={[60, 10, 2]} />
+          <anchor id="a" at={[-15, 0, 2]} />
+          <anchor id="b" at={[15, 0, 2]} />
+        </part>
+        <part name="pinion"><cylinder r={10} h={2} /><anchor id="hub" /><anchor id="mark" at={[10, 0, 0]} /></part>
+        <part name="wheel"><cylinder r={20} h={2} /><anchor id="hub" /><anchor id="mark" at={[20, 0, 0]} /></part>
+        <mate id="drive" a="frame.a" b="pinion.hub" type="revolute" angle={60} />
+        <mate id="driven" a="frame.b" b="wheel.hub" type="revolute" />
+        <gear a="drive" b="driven" ratio={-0.5} />
+      </assembly>,
+    );
+    expect(r.warnings).toEqual([]);
+    const m = r.assembly!.mates.find((x) => x.id === "driven")!;
+    expect(m.value.angle).toBeCloseTo(-30, 9);
+    close(origin(frame(r, "wheel", "mark")), [15 + 20 * Math.cos(-30 * DEG), 20 * Math.sin(-30 * DEG), 2]);
+    expect(r.assembly!.parts.every((p) => p.dof === 0)).toBe(true);
+  });
+
+  test("limits warn when a joint is out of range", () => {
+    const el = (angle: number) => (
+      <assembly>
+        <Link name="g" length={10} fixed />
+        <Link name="arm" length={10} />
+        <mate a="g.tip" b="arm.base" type="revolute" angle={angle} limits={[-90, 90]} />
+      </assembly>
+    );
+    expect(compile(el(45)).warnings).toEqual([]);
+    expect(compile(el(120)).warnings.some((w) => w.includes("angle 120° is outside limits [-90, 90]"))).toBe(true);
+  });
+
+  test("unchanged assemblies reuse the solve (and replay warnings)", () => {
+    const el = (h: number) => (
+      <assembly>
+        <Link name="g" length={10} fixed />
+        <Link name="arm" length={10} />
+        <mate a="g.tip" b="arm.base" type="revolute" />
+        <part name="other"><box size={h} /></part>
+      </assembly>
+    );
+    const a = compile(el(3)), b = compile(el(5));
+    expect(b.assembly!.mates[0]).toBe(a.assembly!.mates[0]); // the cached object
+    expect(b.warnings).toEqual(a.warnings);
+    expect(a.warnings.length).toBe(1);
+  });
 });
