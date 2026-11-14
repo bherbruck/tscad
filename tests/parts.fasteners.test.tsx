@@ -173,3 +173,29 @@ describe("every head style and the cutter", () => {
     expect(() => compile(<Bearing designation={"999" as any} />)).toThrow(/unknown designation/);
   });
 });
+
+describe("refs into fasteners", () => {
+  test("a named bolt's shank cuts a plate; the head stays", async () => {
+    const h = boltHeads.socket.M3;
+    const v = await volume(
+      <>
+        <box name="plate" size={[40, 20, 4]} />
+        <Bolt name="b" thread="M3" length={12} z={4} />
+        <subtract from=".plate" tool=".b > .shank" />
+      </>,
+    );
+    const head = cyl(h.dk / 2, h.k) - chamfer45(h.dk / 2, Math.min(0.1 * h.k, 0.5)) - hexArea(h.s) * h.t;
+    expect(v).toBeCloseTo(40 * 20 * 4 - cyl(1.5, 4) + head, 0);
+  });
+
+  test("a bolt's clearance cutter is a ref target too", async () => {
+    const v = await volume(
+      <>
+        <box name="plate" size={[40, 20, 4]} />
+        <Bolt name="c" thread="M3" length={12} z={4} cutter />
+        <subtract from=".plate" tool=".c > .clearance" />
+      </>,
+    );
+    expect(v).toBeCloseTo(40 * 20 * 4 - cyl(clearance("M3") / 2, 4), 1);
+  });
+});

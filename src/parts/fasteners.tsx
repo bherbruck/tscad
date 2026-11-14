@@ -120,7 +120,7 @@ export interface BoltProps extends Placement, AnchorsProp {
   cutter?: boolean | HoleFit;
   /** Extra clearance around the head in the cutter's pocket, mm (diameter). Default 1. */
   headClearance?: number;
-  /** Name of the bolt's group. Default `"bolt"`. */
+  /** Instance name for refs (`<Bolt name="b" />` → `.b > .shank`); tscad records it. */
   name?: string;
 }
 
@@ -140,7 +140,6 @@ export function Bolt(props: BoltProps) {
   const r = d / 2;
   const flat = style === "flat";
   if (flat && L <= hd.k) throw new RangeError(`<Bolt head="flat"> length (${L}) must exceed the head height (${hd.k})`);
-  const name = props.name ?? "bolt";
   const anchors = <Anchors opt={props.anchors} list={[["head", [0, 0, 0]], ["tip", [0, 0, -L]]]} />;
 
   if (props.cutter) {
@@ -153,7 +152,7 @@ export function Bolt(props: BoltProps) {
       ? [[0, -L - 0.5], [holeR, -L - 0.5], [holeR, -(headR - holeR)], [headR, 0], [headR, LIFT], [0, LIFT]]
       : [[0, -L - 0.5], [holeR, -L - 0.5], [holeR, 0], [headR, 0], [headR, hd.k + LIFT], [0, hd.k + LIFT]];
     return (
-      <group {...placement(props)} name={`${name}-clearance`}>
+      <group {...placement(props)}>
         <group name="clearance">
           <Turned pts={pts} />
         </group>
@@ -191,7 +190,7 @@ export function Bolt(props: BoltProps) {
   }
   const socketTop = flat ? 0 : hd.k;
   return (
-    <group {...placement(props)} name={name}>
+    <group {...placement(props)}>
       <group name="head">
         {hd.s > 0 ? (
           <difference>
@@ -219,7 +218,7 @@ export interface NutProps extends Placement, AnchorsProp {
   thread: MetricSize;
   /** `"hex"` (ISO 4032, default) or `"nyloc"` (ISO 10511, with the nylon insert's dome). */
   type?: "hex" | "nyloc";
-  /** Name of the nut's group. Default `"nut"`. */
+  /** Instance name for refs (`<Bolt name="b" />` → `.b > .shank`); tscad records it. */
   name?: string;
 }
 
@@ -235,7 +234,7 @@ export function Nut(props: NutProps) {
   const hexH = nyloc ? Math.min(m.nut.height, h * 0.75) : h;
   const domeR = af * 0.45;
   return (
-    <group {...placement(props)} name={props.name ?? "nut"}>
+    <group {...placement(props)}>
       <difference>
         <group name="body">
           <ChamferedHex af={af} h={hexH} top={!nyloc} />
@@ -259,6 +258,7 @@ export interface WasherProps extends Placement, AnchorsProp {
   thread: MetricSize;
   /** `"flat"` (ISO 7089, default) or `"spring"` (DIN 127 B split lock washer, modelled flat with its split). */
   type?: "flat" | "spring";
+  /** Instance name for refs; tscad records it. */
   name?: string;
 }
 
@@ -268,7 +268,7 @@ export function Washer(props: WasherProps) {
   const ring = <Turned pts={[[w.d1 / 2, 0], [w.d2 / 2, 0], [w.d2 / 2, w.h], [w.d1 / 2, w.h]]} />;
   const gap = Math.max(0.3, 0.12 * (w.d2 - w.d1));
   return (
-    <group {...placement(props)} name={props.name ?? "washer"}>
+    <group {...placement(props)}>
       <group name="body">
         {props.type === "spring" ? (
           <difference>
@@ -292,6 +292,7 @@ export interface SetScrewProps extends Placement, AnchorsProp {
   thread: MetricSize;
   /** Length, mm. */
   length: number;
+  /** Instance name for refs; tscad records it. */
   name?: string;
 }
 
@@ -308,7 +309,7 @@ export function SetScrew(props: SetScrewProps) {
   const r = m.d / 2;
   const c = Math.min(m.pitch * 0.6, L / 4);
   return (
-    <group {...placement(props)} name={props.name ?? "setScrew"}>
+    <group {...placement(props)}>
       <difference>
         <group name="body">
           <Turned pts={[[0, 0], [r - c, 0], [r, c], [r, L - c], [r - c, L], [0, L]]} />
@@ -326,6 +327,7 @@ export interface DowelPinProps extends Placement, AnchorsProp {
   d: number;
   /** Length, mm. */
   length: number;
+  /** Instance name for refs; tscad records it. */
   name?: string;
 }
 
@@ -336,7 +338,7 @@ export function DowelPin(props: DowelPinProps) {
   const r = props.d / 2, L = props.length;
   const c = Math.min(0.1 * props.d + 0.1, L / 4);
   return (
-    <group {...placement(props)} name={props.name ?? "dowel"}>
+    <group {...placement(props)}>
       <group name="body">
         <Turned pts={[[0, 0], [r - c, 0], [r, c], [r, L - c], [r - c, L], [0, L]]} />
       </group>
@@ -352,6 +354,7 @@ export function DowelPin(props: DowelPinProps) {
 export interface BearingProps extends Placement, AnchorsProp {
   /** Designation, e.g. `"608"` (8 × 22 × 7), `"625"`, `"6001"`, `"MR105"`. */
   designation: BearingDesignation;
+  /** Instance name for refs; tscad records it. */
   name?: string;
 }
 
@@ -370,7 +373,7 @@ export function Bearing(props: BearingProps) {
   const ri = d / 2, ro = D / 2;
   const innerOut = ri + ring, outerIn = ro - ring;
   return (
-    <group {...placement(props)} name={props.name ?? "bearing"}>
+    <group {...placement(props)}>
       <group name="outer">
         <Turned pts={[[outerIn, 0], [ro - c, 0], [ro, c], [ro, B - c], [ro - c, B], [outerIn, B]]} />
       </group>
@@ -389,6 +392,7 @@ export function Bearing(props: BearingProps) {
 export interface ShaftCollarProps extends Placement, AnchorsProp {
   /** Shaft diameter, mm: 3, 4, 5, 6, 8, 10 or 12. */
   bore: CollarBore;
+  /** Instance name for refs; tscad records it. */
   name?: string;
 }
 
@@ -402,7 +406,7 @@ export function ShaftCollar(props: ShaftCollarProps) {
   const tap = metricData(c.screw).tapDrill;
   const e = Math.min(0.5, c.w / 10);
   return (
-    <group {...placement(props)} name={props.name ?? "collar"}>
+    <group {...placement(props)}>
       <difference>
         <group name="body">
           <Turned pts={[[0, 0], [c.D / 2 - e, 0], [c.D / 2, e], [c.D / 2, c.w - e], [c.D / 2 - e, c.w], [0, c.w]]} />
