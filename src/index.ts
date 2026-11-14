@@ -44,6 +44,11 @@ export { arc3, bezier3, helix, line3, path3, polyline3, type Arc3Options, type H
 export { cm, deg, ft, inch, linspace, m, mm, rad, range, thou, turn } from "./core/units";
 export { massOf, materials, type Material, type MaterialName } from "./core/materials";
 
+// constraint sketches
+export type { SketchDimensionInfo, SketchEntityInfo, SketchInfo, SolvedSketch } from "./core/sketch/constrained";
+export type * from "./core/sketch/constrained-props";
+export { sketchPath, SketchPath } from "./core/sketch/builder";
+
 // element prop types
 export type * from "./core/intrinsics";
 

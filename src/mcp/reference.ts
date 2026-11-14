@@ -5,7 +5,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-interface Member {
+export interface Member {
   name: string;
   optional: boolean;
   type: string;
@@ -60,7 +60,21 @@ export function parseInterfaces(src: string): { ifaces: Map<string, Iface>; fnDo
 }
 
 const here = (p: string) => fileURLToPath(new URL(p, import.meta.url));
-let cache: { elements: string; byTag: Map<string, string>; parts: string; byComponent: Map<string, string> } | undefined;
+/** One documented element or component, for the docs site. */
+export interface Entry {
+  name: string;
+  /** The one-line doc from `IntrinsicElements` (or the component's doc). */
+  summary: string;
+  /** The props interface's doc. */
+  doc: string;
+  props: Member[];
+  /** Shared prop groups it also takes (placement...). */
+  shared: string[];
+}
+
+let cache:
+  | { elements: string; byTag: Map<string, string>; parts: string; byComponent: Map<string, string>; entries: Entry[]; components: Entry[]; shared: Iface[] }
+  | undefined;
 
 /** Interfaces whose props are summarised rather than listed on every element. */
 const SHARED: Record<string, string> = {
@@ -115,10 +129,13 @@ function build() {
   const elements = { members: propsOf("IntrinsicElements", ifaces).own };
   const byTag = new Map<string, string>();
   const sections: string[] = ["## Intrinsic elements", "", sharedSection(ifaces)];
+  const entries: Entry[] = [];
+  const components: Entry[] = [];
   for (const el of elements?.members ?? []) {
     const propsName = el.type.trim();
     const p = ifaces.get(propsName);
     const { own, shared } = propsOf(propsName, ifaces);
+    entries.push({ name: el.name, summary: el.doc, doc: p?.doc && p.doc !== el.doc ? p.doc : "", props: own.filter((m) => m.name !== "key" && m.name !== "children"), shared: [...new Set(shared)] });
     const lines = [`### <${el.name}>`, el.doc, p?.doc && p.doc !== el.doc ? p.doc : "", ...own.map(memberLine).filter(Boolean)];
     if (shared.length) lines.push(`- plus ${[...new Set(shared)].join(", ")}`);
     const text = lines.filter(Boolean).join("\n");
@@ -134,6 +151,8 @@ function build() {
     for (const [fn, doc] of fnDocs) {
       if (!/^[A-Z]/.test(fn)) continue;
       const { own, shared } = propsOf(`${fn}Props`, pi);
+      const placed = shared.length > 0 || !!pi.get(`${fn}Props`)?.extends.includes("Placement");
+      components.push({ name: fn, summary: doc, doc: "", props: own.filter((m) => m.name !== "key" && m.name !== "children"), shared: placed ? ["placement props (x y z at rotate rotateX/Y/Z scale mirror)"] : [] });
       const lines = [`### <${fn}>`, doc, ...own.map(memberLine).filter(Boolean)];
       if (shared.length || pi.get(`${fn}Props`)?.extends.includes("Placement")) lines.push("- plus placement props");
       const text = lines.filter(Boolean).join("\n");
@@ -146,7 +165,15 @@ function build() {
     "- `metric.M3.clearance.normal` (3.4), `.tapDrill`, `.socketHead {diameter,height}`, `.counterbore`, `.countersunk`, `.nut {af,height}`, `.insert`; sizes M2 M2.5 M3 M4 M5 M6 M8 M10 M12",
     "- `mountPatterns.raspberryPi4 | raspberryPiZero | arduinoUno | nema17 | nema23`: `{ points, size, holeDiameter, outline, outlineOffset, pilot? }` (points centred)",
   );
-  cache = { elements: sections.join("\n"), byTag, parts: partSections.join("\n"), byComponent };
+  cache = {
+    elements: sections.join("\n"),
+    byTag,
+    parts: partSections.join("\n"),
+    byComponent,
+    entries,
+    components,
+    shared: ["Placement", "Placement2D"].map((n) => ifaces.get(n)).filter((x): x is Iface => !!x),
+  };
   return cache;
 }
 
@@ -165,4 +192,10 @@ export function lookup(name: string): string | undefined {
 export function names(): { elements: string[]; components: string[] } {
   const c = cache ?? build();
   return { elements: [...c.byTag.keys()], components: [...c.byComponent.keys()] };
+}
+
+/** Structured reference (docs site). */
+export function referenceEntries(): { elements: Entry[]; components: Entry[]; shared: { name: string; doc: string; props: Member[] }[] } {
+  const c = cache ?? build();
+  return { elements: c.entries, components: c.components, shared: c.shared.map((i) => ({ name: i.name, doc: i.doc, props: i.members.filter((m) => m.name !== "key") })) };
 }

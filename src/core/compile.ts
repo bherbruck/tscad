@@ -885,11 +885,13 @@ class Compiler {
   extrudeLoops(h: Host, loops: SketchLoop[], height: number, base: Frame, start: number, draft: number): Node | null {
     const f: Frame = { ...base, origin: [base.n[0] * start, base.n[1] * start, base.n[2] * start] };
     const dir: Vec3 = height > 0 ? [...base.n] : [-base.n[0], -base.n[1], -base.n[2]];
-    return this.regionsOf(h, loops, (l, hole) => {
+    const out = this.regionsOf(h, loops, (l, hole) => {
       const node: Node = { type: "extrude", profile: toCurves(l.loop, f), direction: dir.map((v) => v + 0) as Vec3, distance: Math.abs(height) };
       if (draft) (node as { draft?: number }).draft = (hole ? -draft : draft) * DEG;
       return this.emit(node, l.host);
     });
+    this.sketchRec.claim(h, out, f);
+    return out;
   }
 
   extrude(h: Host): Node | null {
@@ -913,9 +915,11 @@ class Compiler {
       if (minX < -1e-9) this.fail(l.host, `the profile crosses the axis (x reaches ${minX.toPrecision(4)})`, "in <revolve>, sketch x is the radius: keep every shape at x ≥ 0");
     }
     const f = frame([0, 0, 0], [1, 0, 0], [0, 0, 1]);
-    return this.regionsOf(h, loops, (l) =>
+    const out = this.regionsOf(h, loops, (l) =>
       this.emit({ type: "revolve", profile: toCurves(l.loop, f), origin: [0, 0, 0], axis: [0, 0, 1], angle: angle === 360 ? 2 * Math.PI : angle * DEG }, l.host),
     );
+    this.sketchRec.claim(h, out, f);
+    return out;
   }
 
   loft(h: Host): Node {
@@ -935,10 +939,14 @@ class Compiler {
       const l = ls[0]!;
       const { gap } = closureGap(l.loop);
       if (gap > 1e-7 * Math.max(1, loopSize(l.loop))) this.fail(l.host, `open sketch loop (gap ${gap.toPrecision(3)} mm)`);
-      sections.push(toCurves(ccw(l.loop), frame([0, 0, z ?? 0], [1, 0, 0], [0, 1, 0])));
+      const sf = frame([0, 0, z ?? 0], [1, 0, 0], [0, 1, 0]);
+      this.sketchRec.claim(h, undefined, sf);
+      sections.push(toCurves(ccw(l.loop), sf));
     }
     if (sections.length < 2) this.fail(h, `needs at least 2 sections (got ${sections.length})`);
-    return this.emit({ type: "loft", sections, ...(h.props.ruled ? { ruled: true } : {}) }, h);
+    const out = this.emit({ type: "loft", sections, ...(h.props.ruled ? { ruled: true } : {}) } as Node, h);
+    this.sketchRec.claim(h, out);
+    return out;
   }
 
   sweep(h: Host): Node | null {
@@ -960,9 +968,11 @@ class Compiler {
     if (tangent.every((v) => v === 0)) this.fail(h, "the path's first curve has no direction");
     const f = frameAcross(point, normalize(tangent));
     const loops = this.loops(h);
-    return this.regionsOf(h, loops, (l) =>
+    const out = this.regionsOf(h, loops, (l) =>
       this.emit({ type: "sweep", profile: toCurves(l.loop, f), path, ...(frameName === "translate" ? { frame: "translate" as const } : {}) }, l.host),
     );
+    this.sketchRec.claim(h, out, f);
+    return out;
   }
 }
 

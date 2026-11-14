@@ -8,6 +8,7 @@ import type { Children, Key } from "./element";
 import type { MaterialName } from "./materials";
 import type { Path3 } from "./paths";
 import type { SelectorLike } from "./select";
+import type { ConstraintSketchElements, ConstraintSketchOptions, SketchCircleProps } from "./sketch/constrained-props";
 
 export type Vec3 = [number, number, number];
 export type Vec2 = [number, number];
@@ -322,8 +323,11 @@ export interface RoundedRectProps extends RectProps {
   radius?: number;
 }
 
-/** A circle (one exact arc), centred on its position. */
-export interface CircleProps extends Placement2D {
+/**
+ * A circle (one exact arc), centred on its position. Inside a constraint sketch it is a
+ * solved circle (`center`, `tangent`, `equal`...).
+ */
+export interface CircleProps extends Placement2D, SketchCircleProps {
   /** Radius, mm. */
   r?: number;
   /** Radius, mm (alias of `r`). */
@@ -443,8 +447,11 @@ export interface OffsetProps extends Placement2D, SketchChildren {
   round?: boolean;
 }
 
-/** Groups 2D shapes to place them together. */
-export interface SketchProps extends Placement2D, SketchChildren {}
+/**
+ * Groups 2D shapes to place them together. With `<point>`, `<line>`, `<arc>` and constraints
+ * inside, it is a **constraint sketch**: solved, then its closed loops become profiles.
+ */
+export interface SketchProps extends Placement2D, SketchChildren, ConstraintSketchOptions {}
 
 /** A loft section: one 2D shape at height `z`. */
 export interface SectionProps extends SketchChildren {
@@ -604,7 +611,7 @@ export interface ShellProps extends Placement, SolidChildren {
 // ---------------------------------------------------------------------------------------------
 
 /** Every intrinsic element and its props. */
-export interface IntrinsicElements {
+export interface IntrinsicElements extends ConstraintSketchElements {
   /** A collection of parts (may nest); placement props move every part in it. */
   assembly: AssemblyProps;
   /** One named, coloured solid — the unit of export. Several children are unioned. */
