@@ -5,13 +5,18 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { extractExports, extractIntrinsics, extractMaterials, extractSelectorMethods } from "../src/playground/extract";
 import { decodeSource, encodeSource } from "../src/playground/share";
-import { rewriteImports, textImports, transformModel } from "../src/playground/transform";
-import { describeExample } from "../scripts/build-playground";
+import { joinPath, moduleImports, rewriteImports, textImports, transformModel } from "../src/playground/transform";
+import { DEFAULT_EXAMPLE, describeExample, EXAMPLE_GROUPS, exampleFiles } from "../scripts/build-playground";
 import { renderModule } from "../src";
 
 const ROOT = resolve(import.meta.dir, "..");
 const SRC = join(ROOT, "src");
-const EXAMPLES = readdirSync(join(ROOT, "examples")).filter((f) => f.endsWith(".tsx") && !f.endsWith(".test.tsx"));
+/** Every example the playground ships, as paths under examples/. */
+const EXAMPLES = EXAMPLE_GROUPS.flatMap(([sub]) =>
+  readdirSync(join(ROOT, "examples", sub))
+    .filter((f) => f.endsWith(".tsx") && !/\.(test|spec)\.tsx$/.test(f))
+    .map((f) => (sub ? `${sub}/${f}` : f)),
+);
 
 /** In bun, point the playground's runtime specifiers at the library sources. */
 const localRuntime = (spec: string) =>
@@ -52,6 +57,19 @@ describe("playground transform", () => {
     expect(out.code).toContain('"https://esm.sh/chroma-js"');
   });
 
+  test("local modules in `files` are compiled and linked; paths resolve from the importing module", () => {
+    expect(joinPath(".", "../spur-gear")).toBe("../spur-gear");
+    expect(joinPath("..", "./lib/x")).toBe("../lib/x");
+    expect(joinPath("a/b", "../c.svg")).toBe("a/c.svg");
+    const src = `import { g } from "../gear"\nimport logo from "./a.svg" with { type: "text" }\nexport default () => g`;
+    expect(moduleImports(src)).toEqual(["../gear"]);
+    const linked: string[] = [];
+    const out = transformModel(src, "m.tsx", (s) => `https://x/${s}.js`, { "../gear.tsx": `import { box } from "tscad"\nimport t from "./t.txt" with { type: "text" }\nexport const g = [box, t]`, "../t.txt": "hi", "./a.svg": "<svg/>" }, (code) => (linked.push(code), `blob:${linked.length}`));
+    expect(out.code).toContain('from "blob:1"');
+    expect(linked[0]).toContain('"https://x/tscad.js"');
+    expect(linked[0]).toContain('const t = "hi";');
+  });
+
   test("text imports of known files are inlined on the same line", () => {
     const src = `import { edges } from "tscad"\nimport logo from "./a.svg" with { type: "text" }\nexport default () => <box size={logo.length} />\n`;
     expect(textImports(src)).toEqual(["./a.svg"]);
@@ -68,10 +86,17 @@ describe("playground transform", () => {
   for (const f of EXAMPLES) {
     test(`example ${f} compiles in-browser style and renders`, async () => {
       const source = readFileSync(join(ROOT, "examples", f), "utf8");
-      const files = Object.fromEntries(textImports(source).map((s) => [s, readFileSync(join(ROOT, "examples", s), "utf8")]));
-      const out = transformModel(source, f, localRuntime, files);
+      const files = await exampleFiles(join(ROOT, "examples", f));
       const dir = mkdtempSync(join(tmpdir(), "tscad-pg-"));
-      const file = join(dir, f.replace(/\.tsx$/, ".mjs"));
+      let n = 0;
+      // Local modules (cookbook/gear-pair → ../spur-gear) become files here; blob: URLs in the browser.
+      const link = (code: string) => {
+        const p = join(dir, `dep${n++}.mjs`);
+        writeFileSync(p, code);
+        return pathToFileURL(p).href;
+      };
+      const out = transformModel(source, f, localRuntime, files, link);
+      const file = join(dir, "model.mjs");
       writeFileSync(file, out.code);
       const mod = await import(file);
       const r = renderModule(mod);
@@ -150,7 +175,9 @@ describe("static build", () => {
   test("ships every example and the completion data", () => {
     const examples = JSON.parse(readFileSync(join(out, "examples.json"), "utf8"));
     expect(examples.length).toBe(EXAMPLES.length);
-    expect(examples[0].name).toBe("bracket");
+    expect(examples[0].name).toBe(DEFAULT_EXAMPLE);
+    expect(examples.find((e: { name: string }) => e.name === "cookbook/gear-pair").files["../spur-gear.tsx"]).toContain("involuteGear");
+    expect(new Set(examples.map((e: { group: string }) => e.group)).size).toBe(EXAMPLE_GROUPS.length);
     for (const e of examples) expect(e.title.length).toBeGreaterThan(2);
     const c = JSON.parse(readFileSync(join(out, "completions.json"), "utf8"));
     expect(c.tags.length).toBeGreaterThan(30);

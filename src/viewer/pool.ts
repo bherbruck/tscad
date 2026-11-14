@@ -223,9 +223,7 @@ export class Pool {
       });
       for (const [name, m] of o.r.meshes) meshes.set(name, m);
       // Face frames are keyed by IR path: renumber the sub-document's part index too.
-      // (older wasm builds returned a Map)
-      const fr = o.r.result.frames as Record<string, number[]> | Map<string, number[]> | undefined;
-      for (const [k, v] of fr instanceof Map ? fr : Object.entries(fr ?? {})) {
+      for (const [k, v] of Object.entries(o.r.result.frames ?? {})) {
         frames[k.replace(/^parts\/(\d+)/, (_m, i) => `parts/${o.g[Number(i)]}`)] = v;
       }
       hits += o.r.result.cacheHits;

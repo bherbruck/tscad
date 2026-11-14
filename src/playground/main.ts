@@ -14,11 +14,14 @@ import { applyChanges } from "../index";
 import { scadImportDialog, withNotes, NOTES_HEAD } from "./scad-import";
 
 interface Example {
+  /** URL key: `#example=<name>` (`bracket`, `cookbook/gear-pair`). */
   name: string;
+  /** Dropdown group. */
+  group?: string;
   title: string;
   description: string;
   source: string;
-  /** Files it imports as text (`"./assets/logo.svg"` → contents). */
+  /** Files it imports (text and local modules) → contents. */
   files?: Record<string, string>;
 }
 
@@ -64,6 +67,16 @@ export default function Model(p: ParamValues<typeof params>) {
 }
 `;
 
+/** Examples by group, in the order the build wrote them. */
+function groupExamples(examples: Example[]): [string, Example[]][] {
+  const groups = new Map<string, Example[]>();
+  for (const e of examples) {
+    const g = e.group ?? "Examples";
+    groups.set(g, [...(groups.get(g) ?? []), e]);
+  }
+  return [...groups];
+}
+
 async function main() {
   const [examples, completions] = await Promise.all([
     fetch(abs("examples.json")).then((r) => (r.ok ? (r.json() as Promise<Example[]>) : [])).catch(() => [] as Example[]),
@@ -92,7 +105,8 @@ async function main() {
     files = examples.find((e) => e.name === exampleName)!.files ?? {};
   } else {
     const draft = safeGet(DRAFT_KEY);
-    const first = examples.find((e) => e.name === "bracket") ?? examples[0];
+    // The build puts the landing example first.
+    const first = examples[0];
     if (draft) {
       source = draft;
       try {
@@ -129,7 +143,7 @@ async function main() {
     "select",
     { class: "pg-examples", title: "Examples" },
     h("option", { value: "" }, "Examples…"),
-    ...examples.map((e) => h("option", { value: e.name, selected: e.name === current }, e.title)),
+    ...groupExamples(examples).map(([group, list]) => h("optgroup", { label: group }, ...list.map((e) => h("option", { value: e.name, selected: e.name === current }, e.title)))),
   ) as HTMLSelectElement;
   const exampleWrap = h("label", { class: "pg-select" }, icon("layers", 14), select, icon("chevron", 13));
   const importBtn = h("button", { class: "btn", title: "Convert an OpenSCAD file into this editor" }, icon("file", 14), h("span", null, "Import .scad"));

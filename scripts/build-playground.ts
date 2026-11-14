@@ -2,17 +2,18 @@
 /**
  * Build the static browser playground into dist/playground/ (deployable anywhere, e.g. GitHub
  * Pages under /<repo>/): the bundled tscad runtime + viewer + eval worker + editor, the kernel
- * wasm, every examples/*.tsx and the autocompletion data.
+ * wasm, every example (examples/*.tsx and its folders, without tests/specs) and the
+ * autocompletion data.
  *
  *   bun scripts/build-playground.ts            # minified build
  *   bun scripts/build-playground.ts --dev      # unminified
  *   bun scripts/build-playground.ts --serve 4600   # build, then serve dist/playground locally
  */
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { buildApp, PKG_ROOT, SRC, WASM_DIR } from "../src/cli/bundle";
 import { extractExports, extractIntrinsics, extractMaterials, extractSelectorMethods } from "../src/playground/extract";
-import { textImports } from "../src/playground/transform";
+import { joinPath, moduleImports, textImports } from "../src/playground/transform";
 
 const args = process.argv.slice(2);
 const dev = args.includes("--dev");
@@ -21,12 +22,53 @@ const OUT = args.includes("--out") ? resolve(args[args.indexOf("--out") + 1]!) :
 const t0 = performance.now();
 
 export interface Example {
+  /** URL key (`#example=<name>`): the path under examples/ without `.tsx` (`bracket`, `cookbook/gear-pair`). */
   name: string;
+  /** Dropdown group (the folder's title). */
+  group?: string;
   title: string;
   description: string;
   source: string;
-  /** Files it imports as text (`"./assets/logo.svg"` → contents). */
+  /** Files it imports (text: `"./assets/logo.svg"`; modules: `"../spur-gear.tsx"`) → contents. */
   files?: Record<string, string>;
+}
+
+/** Example folders, in dropdown order, with their group titles ("" is examples/ itself). */
+export const EXAMPLE_GROUPS: [dir: string, title: string][] = [
+  ["", "Examples"],
+  ["cookbook", "Cookbook"],
+  ["agent", "Designed by an agent (MCP)"],
+  ["converted", "Converted from OpenSCAD"],
+];
+
+/** The landing example when the URL names none (impressive, and quick to evaluate). */
+export const DEFAULT_EXAMPLE = "pi5-case-auto";
+
+/**
+ * The files a model at `file` imports, transitively (keys relative to the model's folder, as
+ * the playground's transform looks them up). Throws when one is missing.
+ */
+export async function exampleFiles(file: string): Promise<Record<string, string>> {
+  const root = dirname(file);
+  const files: Record<string, string> = {};
+  const visit = async (abs: string, source: string) => {
+    const dir = relative(root, dirname(abs)) || ".";
+    for (const spec of textImports(source)) {
+      const key = dir === "." ? spec : joinPath(dir, spec);
+      if (!(key in files)) files[key] = await Bun.file(resolve(dirname(abs), spec)).text();
+    }
+    for (const spec of moduleImports(source)) {
+      const base = resolve(dirname(abs), spec);
+      const found = ["", ".tsx", ".ts", ".jsx", ".js"].map((e) => base + e).find((f) => existsSync(f) && statSync(f).isFile());
+      if (!found) throw new Error(`${relative(PKG_ROOT, abs)}: can't find "${spec}"`);
+      const key = joinPath(".", relative(root, found));
+      if (key in files) continue;
+      files[key] = await Bun.file(found).text();
+      await visit(found, files[key]!);
+    }
+  };
+  await visit(file, await Bun.file(file).text());
+  return files;
 }
 
 /** Title and description from an example's leading doc comment ("Title: description…"). */
@@ -42,7 +84,9 @@ export function describeExample(name: string, source: string): Example {
   const firstSentence = text.split(/(?<=[.:—])\s/)[0] ?? "";
   const cut = text.match(/^(.{3,60}?)(?::| — |, )/);
   const title = (cut?.[1] ?? name.replace(/-/g, " ")).replace(/^"|"$/g, "").replace(/`/g, "").trim();
-  const nice = title.charAt(0).toUpperCase() + title.slice(1);
+  // `HexBitHolder` (converted from OpenSCAD) → "Hex bit holder".
+  const words = /^[A-Z][a-z0-9]*(?:[A-Z][a-z0-9]*)+$/.test(title) ? title.replace(/(?<=[a-z0-9])([A-Z])/g, (_m, c: string) => ` ${c.toLowerCase()}`) : title;
+  const nice = words.charAt(0).toUpperCase() + words.slice(1);
   return { name, title: nice, description: (cut ? text.slice(cut[0].length) : firstSentence).trim().split(/(?<=\.)\s/)[0] ?? "", source };
 }
 
@@ -68,17 +112,23 @@ async function build() {
   mkdirSync(join(OUT, "wasm"), { recursive: true });
   for (const f of ["tscad_wasm.js", "tscad_wasm_bg.wasm"]) cpSync(join(WASM_DIR, f), join(OUT, "wasm", f));
 
-  // Examples (bracket first, then alphabetical).
-  const dir = join(PKG_ROOT, "examples");
+  // Examples, grouped by folder: the default first, then alphabetical within each group.
   const examples: Example[] = [];
-  for (const f of readdirSync(dir).filter((f) => f.endsWith(".tsx") && !f.endsWith(".test.tsx")).sort()) {
-    const ex = describeExample(f.replace(/\.tsx$/, ""), await Bun.file(join(dir, f)).text());
-    const files: Record<string, string> = {};
-    for (const spec of textImports(ex.source)) files[spec] = await Bun.file(join(dir, spec)).text();
-    if (Object.keys(files).length) ex.files = files;
-    examples.push(ex);
+  for (const [sub, group] of EXAMPLE_GROUPS) {
+    const dir = join(PKG_ROOT, "examples", sub);
+    if (!existsSync(dir)) continue;
+    const list: Example[] = [];
+    for (const f of readdirSync(dir).filter((f) => f.endsWith(".tsx") && !/\.(test|spec)\.tsx$/.test(f))) {
+      const file = join(dir, f);
+      const ex = describeExample((sub ? `${sub}/` : "") + f.replace(/\.tsx$/, ""), await Bun.file(file).text());
+      ex.group = group;
+      const files = await exampleFiles(file);
+      if (Object.keys(files).length) ex.files = files;
+      list.push(ex);
+    }
+    list.sort((a, b) => (a.name === DEFAULT_EXAMPLE ? -1 : b.name === DEFAULT_EXAMPLE ? 1 : a.title.localeCompare(b.title)));
+    examples.push(...list);
   }
-  examples.sort((a, b) => (a.name === "bracket" ? -1 : b.name === "bracket" ? 1 : a.title.localeCompare(b.title)));
   writeFileSync(join(OUT, "examples.json"), JSON.stringify(examples));
 
   // Autocompletion data from the library's own sources.

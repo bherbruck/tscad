@@ -510,8 +510,8 @@ async function assemblyOf(rendered: any): Promise<AssemblyData | undefined> {
 }
 
 /** The render's constraint sketches with their source locations mapped to the TSX. */
-async function sketchesOf(rendered: any, docParts: { name?: string }[], frames?: Map<string, number[]> | Record<string, number[]>): Promise<SketchData[]> {
-  const frameOf = (path: string) => (frames instanceof Map ? frames.get(path) : frames?.[path]);
+async function sketchesOf(rendered: any, docParts: { name?: string }[], frames: Record<string, number[]> = {}): Promise<SketchData[]> {
+  const frameOf = (path: string) => frames[path];
   const out: SketchData[] = [];
   for (const s of (rendered.sketches as any[] | undefined) ?? []) {
     const partIndex = Number(String(s.path).split("/")[1]);
