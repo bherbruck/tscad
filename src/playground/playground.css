@@ -234,3 +234,71 @@
     display: none;
   }
 }
+
+.scad-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  background: rgba(5, 7, 12, 0.55);
+  backdrop-filter: blur(3px);
+}
+
+.scad-dialog {
+  width: min(640px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px 16px;
+  border-radius: 14px;
+  background: var(--panel-solid);
+  border: 1px solid var(--line-2);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+  animation: card-in 0.2s var(--ease) both;
+}
+
+.scad-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.scad-dialog p {
+  margin: 0;
+  font-size: 12px;
+}
+
+.scad-input {
+  height: 280px;
+  resize: vertical;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line-2);
+  background: var(--code-bg);
+  color: var(--text);
+  font: 12.5px/1.5 var(--mono);
+  outline: none;
+}
+
+.scad-input:focus {
+  border-color: var(--accent);
+}
+
+.scad-error {
+  color: var(--err);
+  font: 12px var(--mono);
+}
+
+.scad-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.scad-actions kbd {
+  margin-left: 6px;
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}

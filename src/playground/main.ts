@@ -9,6 +9,8 @@ import { copyText, h, icon } from "../viewer/dom";
 import { createEditor, type CompletionData, type EditorProblem } from "./editor";
 import { decodeSource, encodeSource } from "./share";
 import { transformModel } from "./transform";
+import { convertScad, ScadSyntaxError } from "../convert";
+import { scadImportDialog, withNotes, NOTES_HEAD } from "./scad-import";
 
 interface Example {
   name: string;
@@ -114,16 +116,25 @@ async function main() {
     ...examples.map((e) => h("option", { value: e.name, selected: e.name === current }, e.title)),
   ) as HTMLSelectElement;
   const exampleWrap = h("label", { class: "pg-select" }, icon("layers", 14), select, icon("chevron", 13));
+  const importBtn = h("button", { class: "btn", title: "Convert an OpenSCAD file into this editor" }, icon("file", 14), h("span", null, "Import .scad"));
   const shareBtn = h("button", { class: "btn", title: "Copy a link with this code and these parameters" }, icon("link", 14), h("span", null, "Share"));
   const codeBtn = h("button", { class: "icon-btn pg-code-toggle", title: "Show / hide code" }, icon("panel"));
 
   let problemsFromRun: EditorProblem[] = [];
+  // eslint-disable-next-line prefer-const
+  let notes: EditorProblem[] = [];
+  const currentNotes = () => {
+    // Notes stay while the converted file's notes header is still at the top.
+    if (notes.length && !editor?.getValue().startsWith(NOTES_HEAD)) notes = [];
+    return notes;
+  };
+
   const viewer = mountViewer(document.getElementById("app")!, {
     wasmUrl: abs("wasm/tscad_wasm_bg.wasm"),
     glueUrl: abs("wasm/tscad_wasm.js"),
     workerUrl: abs("__tscad/viewer/worker.js"),
     file: FILE,
-    topbarExtras: [h("div", { class: "pg-extras" }, exampleWrap, shareBtn, codeBtn)],
+    topbarExtras: [h("div", { class: "pg-extras" }, exampleWrap, importBtn, shareBtn, codeBtn)],
     sidePane: pane,
     hashKeep: ["code", "example"],
     onSourceClick: (loc, target) => {
@@ -138,7 +149,7 @@ async function main() {
       for (const b of bundleErrors) if (b.line) problems.push({ line: b.line, column: b.column, message: b.message });
       if (!bundleErrors.length && err?.loc && sameFile(err.loc.file)) problems.push({ line: err.loc.line, column: err.loc.column, message: errText(err) });
       problemsFromRun = problems;
-      editor?.setProblems(problems);
+      editor?.setProblems([...problems, ...currentNotes()]);
     },
   });
 
@@ -182,6 +193,28 @@ async function main() {
     onRun: run,
   });
   run();
+
+  // ── OpenSCAD import: converted into the editor; what didn't convert exactly becomes warnings
+  importBtn.addEventListener("click", () =>
+    scadImportDialog(document.body, (source, fileName) => {
+      const name = (fileName ?? "model").replace(/\.scad$/i, "").replace(/(^|[^a-zA-Z0-9]+)([a-zA-Z0-9])/g, (_m, _s, ch: string) => ch.toUpperCase()).replace(/^[^a-zA-Z]+/, "").replace(/^./, (c) => c.toUpperCase()) || "Model";
+      try {
+        const r = convertScad(source, { name });
+        const out = withNotes(r.tsx, r.warnings, fileName ?? "pasted.scad");
+        notes = out.notes;
+        select.value = "";
+        resetParams = true;
+        editor!.setValue(out.text);
+        history.replaceState(null, "", location.pathname + location.search);
+        run();
+        viewer.toast(r.warnings.length ? `Converted with ${r.warnings.length} note${r.warnings.length > 1 ? "s" : ""} — see the top of the file` : "Converted from OpenSCAD");
+        return undefined;
+      } catch (e) {
+        if (e instanceof ScadSyntaxError) return `Line ${e.line}:${e.col}: ${e.message.replace(/^line \d+:\d+: /, "")}`;
+        return String((e as Error)?.message ?? e);
+      }
+    }),
+  );
 
   // ── examples
   select.addEventListener("change", () => {

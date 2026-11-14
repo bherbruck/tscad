@@ -9,7 +9,7 @@ import { c, codeFrame, sym } from "./ui";
 export function componentName(file: string): string {
   const base = basename(file).replace(/\.[^.]+$/, "");
   const name = base.replace(/(^|[^a-zA-Z0-9]+)([a-zA-Z0-9])/g, (_m, _s, ch: string) => ch.toUpperCase()).replace(/^[^a-zA-Z]+/, "");
-  return name || "Model";
+  return name ? name[0]!.toUpperCase() + name.slice(1) : "Model";
 }
 
 /** Returns the exit code. `out` "-" prints the TSX to stdout. */
@@ -27,7 +27,7 @@ export function convert(opts: { file: string; out?: string; name?: string; force
     }
     throw e;
   }
-  for (const w of result.warnings) console.error(`${sym.warn} ${c.cyan(`${rel(resolve(opts.file))}:${w.line}`)} ${w.message}`);
+  for (const w of result.warnings) console.error(`${sym.warn} ${c.cyan(`${rel(resolve(opts.file))}:${w.line}:`)} ${w.message}`);
   if (out === "-") {
     process.stdout.write(result.tsx);
     return 0;
