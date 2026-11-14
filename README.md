@@ -241,7 +241,9 @@ an OpenSCAD model you paste or open. `tscad dev` gives you the same viewer local
 - hot reload and param sliders;
 - section and measure tools;
 - sketch and assembly overlays, including dragging joints;
-- pick-to-selector.
+- pick-to-selector;
+- **geometry diff** (`D`): after each edit, added material shows green and removed material
+  red, with per-part Δvolume. **Pin** a version to compare later edits against it.
 
 A VS Code extension ([editors/vscode](editors/vscode), not yet on the Marketplace) puts that
 viewer beside the editor. It adds squiggles on the failing element, export CodeLenses and
@@ -318,8 +320,9 @@ kernel; [docs/KERNEL_ISSUES.md](docs/KERNEL_ISSUES.md) has repros and
 - **Speed.** On WebAssembly a boolean takes on the order of a second on the first build (the
   examples take roughly 1–8 s). After that the subtree cache keeps parameter tweaks quick.
   - The native kernel (`bun scripts/build-native.ts`) is 2–3× faster.
-  - With it, multi-part models evaluate on a pool of kernel processes, another 1.6–1.8×: the
-    enclosure goes from 4.1 s to 2.2 s.
+  - With it, multi-part models evaluate on a pool of kernel processes (up to 4) in `build`,
+    `info`, `render` and `dev`: `tscad build` of the enclosure goes from 4.2 s to 2.4 s.
+    `TSCAD_PARALLEL=0` turns the pool off, and STEP output always uses one session.
   - Prefer one cut with many shapes, or a 2D boolean, over many separate solid cuts.
 - **Sweeps** along a `helix()` don't produce a closed solid yet, and polyline paths with sharp
   corners fail, so threads are cosmetic for now.

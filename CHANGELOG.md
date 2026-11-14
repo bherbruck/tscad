@@ -68,7 +68,8 @@ The first release: CAD as TSX.
   - An optional native build (`bun scripts/build-native.ts`, through `bun:ffi`) is 2–3×
     faster, and `loadKernel` picks it up automatically.
   - With the native build, multi-part models evaluate on a pool of kernel processes in
-    `build`, `info`, `render` and `dev`, 1.6–1.8× faster.
+    `build`, `info`, `render` and `dev` (min(parts, cores − 1, 4); `TSCAD_PARALLEL=0` turns it
+    off; skipped for STEP output). `tscad build` of the enclosure: 4.24 → 2.38 s.
 - **`tscad/export`:** STL, 3MF (with colours), GLB, OBJ and STEP.
 - **`tscad/render`:** a headless PNG renderer in pure TypeScript, with studio lighting, edges
   and shadow.
@@ -101,12 +102,15 @@ The first release: CAD as TSX.
 - **CLI:** `tscad init`, `dev` (live viewer with hot reload), `build` (step, stl, 3mf, glb,
   obj, dxf, svg), `info`, `render`, `convert`, `mcp`.
   - `tscad dev` evaluates on the server with the native kernel when it's available, and falls
-    back to the browser.
+    back to the browser, where parts also evaluate in parallel (up to 4 wasm kernels).
 - **Viewer:**
   - param sliders, pick-to-selector, section and measure tools, export;
   - sketch overlays (dimensions, free points, patterns) with click-to-source;
   - assembly gizmos with drag-to-drive joints and an explode slider;
-  - heatmaps for overhangs, wall thickness and interference.
+  - heatmaps for overhangs, wall thickness and interference;
+  - geometry diff (`D` or the ± button): added material green, removed red (exact kernel
+    booleans), a Diff panel with per-part added/removed mm³, Δvolume and Δsize, and **Pin**
+    to keep a baseline for A/B comparisons.
 - **Playground:** a static in-browser editor with autocompletion, error squiggles, share links
   and **Import .scad**.
 - **VS Code extension** (`editors/vscode`, not yet on the Marketplace):

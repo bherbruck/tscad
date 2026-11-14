@@ -29,8 +29,13 @@ save: orbit the model, drag parameter sliders, click an edge to get a selector f
 export from the **Export** button (top right).
 
 `tscad dev` evaluates models in the dev server with the native kernel when one is built for
-your platform, and otherwise in the browser with WebAssembly. The banner says which;
-`--browser-eval` forces the browser.
+your platform, and otherwise in the browser with WebAssembly (parts evaluate in parallel
+either way). The banner says which; `--browser-eval` forces the browser.
+
+Press **D** (or the ± button) for the geometry diff: after every param or code change, the
+material the change added shows in green and what it removed in red, and the Diff panel lists
+each part's added and removed mm³. **Pin** keeps the current version as the baseline, so you
+can drag a slider and compare against it.
 
 Using VS Code? The extension in [`editors/vscode`](https://github.com/bherbruck/tscad/tree/main/editors/vscode)
 (not yet on the Marketplace) puts this viewer beside the editor, with squiggles on failing
