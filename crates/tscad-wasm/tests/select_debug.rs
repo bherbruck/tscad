@@ -131,3 +131,15 @@ fn on_face() {
     let pocket = vol(r#"{"type":"onFace","op":"difference","base":{"type":"box","size":[40,30,10],"center":true},"faces":{"type":"max","axis":"x"},"children":[{"type":"transform","matrix":[1,0,0,0, 0,1,0,0, 0,0,1,-2, 0,0,0,1],"children":[{"type":"box","size":[6,6,4],"center":true}]}]}"#).unwrap();
     assert!((pocket - (12000.0 - 144.0)).abs() < 1e-3, "{pocket}");
 }
+
+#[test]
+fn on_face_frames_reported() {
+    let d: Document = serde_json::from_str(r#"{"parts":[{"name":"a","node":{"type":"onFace","base":{"type":"box","size":[40,30,10],"center":true},"faces":{"type":"max","axis":"z"},"children":[{"type":"cylinder","radius":5,"height":10}]}}]}"#).unwrap();
+    let mut e = Engine::new(None);
+    let r = e.evaluate(&d, &EvalOptions::default());
+    let m = r.frames.get("parts/0").expect("frame");
+    assert_eq!(m.len(), 16);
+    assert!((m[11] - 5.0).abs() < 1e-9 && (m[10] - 1.0).abs() < 1e-9, "{m:?}");
+    let r2 = e.evaluate(&d, &EvalOptions::default());
+    assert!(r2.frames.contains_key("parts/0"));
+}

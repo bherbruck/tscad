@@ -38,6 +38,9 @@ pub struct Cache {
     used: HashSet<u64>,
     pub hits: usize,
     pub misses: usize,
+    /// The face frame each `onFace` node used, by node path (kept across evaluations, so a
+    /// cached onFace subtree still has its frame).
+    pub frames: HashMap<String, crate::ir::Matrix>,
 }
 
 impl Cache {
@@ -308,6 +311,7 @@ fn eval_uncached(node: &Node, path: &str, cache: &mut Cache) -> R<Solid> {
                 return Err(fail(path, "onFace", "the base is empty"));
             };
             let frame = face_frame(&b, faces, *index, path)?;
+            cache.frames.insert(path.to_string(), frame);
             let placed = Node::Transform { matrix: frame, children: children.clone() };
             let Some(tool) = eval_uncached(&placed, path, cache)? else {
                 return Ok(if matches!(op, FaceOp::None) { None } else { Some(b) });

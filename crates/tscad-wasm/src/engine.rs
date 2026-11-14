@@ -85,6 +85,9 @@ pub struct EvalResult {
     pub cache_misses: usize,
     pub cache_size: usize,
     pub millis: f64,
+    /// The face frame (column-vector 4x4, row-major) each `onFace` node placed its children in,
+    /// by node path: where a sketch drawn on a face sits in model space.
+    pub frames: std::collections::BTreeMap<String, Vec<f64>>,
 }
 
 /// A picked edge or face: what it is, and selectors that would name it.
@@ -219,6 +222,7 @@ impl Engine {
             out.millis = self.now() - t;
             result.parts.push(out);
         }
+        result.frames = self.cache.frames.iter().filter(|(p, _)| doc_paths_has(doc, p)).map(|(p, m)| (p.clone(), m.to_vec())).collect();
         result.cache_hits = self.cache.hits;
         result.cache_misses = self.cache.misses;
         self.cache.sweep();
@@ -420,4 +424,12 @@ fn mesh_of(record: &Record, tolerance: Option<f64>, size: Option<f64>, warnings:
         out.edge_ids.push(i as u32);
     }
     Ok(out)
+}
+
+/// Whether `path` (`parts/i/...`) names a part of `doc` (frames of parts no longer there are left out).
+fn doc_paths_has(doc: &Document, path: &str) -> bool {
+    path.strip_prefix("parts/")
+        .and_then(|r| r.split('/').next())
+        .and_then(|i| i.parse::<usize>().ok())
+        .is_some_and(|i| i < doc.parts.len())
 }
