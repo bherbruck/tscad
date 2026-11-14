@@ -118,6 +118,12 @@ export interface BoltProps extends Placement, AnchorsProp {
    * `"normal"` fit; or give `"close"` / `"loose"`.
    */
   cutter?: boolean | HoleFit;
+  /**
+   * With `cutter`: make the cutter a ghost, a tool-only solid that is left out of the output
+   * unless a `<difference>` or a ref op (`<subtract tool=".b > .clearance">`) uses it. Default
+   * true.
+   */
+  ghost?: boolean;
   /** Extra clearance around the head in the cutter's pocket, mm (diameter). Default 1. */
   headClearance?: number;
   /** Instance name for refs (`<Bolt name="b" />` → `.b > .shank`); tscad records it. */
@@ -152,7 +158,7 @@ export function Bolt(props: BoltProps) {
       ? [[0, -L - 0.5], [holeR, -L - 0.5], [holeR, -(headR - holeR)], [headR, 0], [headR, LIFT], [0, LIFT]]
       : [[0, -L - 0.5], [holeR, -L - 0.5], [holeR, 0], [headR, 0], [headR, hd.k + LIFT], [0, hd.k + LIFT]];
     return (
-      <group {...placement(props)}>
+      <group {...placement(props)} ghost={props.ghost ?? true}>
         <group name="clearance">
           <Turned pts={pts} />
         </group>

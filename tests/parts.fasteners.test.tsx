@@ -131,7 +131,7 @@ describe("every head style and the cutter", () => {
   for (const head of ["socket", "hex", "button", "flat", "pan"] as const) {
     test(`M4 × 12 ${head}: a solid; its cutter is larger and contains it`, async () => {
       const bolt = await volume(<Bolt thread="M4" length={12} head={head} />);
-      const cutter = await volume(<Bolt thread="M4" length={12} head={head} cutter />);
+      const cutter = await volume(<Bolt thread="M4" length={12} head={head} cutter ghost={false} />);
       expect(bolt).toBeGreaterThan(cyl(2, 12) * 0.9);
       expect(cutter).toBeGreaterThan(bolt);
       // the bolt lies inside its own cutter: bolt − cutter is empty
@@ -197,5 +197,16 @@ describe("refs into fasteners", () => {
       </>,
     );
     expect(v).toBeCloseTo(40 * 20 * 4 - cyl(clearance("M3") / 2, 4), 1);
+  });
+
+  test("an unused cutter is a ghost: dropped from the output", async () => {
+    const { document } = compile(
+      <part name="p">
+        <box size={[10, 10, 10]} />
+        <Bolt thread="M3" length={12} z={10} cutter />
+      </part>,
+    );
+    const r = await k.evaluate(document, { noMesh: true });
+    expect(r.parts[0]!.volume).toBeCloseTo(1000, 3);
   });
 });

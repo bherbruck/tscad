@@ -45,7 +45,7 @@ import { Bolt, Nut } from "tscad/parts"
 </assembly>
 ```
 
-`cutter` takes `true` (the `"normal"` fit) or a fit: `"close"`, `"normal"` or `"loose"`. To sink
+The cutter is a *ghost*: it is left out of the output unless a `<difference>` or a ref op uses it (pass `ghost={false}` to keep it as a solid). `cutter` takes `true` (the `"normal"` fit) or a fit: `"close"`, `"normal"` or `"loose"`. To sink
 the head, place the bolt lower: the cutter's head pocket then becomes a counterbore.
 `clearance(thread, fit)` returns the bare clearance diameter, for example `clearance("M3")` is
 3.4.
