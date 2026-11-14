@@ -31,5 +31,12 @@ jobs:
         run: bun scripts/build-native.ts
       - name: Typecheck
         run: bun run typecheck
-      - name: Tests
+      - name: Tests (includes the render snapshots of every example, tests/snapshots.test.ts)
         run: bun test
+      - name: Render snapshot diffs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: render-snapshot-diffs
+          path: tests/__snapshots__/*.diff.png
+          if-no-files-found: ignore

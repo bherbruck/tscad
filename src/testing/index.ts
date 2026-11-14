@@ -1,6 +1,7 @@
 /**
  * `tscad/testing`: test your models with bun:test. Importing it registers the matchers
- * (`toEvaluate`, `toHaveVolume`, `toFitIn`, `toHaveNoInterference`, `toBePrintable`).
+ * (`toEvaluate`, `toHaveVolume`, `toFitIn`, `toHaveNoInterference`, `toBePrintable`,
+ * `toMatchRenderSnapshot`).
  *
  * @example
  * import { expect, test } from "bun:test"
@@ -16,3 +17,4 @@
 export { evaluateModel, ModelResult, type EvaluateOptions, type ModelInput } from "./model";
 export { forEachParamCombo, paramCombos, type ComboOptions } from "./params";
 export { matchers, type PrintableOptions } from "./matchers";
+export { diffImages, matchRenderSnapshot, renderParts, type ImageDiff, type RenderSnapshotOptions, type RenderSnapshotResult } from "./snapshot";

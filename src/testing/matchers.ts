@@ -1,7 +1,8 @@
 /** bun:test matchers for tscad models (registered by importing `tscad/testing`). */
 import { expect } from "bun:test";
 import type { PrintabilityOptions } from "../check/printability";
-import { ModelResult } from "./model";
+import { ModelResult, type ModelInput } from "./model";
+import { matchRenderSnapshot, type RenderSnapshotOptions } from "./snapshot";
 
 /** Options for `toBePrintable()`: {@link PrintabilityOptions} plus pass thresholds. */
 export interface PrintableOptions extends PrintabilityOptions {
@@ -25,6 +26,11 @@ declare module "bun:test" {
     toHaveNoInterference(minVolume?: number): Promise<void>;
     /** Every part passes the printability checks. */
     toBePrintable(options?: PrintableOptions): void;
+    /**
+     * The model renders like its snapshot `<dir>/<name>.<view>.png` (written when missing;
+     * `TSCAD_UPDATE_SNAPSHOTS=1` rewrites). Async: `await expect(r).toMatchRenderSnapshot("bracket")`.
+     */
+    toMatchRenderSnapshot(nameOrOptions: string | RenderSnapshotOptions): Promise<void>;
   }
 }
 
@@ -79,6 +85,11 @@ export const matchers = {
     }
     if (options.watertight !== false) for (const [name, w] of r.watertight()) if (!w.watertight) problems.push(`${name}: mesh not watertight (${w.boundaryEdges} open, ${w.nonManifoldEdges} non-manifold edges)`);
     return { pass: problems.length === 0, message: () => (problems.length ? `expected the model to be printable:\n  ${problems.join("\n  ")}` : "expected the model not to be printable") };
+  },
+  async toMatchRenderSnapshot(received: unknown, nameOrOptions: string | RenderSnapshotOptions) {
+    const opts = typeof nameOrOptions === "string" ? { name: nameOrOptions } : nameOrOptions;
+    const res = await matchRenderSnapshot(received as ModelInput | ModelResult, opts);
+    return { pass: res.pass, message: () => (res.pass ? `expected ${opts.name} not to match its render snapshot (${res.message})` : res.message) };
   },
 };
 

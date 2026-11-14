@@ -12,3 +12,6 @@ native/
 .tmp/
 tests/_tmp/
 tests/.convert-tmp/
+
+# render snapshot diffs
+*.diff.png

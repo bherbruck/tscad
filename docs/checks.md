@@ -60,10 +60,62 @@ never throws for modelling errors; check them with `toEvaluate()` or `r.ok`. The
 | `toHaveVolume(v, tol = 1e-3, part?)` | the volume is `v` mm³ (a `tol` < 1 is relative, ≥ 1 is in mm³) |
 | `toFitIn([x, y, z])` | the bounds fit inside the box |
 | `await toHaveNoInterference(minVolume?)` | no two parts share volume. It is async, so `await expect(r).toHaveNoInterference()` |
+| `await toMatchRenderSnapshot(name or options)` | the model renders like its stored snapshot (see [Render snapshots](#render-snapshots)) |
 | `toBePrintable(opts)` | the overhang share of the surface is ≤ `maxOverhangFraction` (default 5 %), the thin-wall share is ≤ `maxThinFraction` (0.5 %), the part fits `bed`, and the mesh is watertight |
 
 `toBePrintable` takes the same options as `checkPrintability` (below), plus `maxOverhangFraction`,
 `maxThinFraction` and `watertight`.
+
+### Render snapshots
+
+A render snapshot catches changes that numbers miss: a fillet that moved, a hole that
+vanished, a part that rotated. `toMatchRenderSnapshot` renders the model with the headless
+renderer (`tscad/render`, no GPU or browser) and compares it with a PNG stored next to your
+tests.
+
+```tsx
+import { expect, test } from "bun:test"
+import { evaluateModel } from "tscad/testing"
+import * as bracket from "./bracket"
+
+test("bracket looks the same", async () => {
+  const r = await evaluateModel(bracket)
+  await expect(r).toMatchRenderSnapshot({ name: "bracket", dir: "tests/__snapshots__" })
+  await expect(r).toMatchRenderSnapshot({ name: "bracket", view: "top", dir: "tests/__snapshots__" })
+}, 60_000)
+```
+
+- The first run writes `<dir>/<name>.<view>.png`. Commit it.
+- Later runs render again and compare. A pixel counts as different when a colour channel is off
+  by more than `tolerance` (default 24 of 255). The test fails when more than `maxDiffRatio` of
+  the pixels differ (default 0.5 %).
+- On a failure, `<name>.<view>.diff.png` is written next to the snapshot (the differing pixels in
+  red over a faded copy) and its path is in the message. Add `*.diff.png` to `.gitignore`.
+- If the change is intended, rerun with `TSCAD_UPDATE_SNAPSHOTS=1 bun test` to rewrite the
+  snapshots.
+- When the `CI` environment variable is set, a missing snapshot fails instead of being written.
+
+`toMatchRenderSnapshot("name")` is short for `{ name }`, which stores the PNG in `__snapshots__`
+under the current directory. The options:
+
+| Option | |
+|---|---|
+| `name` | file name, `<name>.<view>.png` |
+| `dir` | where the PNGs live, default `__snapshots__` |
+| `view` | `"iso"` (default), `"top"`, `"front"`, `"right"`, `"back"`, `"left"`, `"bottom"` |
+| `width`, `height` | image size, default 256 × 192 |
+| `tolerance`, `maxDiffRatio` | see above |
+| `quantize` | colour channels are rounded to multiples of this before saving and comparing, which halves the file size (default 8; 1 keeps full precision) |
+| `params`, `evaluate`, `render` | params and kernel options when you pass a module, and extra renderer options |
+
+The matcher takes a `ModelResult`, a model module, a component or an element. The same check
+is available as a function, `await matchRenderSnapshot(model, options)`. It returns
+`{ pass, written, path, diffPath, diffRatio, message }` and never throws for a mismatch.
+`diffImages(a, b, tolerance)` compares two images yourself.
+
+The renderer is plain TypeScript, so images are the same on every machine. The native and
+wasm kernels produce the same meshes, so their renders match pixel for pixel. tscad's own
+tests keep a snapshot of every example in `tests/__snapshots__`.
 
 ### Parameter sweeps
 

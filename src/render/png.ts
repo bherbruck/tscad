@@ -1,5 +1,5 @@
-/** Minimal PNG encoder: 8-bit RGB or RGBA, one IDAT, zlib via fflate. */
-import { zlibSync } from "fflate";
+/** Minimal PNG encoder and decoder: 8-bit RGB or RGBA, zlib via fflate. */
+import { unzlibSync, zlibSync } from "fflate";
 
 const CRC_TABLE = (() => {
   const t = new Uint32Array(256);
@@ -59,4 +59,64 @@ export function encodePNG(pixels: Uint8Array, width: number, height: number, cha
     o += p.length;
   }
   return out;
+}
+
+/**
+ * Decode an 8-bit, non-interlaced PNG (grey, grey+alpha, RGB, RGBA; any row filter) to RGBA
+ * pixels. Enough for render snapshots; palette and 16-bit images throw.
+ */
+export function decodePNG(file: Uint8Array): { width: number; height: number; data: Uint8Array } {
+  const sig = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  if (sig.some((b, i) => file[i] !== b)) throw new Error("not a PNG file");
+  const dv = new DataView(file.buffer, file.byteOffset, file.byteLength);
+  let width = 0, height = 0, depth = 0, type = 0, interlace = 0;
+  const idat: Uint8Array[] = [];
+  for (let o = 8; o + 8 <= file.length; ) {
+    const len = dv.getUint32(o);
+    const kind = String.fromCharCode(file[o + 4]!, file[o + 5]!, file[o + 6]!, file[o + 7]!);
+    const body = file.subarray(o + 8, o + 8 + len);
+    if (kind === "IHDR") {
+      width = dv.getUint32(o + 8);
+      height = dv.getUint32(o + 12);
+      depth = body[8]!;
+      type = body[9]!;
+      interlace = body[12]!;
+    } else if (kind === "IDAT") idat.push(body);
+    else if (kind === "IEND") break;
+    o += 12 + len;
+  }
+  const channels = ({ 0: 1, 2: 3, 4: 2, 6: 4 } as Record<number, number>)[type];
+  if (depth !== 8 || !channels || interlace) throw new Error(`unsupported PNG (bit depth ${depth}, colour type ${type}${interlace ? ", interlaced" : ""})`);
+  const joined = new Uint8Array(idat.reduce((n, c) => n + c.length, 0));
+  let at = 0;
+  for (const c of idat) joined.set(c, (at += c.length) - c.length);
+  const raw = unzlibSync(joined);
+  const stride = width * channels;
+  const px = new Uint8Array(stride * height);
+  for (let y = 0; y < height; y++) {
+    const f = raw[y * (stride + 1)]!;
+    const src = y * (stride + 1) + 1, dst = y * stride;
+    for (let x = 0; x < stride; x++) {
+      const a = x >= channels ? px[dst + x - channels]! : 0;
+      const b = y > 0 ? px[dst - stride + x]! : 0;
+      const c = x >= channels && y > 0 ? px[dst - stride + x - channels]! : 0;
+      const v = raw[src + x]!;
+      let p = 0;
+      if (f === 1) p = a;
+      else if (f === 2) p = b;
+      else if (f === 3) p = (a + b) >> 1;
+      else if (f === 4) {
+        const e = a + b - c, pa = Math.abs(e - a), pb = Math.abs(e - b), pc = Math.abs(e - c);
+        p = pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+      }
+      px[dst + x] = (v + p) & 0xff;
+    }
+  }
+  const data = new Uint8Array(width * height * 4);
+  for (let i = 0; i < width * height; i++) {
+    const s = i * channels;
+    if (channels === 1 || channels === 2) data.set([px[s]!, px[s]!, px[s]!, channels === 2 ? px[s + 1]! : 255], i * 4);
+    else data.set([px[s]!, px[s + 1]!, px[s + 2]!, channels === 4 ? px[s + 3]! : 255], i * 4);
+  }
+  return { width, height, data };
 }

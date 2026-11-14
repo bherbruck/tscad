@@ -627,3 +627,4 @@ function stampSegment(
       void len;
     }
 }
+export { decodePNG, encodePNG } from "./png";
