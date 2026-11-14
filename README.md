@@ -7,7 +7,7 @@ geometry: STEP for CAD, STL and 3MF for printing, DXF for laser cutters. It's li
 the same model runs in bun, in the browser and in CI.
 
 **[Docs](https://bherbruck.github.io/tscad/)** · **[Playground](https://bherbruck.github.io/tscad/play/)** ·
-[Guide](docs/guide.md) · [API](docs/api.md) · [Examples](#gallery)
+[Guide](docs/guide.md) · [Cookbook](docs/cookbook.md) · [API](docs/api.md) · [Examples](#gallery)
 
 <p align="center"><a href="examples/enclosure.tsx"><img src="docs/images/enclosure.png" alt="A parametric electronics enclosure rendered by tscad" width="760"></a></p>
 

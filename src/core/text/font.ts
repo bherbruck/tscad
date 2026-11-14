@@ -80,7 +80,7 @@ export function joinCurves(loop: Loop2): Loop2 {
       const p = prev.degree;
       const last = prev.knots[prev.knots.length - 1]!;
       // prev knots end with p+1 copies of `last`; keep p of them as an interior knot
-      const knots = [...prev.knots.slice(0, prev.knots.length - 1), ...s.knots.slice(p + 1).map((k) => k - s.knots[0]! + last + 1)];
+      const knots = [...prev.knots.slice(0, prev.knots.length - 1), ...s.knots.slice(p + 1).map((k) => k - s.knots[0]! + last)];
       out[out.length - 1] = { kind: "nurbs", degree: p, pts: [...prev.pts, ...s.pts.slice(1)], knots };
     } else out.push(s);
   }

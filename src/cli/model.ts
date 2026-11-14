@@ -36,6 +36,23 @@ const outDir = join(tmpdir(), `tscad-cli-${process.pid}`);
  * points at the original files, so stack traces and source locations name the TSX lines.
  */
 export async function importModel(file: string): Promise<any> {
+  const b = await bundleModel(file);
+  try {
+    return await import(b.path);
+  } finally {
+    rmSync(b.path, { force: true });
+  }
+}
+
+export interface BunBundle {
+  /** The bundled module, written to a temp file (delete it when done). */
+  path: string;
+  /** Its source map (sources absolute, with contents). */
+  map?: { sources: string[]; sourcesContent?: string[]; mappings: string; [k: string]: unknown };
+}
+
+/** Bundle a model for bun into a temp `.mjs` (inline source map pointing at the TSX). */
+export async function bundleModel(file: string): Promise<BunBundle> {
   const abs = resolve(file);
   if (!existsSync(abs)) throw new Error(`no such file: ${file}`);
   const result = await Bun.build({
@@ -48,24 +65,21 @@ export async function importModel(file: string): Promise<any> {
     throw: false,
   });
   if (!result.success) throw new BundleError(`Failed to bundle ${relative(process.cwd(), abs) || abs}`, result.logs);
-  let js = "", map = "";
+  let js = "", raw = "";
   for (const o of result.outputs) {
-    if (o.kind === "sourcemap") map = await o.text();
+    if (o.kind === "sourcemap") raw = await o.text();
     else if (o.kind === "entry-point") js = await o.text();
   }
-  if (map) {
-    const m = JSON.parse(map);
-    m.sources = (m.sources as string[]).map((s) => resolve(process.cwd(), s));
-    js = js.replace(/\n\/\/# sourceMappingURL=.*$/m, "") + `\n//# sourceMappingURL=data:application/json;base64,${Buffer.from(JSON.stringify(m)).toString("base64")}\n`;
+  let map: BunBundle["map"];
+  if (raw) {
+    map = JSON.parse(raw);
+    map!.sources = map!.sources.map((s) => resolve(process.cwd(), s));
+    js = js.replace(/\n\/\/# sourceMappingURL=.*$/m, "") + `\n//# sourceMappingURL=data:application/json;base64,${Buffer.from(JSON.stringify(map)).toString("base64")}\n`;
   }
   mkdirSync(outDir, { recursive: true });
-  const out = join(outDir, `${basename(abs).replace(/\.[^.]+$/, "")}-${generation++}.mjs`);
-  writeFileSync(out, js);
-  try {
-    return await import(out);
-  } finally {
-    rmSync(out, { force: true });
-  }
+  const path = join(outDir, `${basename(abs).replace(/\.[^.]+$/, "")}-${generation++}.mjs`);
+  writeFileSync(path, js);
+  return { path, map };
 }
 
 export interface ModelRun {

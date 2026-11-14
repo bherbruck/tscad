@@ -133,7 +133,7 @@ export function renderModule<S extends ParamSchema = ParamSchema>(
 // ---------------------------------------------------------------------------------------------
 
 const SOLID_TAGS = new Set([
-  "group", "step", "translate", "rotate", "scale", "mirror", "box", "cylinder", "cone", "sphere", "torus",
+  "group", "step", "translate", "rotate", "scale", "mirror", "transform", "box", "cylinder", "cone", "sphere", "torus",
   "union", "difference", "subtract", "intersection", "intersect", "extrude", "revolve", "loft", "sweep",
   "linearPattern", "gridPattern", "polarPattern", "fillet", "chamfer", "shell", "draft", "pushPull", "offsetFaces", "split",
 ]);
@@ -142,7 +142,7 @@ const SKETCH_TAGS = new Set([...SHAPE_TAGS, "sketch", "section", "offset", "hull
 const CONTAINER_TAGS = new Set(["part", "assembly", "drawing"]);
 const ALL_TAGS = [...SOLID_TAGS, ...SKETCH_TAGS, ...CONTAINER_TAGS, ...CONSTRAINT_TAGS, ...ASSEMBLY_TAGS];
 /** Tags whose x/y/z mean something else (no universal placement). */
-const OWN_TRANSFORM = new Set(["translate", "rotate", "scale", "mirror"]);
+const OWN_TRANSFORM = new Set(["translate", "rotate", "scale", "mirror", "transform"]);
 
 interface SketchLoop {
   loop: Loop2;
@@ -484,6 +484,19 @@ class Compiler {
           m = scaling(v[0], v[1], v[2]);
         }
         return this.transformed(h, this.about(h, m));
+      }
+      case "transform": {
+        // an arbitrary affine matrix: 16 (4×4) or 12 (3×4) numbers row-major, or nested rows
+        const raw = p.matrix;
+        const flat: unknown[] = Array.isArray(raw) ? (Array.isArray(raw[0]) ? (raw as unknown[][]).flat() : raw) : [];
+        if (!(flat.length === 16 || flat.length === 12) || !flat.every((v) => typeof v === "number" && Number.isFinite(v))) {
+          this.fail(h, `matrix must be 16 (4×4) or 12 (3×4) numbers, row-major (got ${show(raw)})`, "<transform matrix={[1, 0, 0, tx, 0, 1, 0, ty, 0, 0, 1, tz, 0, 0, 0, 1]}>");
+        }
+        const m = (flat.length === 12 ? [...flat, 0, 0, 0, 1] : flat) as number[];
+        if (m[12] !== 0 || m[13] !== 0 || m[14] !== 0 || m[15] !== 1) this.fail(h, "the matrix's last row must be [0, 0, 0, 1] (no projective transforms)");
+        const det = m[0]! * (m[5]! * m[10]! - m[6]! * m[9]!) - m[1]! * (m[4]! * m[10]! - m[6]! * m[8]!) + m[2]! * (m[4]! * m[9]! - m[5]! * m[8]!);
+        if (Math.abs(det) < 1e-12) this.fail(h, "the matrix is singular (it flattens the solid)");
+        return this.transformed(h, m);
       }
       case "mirror": {
         const n = typeof p.axis === "string" ? (["x", "y", "z"].includes(p.axis) ? axisVector(p.axis as "x") : this.fail(h, `axis must be "x", "y", "z" or a vector (got ${show(p.axis)})`)) : this.vec3(h, "axis", p.axis);

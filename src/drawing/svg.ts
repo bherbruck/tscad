@@ -47,9 +47,9 @@ export function svgPathData(loops: readonly Loop2[], tolerance = 0.01): string {
           d.push(`A${fmt(s.r, 4)} ${fmt(s.r, 4)} 0 ${large} ${flag} ${P(s.c[0] + s.r * Math.cos(t), s.c[1] + s.r * Math.sin(t))}`);
         }
       } else {
-        const bez = s.knots.length === 2 * (s.degree + 1) && s.pts.every((p) => p[2] === 1);
-        if (bez && s.degree === 2) d.push(`Q${P(s.pts[1]![0], s.pts[1]![1])} ${P(s.pts[2]![0], s.pts[2]![1])}`);
-        else if (bez && s.degree === 3) d.push(`C${P(s.pts[1]![0], s.pts[1]![1])} ${P(s.pts[2]![0], s.pts[2]![1])} ${P(s.pts[3]![0], s.pts[3]![1])}`);
+        const pieces = bezierPieces(s);
+        if (pieces && s.degree === 2) for (const b of pieces) d.push(`Q${P(b[1]![0], b[1]![1])} ${P(b[2]![0], b[2]![1])}`);
+        else if (pieces && s.degree === 3) for (const b of pieces) d.push(`C${P(b[1]![0], b[1]![1])} ${P(b[2]![0], b[2]![1])} ${P(b[3]![0], b[3]![1])}`);
         else for (const p of flattenNurbs(s, tolerance).slice(1)) d.push(`L${P(p[0], p[1])}`);
       }
     }
@@ -57,6 +57,21 @@ export function svgPathData(loops: readonly Loop2[], tolerance = 0.01): string {
     parts.push(d.join(""));
   }
   return parts.join(" ");
+}
+
+/**
+ * A non-rational NURBS whose interior knots all have multiplicity = degree is a chain of
+ * Béziers: their control points, or undefined.
+ */
+function bezierPieces(s: { degree: number; pts: [number, number, number][]; knots: number[] }): [number, number, number][][] | undefined {
+  const p = s.degree;
+  if (!s.pts.every((q) => q[2] === 1)) return undefined;
+  const inner = s.knots.slice(p + 1, s.knots.length - p - 1);
+  if (inner.length % p !== 0 || (s.pts.length - 1) % p !== 0) return undefined;
+  for (let i = 0; i < inner.length; i += p) if (!inner.slice(i, i + p).every((k) => k === inner[i])) return undefined;
+  const n = (s.pts.length - 1) / p;
+  if (inner.length / p !== n - 1) return undefined;
+  return Array.from({ length: n }, (_, i) => s.pts.slice(i * p, i * p + p + 1));
 }
 
 /** SVG text (mm units, y up) for drawings or loops: one `<g>` + even-odd `<path>` per drawing. */

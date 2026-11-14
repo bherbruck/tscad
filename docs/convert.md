@@ -113,6 +113,12 @@ OpenSCAD's placement conventions are kept, so shapes land exactly where they did
 | `square(s, center)` / `circle` / `polygon(points, paths)` / `text` / `offset(r \| delta)` | `<rect center={false}>` / `<circle>` / `<polygon>` (one per path, so nested paths are holes) / `<text>` / `<offset round>` |
 | `scale(v) circle(r)` | `<ellipse rx ry>` |
 | 2D `hull()` | `<hull>`: exact (tangent lines and true arcs) |
+| 2D `minkowski() { shape; circle(r); }` | `<offset distance={r}>` (rounded): exact |
+| `minkowski() { cube(s); sphere(r); }` | `<fillet radius={r}><box>` grown by r on every side: exact (a box ⊕ a ball *is* the grown box with every edge filleted r) |
+| `minkowski() { cube(s); cylinder(r, h); }` | `<extrude height={z + h}><roundedRect>` grown by r: exact |
+| `multmatrix(m)` | `<transform matrix={m}>` (4×4 or 3×4, row-major, column-vector) |
+| `resize([x, y, z])` (literal sizes) on one cube/square | the primitive with the new size (0 keeps a dimension) |
+| `resize([x, y, z])` on one sphere/circle/cylinder of literal size | `<scale by>` of the computed factors |
 | 3D `hull()` of straight prisms on one base (cylinders and cubes of one height, moved by `translate([x, y, 0])`, `rotate([0, 0, a])` or `for` loops) | `<extrude height><hull>` of their footprints: exact, e.g. rounded plates from four corner cylinders |
 
 **2D booleans.** tscad has no 2D boolean kernel. Instead, each 2D leaf under an extrusion is
@@ -124,8 +130,8 @@ leaves, which is also exact since planar motions commute with the extrusion. Und
 gets a `$leaf` prop, so the caller decides how its shapes become solids (extruded or
 revolved). A 2D object where a solid is expected (top level) is extruded 1 mm, with a warning.
 
-**Not converted (warnings):** other 3D `hull`s and `minkowski` (children unioned), `polyhedron`, `import`,
-`surface`, `projection`, `multmatrix`, `resize`, `linear_extrude` `twist` / `scale`,
+**Not converted (warnings):** other 3D `hull`s and `minkowski`s (children unioned),
+`polyhedron`, `import`, `surface`, `projection`, other `resize`s (`auto`, expressions), `linear_extrude` `twist` / `scale`,
 `offset(chamfer)`, 2D booleans inside `offset()` (even-odd approximation), `color` (set it on
 the `<part>`), text fonts (metrics differ, so check the size), `search`, `rands` (works but
 random).
@@ -135,7 +141,9 @@ random).
 `tests/convert.test.ts` covers the parser and codegen. It also checks geometric equivalence:
 converted snippets and three classic parametric models (`tests/fixtures/scad/`: a box with
 lid, a knurled knob with a D-shaft bore, a hex-key holder, a key tag hulled from four corner
-cylinders, a plate cam from a 2D hull) are evaluated by the kernel, and
+cylinders, a plate cam from a 2D hull), plus a corpus of realistic models
+(`tests/fixtures/scad/corpus/`: an enclosure with screw posts, a spool holder, a cable comb,
+a gridfinity-style bin) are evaluated by the kernel, and
 their volumes are compared with closed forms. The converted models are in `examples/converted/`
 next to their `.scad` sources. A test keeps them in sync with the converter and checks that each
 evaluates in under 10 s.

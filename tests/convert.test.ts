@@ -37,6 +37,7 @@ const belt = (r1: number, r2: number, d: number) => {
   const phi = Math.asin((r1 - r2) / d), t = Math.sqrt(d * d - (r1 - r2) ** 2);
   return (r1 + r2) * t + 0.5 * r1 * r1 * (PI + 2 * phi) + 0.5 * r2 * r2 * (PI - 2 * phi);
 };
+const close3 = (bb: number[][], want: number[][]) => bb.forEach((p, i) => p.forEach((v, j) => expect(Math.abs(v - want[i]![j]!)).toBeLessThan(1e-6)));
 const near = (a: number, b: number, rel = 1e-6) => expect(Math.abs(a - b) / Math.max(1, Math.abs(b))).toBeLessThan(rel);
 
 describe("parser", () => {
@@ -184,6 +185,45 @@ describe("geometric equivalence (kernel volumes)", () => {
     expect(warnings.some((w) => w.message.startsWith("3D hull() is only converted for prisms"))).toBe(true);
   });
 
+  test("minkowski: 2D ⊕ circle = rounded offset", async () => {
+    const { volume, warnings } = await run("linear_extrude(2) minkowski() { square([10, 6]); circle(r = 2); }");
+    expect(warnings).toEqual([]);
+    near(volume, 2 * (60 + 2 * 2 * 16 + 4 * PI));
+  }, 30_000);
+  test("minkowski: box ⊕ ball = grown, filleted box", async () => {
+    const [x, y, z, r] = [10, 8, 6, 1.5];
+    const exact = x * y * z + 2 * r * (x * y + y * z + z * x) + PI * r * r * (x + y + z) + (4 / 3) * PI * r ** 3;
+    const a = await run(`minkowski() { cube([${x}, ${y}, ${z}]); sphere(r = ${r}); }`);
+    near(a.volume, exact, 1e-5);
+    close3(a.bbox!, [[-r, -r, -r], [x + r, y + r, z + r]]);
+    const b = await run(`minkowski() { translate([5, 0, 0]) cube([${x}, ${y}, ${z}], center = true); sphere(${r}); }`);
+    near(b.volume, exact, 1e-5);
+    close3(b.bbox!, [[5 - x / 2 - r, -y / 2 - r, -z / 2 - r], [5 + x / 2 + r, y / 2 + r, z / 2 + r]]);
+  }, 30_000);
+  test("minkowski: box ⊕ cylinder = extruded rounded rectangle", async () => {
+    const { volume, bbox } = await run("minkowski() { cube([20, 10, 4]); cylinder(r = 3, h = 2); }");
+    near(volume, (26 * 16 - 9 * (4 - PI)) * 6);
+    close3(bbox!, [[-3, -3, 0], [23, 13, 6]]);
+  }, 30_000);
+  test("minkowski of other shapes still warns", () => {
+    const { warnings } = convertScad("minkowski() { linear_extrude(2) square(5); sphere(1); }");
+    expect(warnings.some((w) => w.message.startsWith("minkowski() is only converted"))).toBe(true);
+  });
+  test("multmatrix → <transform matrix>", async () => {
+    const { volume, bbox, tsx } = await run("multmatrix([[1, 0.5, 0, 10], [0, 1, 0, 0], [0, 0, 2, 0], [0, 0, 0, 1]]) cube(10);");
+    expect(tsx).toContain("<transform matrix=");
+    near(volume, 2000); // shear keeps volume, z doubled
+    close3(bbox!, [[10, 0, 0], [25, 10, 20]]);
+  }, 30_000);
+  test("resize with literal sizes", async () => {
+    const a = await run("resize([20, 0, 5]) cube([10, 8, 4]);");
+    near(a.volume, 20 * 8 * 5);
+    const b = await run("resize([10, 20, 30]) sphere(r = 5);");
+    near(b.volume, (4 / 3) * PI * 5 * 10 * 15, 1e-4);
+    const c = await run("linear_extrude(2) resize([10, 4]) circle(r = 1);");
+    near(c.volume, PI * 5 * 2 * 2);
+  }, 30_000);
+
   test("models: key tag (hull of four corner cylinders) and plate cam (2D hull)", async () => {
     const tag = await run(readFileSync(new URL("./fixtures/scad/rounded-tag.scad", import.meta.url), "utf8"));
     expect(tag.warnings).toEqual([]);
@@ -233,7 +273,7 @@ describe("geometric equivalence (kernel volumes)", () => {
 
 describe("examples/converted", () => {
   const dir = new URL("../examples/converted/", import.meta.url);
-  for (const name of ["box-with-lid", "knob", "hex-key-holder", "rounded-tag", "cam"]) {
+  for (const name of ["box-with-lid", "knob", "hex-key-holder", "rounded-tag", "cam", "enclosure", "cable-comb"]) {
     test(`${name}: up to date with the converter, evaluates in < 10 s`, async () => {
       const scad = readFileSync(new URL(`${name}.scad`, dir), "utf8");
       const pascal = name.replace(/(^|-)(\w)/g, (_, __, c: string) => c.toUpperCase());
@@ -246,4 +286,52 @@ describe("examples/converted", () => {
       expect(performance.now() - t0).toBeLessThan(10_000);
     }, 30_000);
   }
+});
+
+describe("corpus of realistic models", () => {
+  const src = (f: string) => readFileSync(new URL(`./fixtures/scad/corpus/${f}`, import.meta.url), "utf8");
+
+  test("enclosure: rounded hull shell, screw posts via children()", async () => {
+    const { volume, warnings, bbox } = await run(src("enclosure.scad"));
+    expect(warnings).toEqual([]);
+    const A = 74 * 49 - 9 * (4 - PI);
+    near(volume, A * 27 - 70 * 45 * 25 + 4 * (PI * 9 * 22 - PI * 1.25 ** 2 * 20 - PI * 9 * 2));
+    close3(bbox!, [[0, 0, 0], [74, 49, 27]]);
+  }, 30_000);
+
+  test("spool holder: revolved polygon profile (Pappus) and spokes", async () => {
+    const { volume, warnings } = await run(src("spool-holder.scad"));
+    expect(warnings).toEqual([]);
+    const P: [number, number][] = [[11, 0], [30, 0], [30, 3], [26, 3], [25, 30], [13, 30], [13, 7], [11, 7]];
+    let A = 0, Cx = 0;
+    P.forEach(([x0, y0], i) => {
+      const [x1, y1] = P[(i + 1) % P.length]!;
+      const c = x0 * y1 - x1 * y0;
+      A += c;
+      Cx += (x0 + x1) * c;
+    });
+    A /= 2;
+    Cx /= 6 * A;
+    near(volume, 2 * PI * Cx * Math.abs(A)); // the spokes lie inside the base ring
+  }, 30_000);
+
+  test("cable comb: offset-rounded plate minus circle+slot cutouts (2D booleans pushed to 3D)", async () => {
+    const { volume, warnings } = await run(src("cable-comb.scad"));
+    expect(warnings).toEqual([]);
+    const n = 6, d = 5.5, sp = 2, t = 4, slot = 0.8;
+    const w = n * (d + sp) + sp, h = d + 2 * sp, R = d / 2, a = (d * slot) / 2;
+    const cut = PI * R * R + 2 * a * (h / 2) - (a * Math.sqrt(R * R - a * a) + R * R * Math.asin(a / R));
+    near(volume, t * (w * h - (4 - PI) - n * cut));
+  }, 30_000);
+
+  test("grid bin: converts and compiles (3D hull of stacked extrusions stays a warning)", async () => {
+    const { tsx, warnings } = convertScad(src("grid-bin.scad"));
+    expect(warnings.map((w) => w.line)).toEqual([18]);
+    const file = new URL(`m${++n}.tsx`, TMP);
+    writeFileSync(file, tsx);
+    const r = renderModule(await import(file.href));
+    expect(r.document.parts!.length).toBe(1);
+    // kernel evaluation skipped: union of the stacked rounded plates with the bin trips a kernel
+    // bug (reported: three extruded roundedRects, disjoint then touching → "not a closed solid")
+  });
 });

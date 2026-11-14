@@ -4,7 +4,7 @@
  * evaluates it with the kernel and posts meshes back as transferables. Param changes re-run
  * here only (latest wins). No server-only APIs: a static playground can host this file as is.
  */
-import { loadKernel, type KernelHost, KernelPanic } from "../kernel";
+import { loadKernel, type KernelHost, KernelPanic, WasmKernelHost } from "../kernel";
 import { renderModule } from "../index";
 import { toGLB, toOBJ, toSTL, to3MF, type ExportPart } from "../export";
 import { ChildEvaluator, LocalEvaluator, Pool, serveChild } from "./pool";
@@ -49,7 +49,7 @@ function post(msg: FromWorker, transfer: Transferable[] = []) {
   self.postMessage(msg, transfer);
 }
 
-self.onmessage = async (e: MessageEvent<ToWorker | { type: "child-init"; module: WebAssembly.Module; glueUrl: string }>) => {
+self.onmessage = async (e: MessageEvent<ToWorker | { type: "child-init"; module?: WebAssembly.Module; glueUrl: string }>) => {
   const msg = e.data;
   // A nested kernel worker (see pool.ts): from now on it only serves evaluate/pick/mesh/step.
   if (msg.type === "child-init") return serveChild(self, msg.module, msg.glueUrl);
@@ -57,6 +57,18 @@ self.onmessage = async (e: MessageEvent<ToWorker | { type: "child-init"; module:
     switch (msg.type) {
       case "init": {
         const t = performance.now();
+        if (msg.native) {
+          // Server-side (a bun Worker in `tscad dev`): the default kernel, native when built.
+          kernel = loadKernel();
+          const k = await kernel;
+          const isNative = !(k instanceof WasmKernelHost);
+          // One kernel: native sessions on several bun threads contend (measured: two parts at once
+          // take as long as in series), so parallel threads only cost memory here. `pool` > 1 opts in.
+          const size = isNative ? Math.max(1, Math.min(4, msg.pool ?? 1)) : 1;
+          pool = new Pool(new LocalEvaluator(k), size, () => new ChildEvaluator(import.meta.url, undefined, ""));
+          post({ type: "ready", version: k.version, loadMs: performance.now() - t, pool: size, native: isNative });
+          break;
+        }
         const wasm = new URL(msg.wasmUrl, self.location.href);
         const res = await fetch(wasm);
         const module = await WebAssembly.compile(await res.arrayBuffer());
@@ -70,7 +82,7 @@ self.onmessage = async (e: MessageEvent<ToWorker | { type: "child-init"; module:
       }
       case "load": {
         post({ type: "busy", stage: "loading" });
-        const url = new URL(msg.url, self.location.href).href;
+        const url = new URL(msg.url, self.location?.href ?? "file:///").href;
         try {
           const next = await import(/* @vite-ignore */ url);
           mod = next;

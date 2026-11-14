@@ -14,12 +14,14 @@ ${c.bold("Usage")}
   ${c.accent("tscad build")} ${c.gray("[file] -o out.stl")}      export STEP / STL / 3MF / GLB / OBJ
   ${c.accent("tscad info")} ${c.gray("[file]")}                  params and part stats
   ${c.accent("tscad render")} ${c.gray("[file] -o out.png")}     a PNG image of the model
+  ${c.accent("tscad convert")} ${c.gray("in.scad [-o out.tsx]")}   OpenSCAD → tscad (--name Component, -o - for stdout)
   ${c.accent("tscad mcp")}                          MCP server for AI agents ${c.gray("(see docs/mcp.md)")}
 
 ${c.bold("dev")}
   --port <n>            port ${c.gray("(default 3333; next free one if taken)")}
   --host <h>            interface ${c.gray("(default localhost)")}
   --open                open the browser
+  --browser-eval        evaluate in the browser (wasm) instead of on the server ${c.gray("(default: server when the native kernel is built)")}
 
 ${c.bold("build")}
   -o, --out <file>      output file; the extension picks the format ${c.gray("(repeatable)")}
@@ -115,6 +117,15 @@ export async function main(argv: string[]): Promise<number> {
       const num = (v: unknown) => (str(v) === undefined ? undefined : Number(str(v)));
       return render({ file, out: str(f.out), params, view: str(f.view), width: num(f.width), height: num(f.height), background: str(f.background), ortho: !!f.ortho, edges: f.edges !== false });
     }
+    case "convert": {
+      const src = args.positionals[0];
+      if (!src || !existsSync(src)) {
+        console.error(`${sym.err} ${src ? `no such file: ${c.bold(src)}` : "usage: tscad convert in.scad [-o out.tsx]"}`);
+        return src ? 1 : 2;
+      }
+      const { convert } = await import("./convert");
+      return convert({ file: src, out: str(f.out), name: str(f.name), force: !!f.force });
+    }
     case "mcp": {
       // stdout is the JSON-RPC stream: print nothing else.
       const { runMcpServer } = await import("../mcp");
@@ -140,6 +151,7 @@ async function dev(file: string, f: Parsed["flags"]): Promise<number> {
         file,
         port,
         host: str(f.host),
+        evaluate: f["browser-eval"] ? "browser" : f["server-eval"] ? "server" : "auto",
         onBuild: (e) => {
           const time = new Date().toLocaleTimeString([], { hour12: false });
           if (e.ok) console.log(`${c.gray(time)} ${sym.ok} bundled ${c.bold(file)} ${c.gray(`in ${fmtMs(e.millis)}`)}${e.version > 1 ? c.gray(` · reload #${e.version - 1}`) : ""}`);
@@ -161,6 +173,7 @@ async function dev(file: string, f: Parsed["flags"]): Promise<number> {
   console.log(`\n  ${logo()} ${c.gray(`v${pkg.version}`)}  ${c.gray(`ready in ${fmtMs(performance.now() - t)}`)}\n`);
   console.log(`  ${sym.arrow}  ${c.bold("Viewer")}  ${c.accent(c.underline(server.url))}`);
   console.log(`  ${c.gray("➜")}  ${c.gray("Model")}   ${file}`);
+  console.log(`  ${c.gray("➜")}  ${c.gray("Kernel")}  ${server.evalMode === "server" ? `native, on the server ${c.gray("(--browser-eval for wasm in the page)")}` : "wasm, in the browser"}`);
   console.log(`  ${c.gray("➜")}  ${c.gray("Press")}   ${c.bold("Ctrl+C")} ${c.gray("to stop")}\n`);
   if (f.open) openBrowser(server.url);
   const stop = async () => {

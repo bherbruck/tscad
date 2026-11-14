@@ -152,7 +152,15 @@ export interface StageError {
 }
 
 export type ToWorker =
-  | { type: "init"; wasmUrl: string; glueUrl: string; /** Max kernels evaluating parts in parallel (default: cores − 1, ≤ 4; 1 = off). */ pool?: number }
+  | {
+      type: "init";
+      wasmUrl: string;
+      glueUrl: string;
+      /** Max kernels evaluating parts in parallel (default: cores − 1, ≤ 4; 1 = off). */
+      pool?: number;
+      /** In bun (the dev server's eval worker): the default kernel, native when built. */
+      native?: boolean;
+    }
   | { type: "load"; url: string; values?: ParamValuesData; /** Raw source map (else `${url}.map` is fetched). */ map?: object }
   | { type: "params"; values: ParamValuesData }
   | { type: "pick"; id: number; kind: "edge" | "face"; part: string; index: number }
@@ -189,7 +197,7 @@ export interface InterferenceData {
 }
 
 export type FromWorker =
-  | { type: "ready"; version: string; loadMs: number; pool: number }
+  | { type: "ready"; version: string; loadMs: number; pool: number; /** Evaluating with the native kernel (server-side). */ native?: boolean }
   | { type: "busy"; stage: "loading" | "rendering" | "evaluating" }
   | { type: "result"; data: EvalData }
   | { type: "error"; error: StageError; schema?: ParamSchemaData; values?: ParamValuesData }

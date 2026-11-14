@@ -123,7 +123,7 @@ export function checkPrintability(mesh: CheckMesh, o: PrintabilityOptions = {}):
   for (let t = 0; t < nt; t++) {
     total += areas[t]!;
     const down = -(normals[3 * t]! * up[0] + normals[3 * t + 1]! * up[1] + normals[3 * t + 2]! * up[2]);
-    if (down <= limit + 1e-9) continue;
+    if (down <= limit + 1e-6) continue; // float32 meshes: exactly-at-the-limit faces pass
     // on the bed? (every vertex at the lowest height)
     let onBed = true;
     for (let k = 0; k < 3; k++) {

@@ -121,7 +121,8 @@ function build() {
   // intrinsics.ts plus any props files it extends from (e.g. constraint sketches)
   const files = [here("../core/intrinsics.ts")];
   try {
-    for (const f of readdirSync(here("../core/sketch/"))) if (/props\.ts$/.test(f)) files.push(here(`../core/sketch/${f}`));
+    for (const dir of ["sketch", "assembly"])
+      for (const f of readdirSync(here(`../core/${dir}/`))) if (/props\.ts$/.test(f)) files.push(here(`../core/${dir}/${f}`));
   } catch {
     /* no sketch dir */
   }

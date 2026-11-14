@@ -34,7 +34,7 @@ class Fake implements Evaluator {
   async evaluate(doc: Document): Promise<Evaluated> {
     const names = (doc.parts ?? []).map((p) => p.name ?? "");
     this.calls.push(names);
-    const parts: PartResult[] = names.map((name, i) => ({ name, ok: name !== "bad", empty: false, error: name === "bad" ? { path: `parts/${i}/0`, op: "fillet", message: "x" } : undefined, volume: 1, area: 1, bbox: undefined, counts: undefined, warnings: [], millis: this.ms, cached: false }));
+    const parts: PartResult[] = names.map((name, i) => ({ name, ok: name !== "bad", empty: false, error: name === "bad" ? { path: `parts/${i}/0`, op: "fillet", message: "x" } : undefined, volume: 1, area: 1, bbox: undefined, counts: undefined, warnings: [], millis: this.ms, cached: false }) as unknown as PartResult);
     const result: EvalResult = { ok: parts.every((p) => p.ok), parts, cacheHits: 1, cacheMisses: 2, cacheSize: 3, millis: 1 };
     return { result, meshes: new Map() };
   }

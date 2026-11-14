@@ -44,6 +44,8 @@ const docPages: DocPage[] = [
   { path: "docs/guide.html", title: "Guide", src: join(DOCS, "guide.md") },
   { path: "docs/sketch.html", title: "Constraint sketches", src: join(DOCS, "sketch.md") },
   { path: "docs/assembly.html", title: "Assemblies & mates", src: join(DOCS, "assembly.md") },
+  { path: "docs/cookbook.html", title: "Cookbook", src: join(DOCS, "cookbook.md") },
+  { path: "docs/convert.html", title: "Converting OpenSCAD", src: join(DOCS, "convert.md") },
   { path: "docs/selectors.html", title: "Selectors", src: join(CONTENT, "selectors.md") },
   { path: "docs/checks.html", title: "Checks & testing", src: join(DOCS, "checks.md") },
   { path: "docs/mcp.html", title: "MCP server (AI agents)", src: join(DOCS, "mcp.md") },
@@ -75,10 +77,11 @@ function titleCase(s: string): string {
 
 const GROUPS: [string, string, string[]][] = [
   ["Containers", "Parts, assemblies and groups: the structure of a model.", ["assembly", "part", "group", "drawing"]],
+  ["Assemblies", "Anchors and mates place parts for you (see Assemblies & mates).", ["anchor", "mate", "gear"]],
   ["Primitives", "Basic solids. Box, cylinder and cone sit centred in X/Y with their base on z = 0.", ["box", "cylinder", "cone", "sphere", "torus", "step"]],
   ["Booleans", "Combine solids.", ["union", "difference", "subtract", "intersection", "intersect"]],
-  ["Transforms", "Move, turn, scale and mirror children (every solid also has placement props).", ["translate", "rotate", "scale", "mirror"]],
-  ["Sketch shapes", "2D shapes, used inside extrude, revolve, loft, sweep and drawing. Nested loops become holes.", ["rect", "roundedRect", "circle", "ellipse", "polygon", "regularPolygon", "slot", "path", "star", "text", "sketch", "offset", "section"]],
+  ["Transforms", "Move, turn, scale and mirror children (every solid also has placement props).", ["translate", "rotate", "scale", "mirror", "transform"]],
+  ["Sketch shapes", "2D shapes, used inside extrude, revolve, loft, sweep and drawing. Nested loops become holes.", ["rect", "roundedRect", "circle", "ellipse", "polygon", "regularPolygon", "slot", "path", "star", "text", "sketch", "offset", "hull", "section"]],
   ["Sketch → solid", "Turn 2D shapes into solids.", ["extrude", "revolve", "loft", "sweep"]],
   ["Patterns", "Repeat children.", ["linearPattern", "gridPattern", "polarPattern"]],
   ["Features", "Round, bevel, hollow, draft, push/pull and split. Edges and faces are picked with selectors.", ["fillet", "chamfer", "shell", "draft", "pushPull", "offsetFaces", "split"]],
@@ -95,7 +98,7 @@ const allGroups: [string, string, string[]][] = [
 ];
 
 const sidebar: NavGroup[] = [
-  { title: "Start", items: docPages.filter((p) => ["docs/getting-started.html", "docs/guide.html", "docs/sketch.html", "docs/assembly.html"].includes(p.path)).map((p) => ({ title: p.title, href: p.path })) },
+  { title: "Start", items: docPages.filter((p) => ["docs/getting-started.html", "docs/guide.html", "docs/cookbook.html", "docs/sketch.html", "docs/assembly.html"].includes(p.path)).map((p) => ({ title: p.title, href: p.path })) },
   {
     title: "Reference",
     items: [
@@ -105,7 +108,7 @@ const sidebar: NavGroup[] = [
       { title: "API", href: "reference/api.html" },
     ],
   },
-  { title: "More", items: [...docPages.filter((p) => ["docs/checks.html", "docs/mcp.html", "docs/kernel.html", "docs/architecture.html"].includes(p.path)).map((p) => ({ title: p.title, href: p.path })), { title: "Gallery", href: "gallery/index.html" }] },
+  { title: "More", items: [...docPages.filter((p) => ["docs/checks.html", "docs/convert.html", "docs/mcp.html", "docs/kernel.html", "docs/architecture.html"].includes(p.path)).map((p) => ({ title: p.title, href: p.path })), { title: "Gallery", href: "gallery/index.html" }] },
 ];
 
 // ---------------------------------------------------------------------------------------------
@@ -121,6 +124,8 @@ const DOC_LINKS: Record<string, string> = {
   "getting-started.md": "docs/getting-started.html",
   "selectors.md": "docs/selectors.html",
   "assembly.md": "docs/assembly.html",
+  "cookbook.md": "docs/cookbook.html",
+  "convert.md": "docs/convert.html",
   "api.md": "reference/api.html",
 };
 

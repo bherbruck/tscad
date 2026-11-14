@@ -658,9 +658,12 @@ export class Gen {
         this.warn(s.line, "2D hull() at the top of a 3D context: extruded 1 mm (OpenSCAD would keep it flat)");
         return [el("extrude", ["height={1}"], [el("hull", [], this.children(s.children, raw))])];
       }
-      case "minkowski":
-        this.warn(s.line, `${s.name}() isn't supported: its children are unioned instead`);
+      case "minkowski": {
+        const exact = this.minkowski(s, ctx);
+        if (exact) return exact;
+        this.warn(s.line, "minkowski() is only converted for shape ⊕ circle (2D), box ⊕ sphere and box ⊕ cylinder: its children are unioned instead");
         return ctx.mode === "raw" ? kids() : [el("union", [], kids())];
+      }
 
       // ---- transforms
       case "translate":
@@ -924,6 +927,111 @@ export class Gen {
     return { h, center: center ?? "", kids };
   }
 
+  /** The geometric children of a statement list (blocks flattened, empty statements dropped). */
+  private operands(stmts: Stmt[]): Stmt[] {
+    return stmts.flatMap((c) => (c.t === "block" ? this.operands(c.body) : c.t === "inst" && (c.name === "echo" || c.name === "assert") ? [] : c.t === "assign" ? [] : [c]));
+  }
+
+  /**
+   * The exact minkowski() idioms: 2D shape ⊕ circle(r) = offset by r (rounded); box ⊕ ball =
+   * the box grown by r with every edge filleted r; box ⊕ cylinder(r, h) = a rounded rectangle
+   * extruded through both heights.
+   */
+  private minkowski(s: Extract<Stmt, { t: "inst" }>, ctx: Ctx): string[] | undefined {
+    const env = ctx.env;
+    const ops = this.operands(s.children);
+    if (ops.length !== 2 || !ops.every((o) => o.t === "inst" && !o.modifier)) return undefined;
+    const [x, y] = ops as Extract<Stmt, { t: "inst" }>[];
+    const radius = (st: Extract<Stmt, { t: "inst" }>, pos: number) => {
+      const r = this.arg(st.args, pos, "r"), d = this.arg(st.args, -1, "d");
+      return r ? this.expr(r, env).code : d ? `${paren(this.expr(d, env).code)} / 2` : "1";
+    };
+    if (ctx.mode !== "3d" || this.dimOfAll(ops) === "2d") {
+      const circle = [x!, y!].find((o) => o.name === "circle");
+      if (!circle) return undefined;
+      const other = circle === x ? y! : x!;
+      const raw: Ctx = { env, mode: "raw", wrap: (q) => q, linear: false, ...(ctx.module ? { module: ctx.module } : {}) };
+      const shape = el("offset", [`distance={${radius(circle, 0)}}`], this.stmt(other, raw));
+      return [ctx.mode === "3d" ? el("extrude", ["height={1}"], [shape]) : ctx.mode === "raw" ? shape : ctx.wrap(shape)];
+    }
+    const tool = [x!, y!].find((o) => o.name === "sphere" || o.name === "cylinder");
+    if (!tool) return undefined;
+    // the box, possibly translated
+    let body = (tool === x ? y : x)!;
+    const moves: string[] = [];
+    while (body.name === "translate" && this.operands(body.children).length === 1) {
+      moves.push(this.vec3(this.arg(body.args, 0, "v"), env, 0));
+      const next = this.operands(body.children)[0]!;
+      if (next.t !== "inst") return undefined;
+      body = next;
+    }
+    if (body.name !== "cube") return undefined;
+    const size = this.arg(body.args, 0, "size");
+    const sz = size ? this.expr(size, env) : { code: "1", kind: "num" as Kind };
+    const dims = size?.t === "vec" && size.items.length === 3 && size.items.every(isExpr) ? (size.items as Expr[]).map((e) => this.expr(e, env).code) : sz.kind === "num" ? [sz.code, sz.code, sz.code] : [0, 1, 2].map((i) => `${this.h("$s3")}(${sz.code})[${i}]`);
+    const cc = this.arg(body.args, 1, "center");
+    if (cc && cc.t !== "bool") return undefined;
+    const centred = cc?.t === "bool" && cc.v;
+    let solid: string;
+    if (tool.name === "sphere") {
+      const r = radius(tool, 0);
+      const grown = dims.map((v) => `${v} + 2 * ${paren(r)}`);
+      const place = centred ? ["center"] : ["center={false}", `x={-${paren(r)}}`, `y={-${paren(r)}}`, `z={-${paren(r)}}`];
+      solid = el("fillet", [`radius={${r}}`], [el("box", [`size={[${grown.join(", ")}]}`, ...place], [])]);
+    } else {
+      if (this.arg(tool.args, 1, "r1") || this.arg(tool.args, 2, "r2") || this.arg(tool.args, -1, "d1") || this.arg(tool.args, -1, "d2")) return undefined;
+      const tc = this.arg(tool.args, 3, "center");
+      if (tc && tc.t !== "bool") return undefined;
+      const h = this.e(this.arg(tool.args, 0, "h", "height"), env) ?? "1";
+      const r = radius(tool, -1);
+      const [w, d, z] = dims;
+      const z0 = [centred ? `-${paren(z!)} / 2` : "", tc?.t === "bool" && tc.v ? `-${paren(h)} / 2` : ""].filter(Boolean).join(" + ") || "0";
+      const place = [...(centred ? [] : [`x={${paren(w!)} / 2}`, `y={${paren(d!)} / 2}`]), ...(z0 !== "0" ? [`z={${z0}}`] : [])];
+      solid = el("extrude", [`height={${z} + ${paren(h)}}`, ...place], [el("roundedRect", [`w={${w} + 2 * ${paren(r)}}`, `h={${d} + 2 * ${paren(r)}}`, `r={${r}}`], [])]);
+    }
+    for (const v of moves.reverse()) solid = el("translate", [`by={${v}}`], [solid]);
+    return [solid];
+  }
+
+  /** resize() with literal sizes on one primitive of known extent: a new size, or a scale. */
+  private resize(s: Extract<Stmt, { t: "inst" }>, ctx: Ctx): string[] | undefined {
+    const env = ctx.env;
+    const ns = this.arg(s.args, 0, "newsize");
+    if (this.arg(s.args, 1, "auto")) return undefined;
+    if (!ns || ns.t !== "vec" || !ns.items.every((i) => isExpr(i) && i.t === "num")) return undefined;
+    const target = (ns.items as Extract<Expr, { t: "num" }>[]).map((i) => i.v);
+    const ops = this.operands(s.children);
+    if (ops.length !== 1 || ops[0]!.t !== "inst") return undefined;
+    const c = ops[0] as Extract<Stmt, { t: "inst" }>;
+    const lit = (e: Expr | undefined) => (e?.t === "num" ? e.v : undefined);
+    const vecLit = (e: Expr | undefined, n: number) => (e?.t === "vec" && e.items.length === n && e.items.every((i) => isExpr(i) && i.t === "num") ? (e.items as Extract<Expr, { t: "num" }>[]).map((i) => i.v) : lit(e) !== undefined ? Array(n).fill(lit(e)) : undefined);
+    // cube / square: just the new size (zeros keep a dimension)
+    if (c.name === "cube" || c.name === "square") {
+      const n = c.name === "cube" ? 3 : 2;
+      const size = vecLit(this.arg(c.args, 0, "size") ?? { t: "num", v: 1, src: "1" }, n);
+      if (!size) return undefined;
+      const next = size.map((v, i) => (target[i] ? target[i]! : v));
+      const center = this.arg(c.args, 1, "center");
+      const args: Arg[] = [{ name: "size", value: { t: "vec", items: next.map((v) => ({ t: "num", v, src: String(v) })) } }, ...(center ? [{ name: "center", value: center }] : [])];
+      return this.stmt({ ...c, args }, ctx);
+    }
+    let extent: number[] | undefined;
+    const r = lit(this.arg(c.args, 0, "r")) ?? (lit(this.arg(c.args, -1, "d")) ?? NaN) / 2;
+    if (c.name === "sphere") extent = [2 * r, 2 * r, 2 * r];
+    else if (c.name === "circle") extent = [2 * r, 2 * r];
+    else if (c.name === "cylinder") {
+      const R = Math.max(lit(this.arg(c.args, -1, "r")) ?? NaN, lit(this.arg(c.args, 1, "r1")) ?? -Infinity, lit(this.arg(c.args, 2, "r2")) ?? -Infinity);
+      extent = [2 * R, 2 * R, lit(this.arg(c.args, 0, "h", "height")) ?? NaN];
+    }
+    if (!extent || !extent.every((v) => Number.isFinite(v) && v > 0)) return undefined;
+    const f = extent.map((e, i) => (target[i] ? target[i]! / e : 1));
+    if (extent.length === 2) f.push(1);
+    if (ctx.mode === "2d" && !ctx.linear) return undefined;
+    if (ctx.mode === "raw") return undefined;
+    void env;
+    return [el("scale", [`by={[${f.map((v) => String(Number(v.toPrecision(15)))).join(", ")}]}`], this.stmt(c, ctx))];
+  }
+
   private centerProp(c: Expr | undefined, env: Env, dflt: string | undefined): string {
     if (!c) return dflt === undefined ? "" : `center={${dflt}}`;
     if (c.t === "bool") return c.v ? "center" : "center={false}";
@@ -940,7 +1048,9 @@ export class Gen {
       return this.children(s.children, ctx);
     }
     if (s.name === "resize") {
-      this.warn(s.line, "resize() isn't supported: children kept at their size");
+      const r = this.resize(s, ctx);
+      if (r) return r;
+      this.warn(s.line, "resize() is only converted with literal sizes on a single cube/square/sphere/circle/cylinder: children kept at their size");
       return this.children(s.children, ctx);
     }
     if (flat3d) {
@@ -968,9 +1078,11 @@ export class Gen {
           if (a.t === "vec" && a.items.length === 3) return [el("rotate", [`by={${e.code}}`], kids)];
           return [el("rotate", [`by={${this.h("$rot")}(${e.code})}`], kids)];
         }
-        case "multmatrix":
-          this.warn(s.line, "multmatrix() isn't supported: children left in place");
-          return kids;
+        case "multmatrix": {
+          const m = A(0, "m");
+          if (!m) return kids;
+          return [el("transform", [`matrix={${this.expr(m, env).code}}`], kids)];
+        }
       }
     }
     // 2D transforms where the extrusion is not known to be linear: sketch placement props

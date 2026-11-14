@@ -165,6 +165,16 @@ export interface ScaleProps extends SolidChildren {
   origin?: Vec3;
 }
 
+/**
+ * Apply an arbitrary affine matrix (OpenSCAD's `multmatrix`): row-major, column-vector
+ * (`p' = M p`, translation in the last column), exactly the IR's layout. Shear or non-uniform
+ * scale turns analytic faces into NURBS.
+ */
+export interface TransformProps extends SolidChildren {
+  /** 16 numbers (4×4), 12 (3×4, last row [0, 0, 0, 1] implied), or the rows as nested arrays. */
+  matrix: readonly number[] | readonly (readonly number[])[];
+}
+
 export interface MirrorProps extends SolidChildren {
   /** The plane to mirror across, by its normal: an axis (`"x"` negates X) or a vector. */
   axis: Axis | Vec3;
@@ -700,6 +710,8 @@ export interface IntrinsicElements extends ConstraintSketchElements, AssemblyEle
   scale: ScaleProps;
   /** Mirror children across a plane (with `keep`, a symmetric pair). */
   mirror: MirrorProps;
+  /** Apply an arbitrary affine matrix (row-major, column-vector). */
+  transform: TransformProps;
 
   /** A box; centred in XY, base on z = 0. */
   box: BoxProps;

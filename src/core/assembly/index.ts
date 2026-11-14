@@ -335,6 +335,11 @@ function ownMatrix(h: Host): Mat4 {
     }
     case "scale":
       return about(typeof p.by === "number" ? scaling(p.by) : Array.isArray(p.by) ? scaling(p.by[0], p.by[1], p.by[2]) : identity());
+    case "transform": {
+      const raw = p.matrix;
+      const flat: number[] = Array.isArray(raw) ? (Array.isArray(raw[0]) ? raw.flat() : raw) : [];
+      return flat.length === 16 ? flat : flat.length === 12 ? [...flat, 0, 0, 0, 1] : identity();
+    }
     case "mirror": {
       if (p.keep) return identity();
       const a: Vec3 = typeof p.axis === "string" ? axisVector(p.axis as "x") : Array.isArray(p.axis) ? v3("axis") : [1, 0, 0];

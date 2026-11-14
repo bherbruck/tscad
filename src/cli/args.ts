@@ -16,7 +16,7 @@ export interface Parsed {
   unknown: string[];
 }
 
-export const COMMANDS = ["init", "dev", "build", "info", "render", "mcp"] as const;
+export const COMMANDS = ["init", "dev", "build", "info", "render", "mcp", "convert"] as const;
 export type Command = (typeof COMMANDS)[number];
 
 export const FLAGS: Record<string, FlagSpec> = {
@@ -41,6 +41,9 @@ export const FLAGS: Record<string, FlagSpec> = {
   ortho: {},
   edges: {},
   "section-z": { value: true },
+  "browser-eval": {},
+  "server-eval": {},
+  name: { value: true },
 };
 
 export function parseArgs(argv: string[], spec: Record<string, FlagSpec> = FLAGS): Parsed {

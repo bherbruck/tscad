@@ -5,7 +5,11 @@
 import { watch, type FSWatcher } from "node:fs";
 import { basename, dirname, relative, resolve } from "node:path";
 import type { Server, ServerWebSocket } from "bun";
+import { rmSync } from "node:fs";
 import { APP_PREFIX, type Asset, buildApp, buildUser, BundleError, type BuildMessage, mime, SRC, WASM_DIR } from "./bundle";
+import { EvalSession } from "./eval-server";
+import { bundleModel, type BunBundle } from "./model";
+import { loadKernel, WasmKernelHost } from "../kernel";
 
 export interface DevOptions {
   file: string;
@@ -14,12 +18,20 @@ export interface DevOptions {
   /** Called on every rebuild (for logging). */
   onBuild?: (e: { ok: true; millis: number; version: number } | { ok: false; errors: BuildMessage[] }) => void;
   quiet?: boolean;
+  /**
+   * Where models are evaluated: `"server"` (in this bun process, native kernel, meshes streamed
+   * over a WebSocket), `"browser"` (wasm in a web worker) or `"auto"` (server when the native
+   * kernel loads). Default `"auto"`.
+   */
+  evaluate?: "auto" | "server" | "browser";
 }
 
 export interface DevServer {
   url: string;
   port: number;
-  server: Server<unknown>;
+  server: Server<any>;
+  /** Where models are evaluated. */
+  evalMode: "server" | "browser";
   rebuild(): Promise<void>;
   stop(): Promise<void>;
 }
@@ -36,18 +48,21 @@ export async function startDev(opts: DevOptions): Promise<DevServer> {
   const fileLabel = fromCwd && !fromCwd.startsWith("..") ? fromCwd : basename(entry);
 
   let [app, html] = await Promise.all([buildApp(), Bun.file(resolve(SRC, "viewer/index.html")).text()]);
+  const evalMode = await chooseEvalMode(opts.evaluate ?? "auto");
   const makePage = () => html.replace(
     "<!--TSCAD_CONFIG-->",
-    `<script>window.__TSCAD__ = ${JSON.stringify({ file: fileLabel, ws: "/__ws", wasmUrl: "/wasm/tscad_wasm_bg.wasm", glueUrl: "/wasm/tscad_wasm.js", workerUrl: `${APP_PREFIX}viewer/worker.js` })};</script>`,
+    `<script>window.__TSCAD__ = ${JSON.stringify({ file: fileLabel, ws: "/__ws", wasmUrl: "/wasm/tscad_wasm_bg.wasm", glueUrl: "/wasm/tscad_wasm.js", workerUrl: `${APP_PREFIX}viewer/worker.js`, ...(evalMode === "server" ? { remoteEval: "/__eval" } : {}) })};</script>`,
   );
   let page = makePage();
 
   let version = 0;
   let bundle: { js: string; map?: string } | undefined;
+  /** The same model bundled for bun (server-side evaluation); the last two stay on disk. */
+  let bunBundles: BunBundle[] = [];
   let state: State = { type: "building" };
   let watched = new Set<string>();
 
-  const sockets = new Set<ServerWebSocket<unknown>>();
+  const sockets = new Set<ServerWebSocket<WsData>>();
   const broadcast = (msg: State | { type: string }) => {
     const text = JSON.stringify(msg);
     for (const ws of sockets) ws.send(text);
@@ -56,8 +71,13 @@ export async function startDev(opts: DevOptions): Promise<DevServer> {
   async function rebuild() {
     broadcast({ type: "building" });
     try {
-      const b = await buildUser(entry, root);
+      const [b, bb] = await Promise.all([buildUser(entry, root), evalMode === "server" ? bundleModel(entry) : undefined]);
       bundle = b;
+      if (bb) {
+        bunBundles.push(bb);
+        // Viewers may still be importing the previous one.
+        for (const old of bunBundles.splice(0, Math.max(0, bunBundles.length - 2))) rmSync(old.path, { force: true });
+      }
       version++;
       state = { type: "bundle", url: `/__user/bundle.js?v=${version}`, file: fileLabel, version, millis: b.millis };
       watched = new Set(b.inputs.filter((p) => !p.includes("/node_modules/")));
@@ -72,15 +92,19 @@ export async function startDev(opts: DevOptions): Promise<DevServer> {
 
   const assetResponse = (a: Asset) => new Response(a.body as BodyInit, { headers: { "content-type": a.type, "cache-control": "no-cache" } });
 
-  const server = Bun.serve({
+  const server = Bun.serve<WsData>({
     port: opts.port ?? 3333,
     hostname: opts.host ?? "localhost",
     development: false,
     fetch(req, server) {
       const url = new URL(req.url);
       const path = decodeURIComponent(url.pathname);
+      if (path === "/__eval" && evalMode === "server") {
+        if (server.upgrade(req, { data: { kind: "eval" } })) return undefined;
+        return new Response("expected a websocket", { status: 400 });
+      }
       if (path === "/__ws") {
-        if (server.upgrade(req)) return undefined;
+        if (server.upgrade(req, { data: { kind: "dev" } })) return undefined;
         return new Response("expected a websocket", { status: 400 });
       }
       if (path === "/" || path === "/index.html") return new Response(page, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache" } });
@@ -107,13 +131,22 @@ export async function startDev(opts: DevOptions): Promise<DevServer> {
     },
     websocket: {
       open(ws) {
+        const data = ws.data as { kind: string; session?: EvalSession };
+        if (data.kind === "eval") {
+          data.session = new EvalSession((frame) => ws.sendBinary(frame), () => bunBundles.at(-1), root);
+          return;
+        }
         sockets.add(ws);
         ws.send(JSON.stringify(state));
       },
       close(ws) {
+        ws.data.session?.close();
         sockets.delete(ws);
       },
-      message() {},
+      message(ws, message) {
+        const session = ws.data.session;
+        if (session && typeof message !== "string") session.handle(message);
+      },
     },
   });
 
@@ -176,9 +209,11 @@ export async function startDev(opts: DevOptions): Promise<DevServer> {
     url: `http://${opts.host && opts.host !== "0.0.0.0" ? opts.host : "localhost"}:${port}`,
     port,
     server,
+    evalMode,
     rebuild,
     async stop() {
       clearTimeout(timer);
+      for (const b of bunBundles) rmSync(b.path, { force: true });
       for (const w of watchers) w.close();
       for (const ws of sockets) ws.close();
       await server.stop(true);
@@ -188,4 +223,21 @@ export async function startDev(opts: DevOptions): Promise<DevServer> {
 
 function notFound() {
   return new Response("not found", { status: 404 });
+}
+
+interface WsData {
+  kind: string;
+  session?: EvalSession;
+}
+
+/** Server-side evaluation needs the native kernel (that's the point: ~2× the wasm). */
+async function chooseEvalMode(want: "auto" | "server" | "browser"): Promise<"server" | "browser"> {
+  if (want === "browser") return "browser";
+  if (want === "server") return "server";
+  try {
+    const k = await loadKernel();
+    return k instanceof WasmKernelHost ? "browser" : "server";
+  } catch {
+    return "browser";
+  }
 }

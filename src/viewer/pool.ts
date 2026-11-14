@@ -4,7 +4,7 @@
  * stick to the evaluator that built them so each kernel's subtree cache keeps hitting; new parts
  * go to the least-loaded one. Picks, meshes and STEP are routed to a part's owner.
  */
-import { loadKernel, type KernelHost, type MeshArrays, KernelPanic } from "../kernel";
+import { createKernel, loadKernel, type KernelHost, type MeshArrays, KernelPanic } from "../kernel";
 import type { Document, EvalOptions, EvalResult, Part, PartResult, PickInfo } from "../ir";
 
 export interface Evaluated {
@@ -57,7 +57,8 @@ export class ChildEvaluator implements Evaluator {
   #waiting = new Map<number, { resolve: (v: any) => void; reject: (e: unknown) => void }>();
   ready: Promise<void>;
 
-  constructor(workerUrl: string, module: WebAssembly.Module, glueUrl: string) {
+  /** `module` undefined: a native kernel (bun) in the child. */
+  constructor(workerUrl: string, module: WebAssembly.Module | undefined, glueUrl: string) {
     this.#worker = new Worker(workerUrl, { type: "module" });
     let readyResolve!: () => void, readyReject!: (e: unknown) => void;
     this.ready = new Promise((res, rej) => ((readyResolve = res), (readyReject = rej)));
@@ -75,7 +76,7 @@ export class ChildEvaluator implements Evaluator {
       else w.reject(m.panic ? new KernelPanic(m.error) : new Error(m.error));
     };
     this.#worker.onerror = (e) => readyReject(new Error(e.message || "kernel worker failed"));
-    this.#worker.postMessage({ type: "child-init", module, glueUrl });
+    this.#worker.postMessage({ type: "child-init", module, glueUrl, native: !module });
   }
 
   #ready = false;
@@ -110,8 +111,9 @@ export class ChildEvaluator implements Evaluator {
 }
 
 /** Serve a {@link ChildEvaluator} from inside a nested worker. */
-export function serveChild(scope: DedicatedWorkerGlobalScope, module: WebAssembly.Module, glueUrl: string) {
-  const local = loadKernel(module, glueUrl).then((k) => new LocalEvaluator(k));
+export function serveChild(scope: DedicatedWorkerGlobalScope, module: WebAssembly.Module | undefined, glueUrl: string) {
+  // No module: bun's default kernel (a native session of its own).
+  const local = (module ? loadKernel(module, glueUrl) : createKernel()).then((k) => new LocalEvaluator(k));
   local.then(
     () => scope.postMessage({ type: "child-ready" }),
     (e) => scope.postMessage({ type: "child-failed", error: String(e?.message ?? e) }),

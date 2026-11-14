@@ -8,6 +8,7 @@ import type { CodeFrame, EvalData, ExportFormat, FromWorker, Loc, ParamSchemaDat
 import { fmtNum, PALETTE, type Hit, type SectionAxis, type ViewName, Viewport } from "./scene";
 import { SketchOverlay } from "./sketch-overlay";
 import { AssemblyOverlay } from "./assembly-overlay";
+import { RemoteWorker } from "./remote";
 import { CheckOverlay, type CheckMode } from "./check-overlay";
 import type { InterferenceData, PrintabilityData } from "./protocol";
 import type { MateData, SketchData, SketchDimensionData } from "./protocol";
@@ -36,6 +37,8 @@ export interface ViewerConfig {
    * file:line and copy it.
    */
   onSourceClick?: (loc: Loc, target: { kind: "sketch"; sketch: SketchData } | { kind: "dimension"; sketch: SketchData; dimension: SketchDimensionData } | { kind: "mate"; mate: MateData }) => void;
+  /** Evaluate on the dev server instead of in a page worker: the socket path (e.g. `/__eval`). */
+  remoteEval?: string;
   /** Max kernels evaluating parts in parallel (default cores − 1, ≤ 4; 1 = off). `?pool=n` in the URL overrides. */
   pool?: number;
   /** Expose `window.__tscadViewer` (tests). Default true. */
@@ -102,6 +105,8 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
     measure: false,
     colors: {} as Record<string, string>,
     connected: false,
+    buildAt: 0,
+    editToRender: 0,
   };
 
   // ───────────────────────── layout ─────────────────────────
@@ -261,7 +266,10 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
 
   // ───────────────────────── worker ─────────────────────────
 
-  const worker = new Worker(cfg.workerUrl, { type: "module" });
+  // Server-side evaluation (dev server with the native kernel) or the wasm worker in this page.
+  const worker: Pick<Worker, "postMessage"> & { onmessage: ((e: MessageEvent<FromWorker>) => void) | null; onerror: ((e: ErrorEvent) => void) | null } = cfg.remoteEval
+    ? new RemoteWorker(cfg.remoteEval)
+    : new Worker(cfg.workerUrl, { type: "module" });
   let inFlight = false;
   let queuedValues: ParamValuesData | undefined;
   let reqId = 0;
@@ -276,7 +284,7 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
     switch (m.type) {
       case "ready":
         state.kernelReady = true;
-        state.kernelVersion = m.version;
+        state.kernelVersion = m.version + (m.native ? " · native (server)" : "");
         loader.querySelector(".loader-text")!.textContent = "Evaluating model…";
         console.info(`[tscad] kernel ${m.version} ready in ${m.loadMs.toFixed(0)} ms`);
         if (state.bundleUrl) loadBundle(state.bundleUrl, bundleMap);
@@ -336,6 +344,16 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
   }
 
   let bundleMap: object | undefined;
+
+  /** Param values that differ from the schema's defaults (set by the user, the URL or a drag). */
+  function userValues(): ParamValuesData {
+    const out: ParamValuesData = {};
+    for (const [k, v] of Object.entries(state.values)) {
+      const spec = state.schema[k];
+      if (!spec || v !== spec.default) out[k] = v;
+    }
+    return out;
+  }
   let refitNext = false;
   function loadBundle(url: string, map?: object) {
     state.bundleUrl = url;
@@ -343,7 +361,8 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
     if (!state.kernelReady) return;
     inFlight = true;
     queuedValues = undefined;
-    send({ type: "load", url, values: state.values, map: bundleMap });
+    // Only what the user changed: a default edited in the code must win over the old value.
+    send({ type: "load", url, values: userValues(), map: bundleMap });
   }
 
   type Req = Extract<ToWorker, { id: number }>;
@@ -362,6 +381,11 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
   // ───────────────────────── results ─────────────────────────
 
   function onResult(data: EvalData) {
+    // Edit → render latency: from the dev server noticing the edit to this result.
+    if (state.buildAt) {
+      state.editToRender = performance.now() - state.buildAt;
+      state.buildAt = 0;
+    }
     const first = !state.data;
     state.data = data;
     state.busy = "";
@@ -1339,6 +1363,7 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
         loadBundle(m.url);
         renderError();
       } else if (m.type === "building") {
+        state.buildAt = performance.now();
         state.busy = "loading";
         renderStatus();
       } else if (m.type === "bundle-error") {
