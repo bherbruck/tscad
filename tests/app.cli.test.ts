@@ -49,7 +49,8 @@ describe("parseArgs", () => {
     expect(formatOf("a.STL")).toBe("stl");
     expect(formatOf("a.stp")).toBe("step");
     expect(formatOf("a", "3mf")).toBe("3mf");
-    expect(() => formatOf("a.dxf")).toThrow(/unknown export format/);
+    expect(formatOf("a.dxf")).toBe("dxf");
+    expect(() => formatOf("a.dwg")).toThrow(/unknown export format/);
   });
 });
 

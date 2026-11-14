@@ -59,6 +59,8 @@ const FORMATS: { id: ExportFormat; name: string; desc: string; ext: string; mime
   { id: "3mf", name: "3MF", desc: "Mesh with colours · slicers", ext: "3mf", mime: "model/3mf" },
   { id: "glb", name: "GLB", desc: "glTF binary · web & AR", ext: "glb", mime: "model/gltf-binary" },
   { id: "obj", name: "OBJ", desc: "Wavefront mesh", ext: "obj", mime: "model/obj" },
+  { id: "dxf", name: "DXF", desc: "2D · drawings, or a mid-height section", ext: "dxf", mime: "image/vnd.dxf" },
+  { id: "svg", name: "SVG", desc: "2D · laser cutters & docs", ext: "svg", mime: "image/svg+xml" },
 ];
 
 /** Mount the viewer app (top bar, 3D workspace, panels, eval worker) into `root`. */
@@ -327,6 +329,7 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
     const failed = data.parts.filter((p) => !p.ok);
     state.error = failed.length ? kernelError(failed[0]!) : undefined;
     params.update(data.schema, data.values);
+    viewport.setDrawings(data.drawings ?? []);
     viewport.setParts(
       data.parts.map((p, i) => ({ name: p.name, color: state.colors[p.name] ?? p.color ?? PALETTE[i % PALETTE.length], mesh: p.mesh, failed: !p.ok })),
     );
@@ -484,6 +487,20 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
       el.title = p.bbox ? `${p.name}\nbbox ${p.bbox[0].map((v) => fmtNum(v)).join(", ")} → ${p.bbox[1].map((v) => fmtNum(v)).join(", ")}\n${p.counts ? `${p.counts[0]} faces, ${p.counts[1]} edges, ${p.counts[2]} vertices` : ""}\n${fmtMs(p.millis)}` : p.name;
       partsList.append(el);
     });
+    for (const dr of d.drawings ?? []) {
+      const v = viewport.drawings.get(dr.name);
+      const visible = v?.visible ?? true;
+      const eye = h("button", { class: "icon-btn sm", title: visible ? "Hide" : "Show", onclick: () => { viewport.setDrawingVisible(dr.name, !visible); renderParts(); } }, icon(visible ? "eye" : "eyeOff", 14));
+      partsList.append(
+        h(
+          "div",
+          { class: `part${visible ? "" : " hidden-part"}`, title: `${dr.name}: a flat drawing — export it with tscad build -o ${dr.name}.dxf` },
+          h("span", { class: "swatch drawing-swatch", style: { "--c": v?.color ?? dr.color ?? "#ffb020" } }),
+          h("div", { class: "part-main" }, h("div", { class: "part-name" }, dr.name, h("span", { class: "chip" }, "2D")), h("div", { class: "part-meta" }, `drawing · ${dr.loops} loop${dr.loops === 1 ? "" : "s"}`)),
+          h("div", { class: "part-actions" }, eye),
+        ),
+      );
+    }
   }
 
   function isolate(name: string) {
@@ -842,7 +859,7 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
     const d = state.data;
     if (!d) return toast("Nothing to export yet");
     const parts = d.parts.filter((p) => p.ok && !p.empty && (viewport.parts.get(p.name)?.visible ?? true)).map((p) => ({ name: p.name, color: state.colors[p.name] ?? p.color }));
-    if (!parts.length) return toast("No visible parts to export");
+    if (!parts.length && !((f.id === "dxf" || f.id === "svg") && d.drawings?.length)) return toast("No visible parts to export");
     const t = performance.now();
     const done = toast(`Exporting ${f.name}…`, true);
     const res = await request<{ data?: Uint8Array | string; error?: string }>({ type: "export", format: f.id, parts, tolerance });

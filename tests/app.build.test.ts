@@ -32,12 +32,23 @@ const BAD = `export default function Bad() {
 
 const run = (...args: string[]) => Bun.spawnSync(["bun", CLI, ...args], { cwd: dir, env: { ...process.env, NO_COLOR: "1" } });
 
+const DRAWING = `export default function G() {
+  return (
+    <>
+      <drawing name="gasket"><rect w={50} h={30} center /><circle r={8} /></drawing>
+      <part name="block"><box size={[20, 20, 10]} x={40} /></part>
+    </>
+  )
+}
+`;
+
 beforeAll(() => {
   dir = mkdtempSync(join(tmpdir(), "tscad-build-"));
   // tsconfig as `tscad init` writes it (also works without one: the CLI maps the JSX runtime).
   writeFileSync(join(dir, "tsconfig.json"), JSON.stringify({ compilerOptions: { jsx: "react-jsx", jsxImportSource: "tscad" } }));
   writeFileSync(join(dir, "cube.tsx"), MODEL);
   writeFileSync(join(dir, "bad.tsx"), BAD);
+  writeFileSync(join(dir, "drawing.tsx"), DRAWING);
 });
 
 describe("tscad build", () => {
@@ -110,6 +121,36 @@ describe("tscad build", () => {
     expect(png.readUInt32BE(16)).toBe(320);
     expect(png.readUInt32BE(20)).toBe(200);
     expect(run("render", "cube.tsx", "--view", "sideways").exitCode).toBe(2);
+  }, 60_000);
+
+  test("DXF/SVG from <drawing>s, and a section of solids otherwise", () => {
+    const r = run("build", "drawing.tsx", "-o", "g.dxf", "-o", "g.svg", "-o", "g.stl");
+    expect(r.exitCode).toBe(0);
+    const dxf = readFileSync(join(dir, "g.dxf"), "utf8");
+    expect(dxf).toContain("SECTION");
+    expect(dxf).toContain("GASKET");
+    expect(dxf.trimEnd().endsWith("EOF")).toBe(true);
+    const svg = readFileSync(join(dir, "g.svg"), "utf8");
+    expect(svg).toContain('id="gasket"');
+    expect(svg).toMatch(/viewBox="-26 -16 52 32"/);
+    // No drawings: the cube is cut at --section-z into a 20 mm square.
+    const s = run("build", "cube.tsx", "-o", "cut.svg", "--section-z", "5", "-p", "size=20");
+    expect(s.exitCode).toBe(0);
+    expect(readFileSync(join(dir, "cut.svg"), "utf8")).toMatch(/width="2\d(\.\d+)?mm"/);
+    expect(run("build", "cube.tsx", "-o", "miss.svg", "--section-z", "500").exitCode).toBe(1);
+    expect(run("build", "cube.tsx", "-o", "x.svg", "--section-z", "abc").exitCode).toBe(2);
+  }, 60_000);
+
+  test("tscad mcp keeps stdout to JSON-RPC only", async () => {
+    const p = Bun.spawn(["bun", CLI, "mcp"], { cwd: dir, stdin: "pipe", stdout: "pipe", stderr: "pipe", env: { ...process.env, FORCE_COLOR: "1" } });
+    p.stdin.write(JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "1" } } }) + "\n");
+    p.stdin.end();
+    const out = await new Response(p.stdout).text();
+    await p.exited;
+    const lines = out.split("\n").filter(Boolean);
+    expect(lines.length).toBeGreaterThan(0);
+    for (const l of lines) expect(JSON.parse(l).jsonrpc).toBe("2.0");
+    expect(JSON.parse(lines[0]!).result.serverInfo.name).toBe("tscad");
   }, 60_000);
 
   test("tscad info lists params and parts", () => {

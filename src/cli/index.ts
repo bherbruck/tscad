@@ -14,6 +14,7 @@ ${c.bold("Usage")}
   ${c.accent("tscad build")} ${c.gray("[file] -o out.stl")}      export STEP / STL / 3MF / GLB / OBJ
   ${c.accent("tscad info")} ${c.gray("[file]")}                  params and part stats
   ${c.accent("tscad render")} ${c.gray("[file] -o out.png")}     a PNG image of the model
+  ${c.accent("tscad mcp")}                          MCP server for AI agents ${c.gray("(see docs/mcp.md)")}
 
 ${c.bold("dev")}
   --port <n>            port ${c.gray("(default 3333; next free one if taken)")}
@@ -22,10 +23,11 @@ ${c.bold("dev")}
 
 ${c.bold("build")}
   -o, --out <file>      output file; the extension picks the format ${c.gray("(repeatable)")}
-  -f, --format <fmt>    step | stl | 3mf | glb | obj ${c.gray("(when -o has no extension)")}
+  -f, --format <fmt>    step | stl | 3mf | glb | obj | dxf | svg ${c.gray("(when -o has no extension)")}
   -p, --param <k=v>     override a parameter ${c.gray("(repeatable, or a=1,b=2)")}
   -t, --tolerance <mm>  mesh chord tolerance ${c.gray("(default 0.01)")}
   --part <name>         only this part ${c.gray("(repeatable)")}
+  --section-z <mm>      .dxf/.svg of a model without <drawing>s: cut at this Z ${c.gray("(default mid-height)")}
   --ascii               ASCII STL
   --json                machine-readable output
 
@@ -95,7 +97,12 @@ export async function main(argv: string[]): Promise<number> {
         return 2;
       }
       const { build } = await import("./build");
-      return build({ file, outputs: list(f.out), params, tolerance: tol ? Number(tol) : undefined, parts: list(f.part), format: str(f.format), ascii: !!f.ascii, json: !!f.json, quiet: !!f.quiet });
+      const sz = str(f["section-z"]);
+      if (sz !== undefined && !Number.isFinite(Number(sz))) {
+        console.error(`${sym.err} --section-z must be a number (mm)`);
+        return 2;
+      }
+      return build({ file, outputs: list(f.out), params, tolerance: tol ? Number(tol) : undefined, parts: list(f.part), format: str(f.format), ascii: !!f.ascii, json: !!f.json, quiet: !!f.quiet, sectionZ: sz === undefined ? undefined : Number(sz) });
     }
     case "info": {
       if (!needFile()) return 1;
@@ -107,6 +114,12 @@ export async function main(argv: string[]): Promise<number> {
       const { render } = await import("./render");
       const num = (v: unknown) => (str(v) === undefined ? undefined : Number(str(v)));
       return render({ file, out: str(f.out), params, view: str(f.view), width: num(f.width), height: num(f.height), background: str(f.background), ortho: !!f.ortho, edges: f.edges !== false });
+    }
+    case "mcp": {
+      // stdout is the JSON-RPC stream: print nothing else.
+      const { runMcpServer } = await import("../mcp");
+      await runMcpServer();
+      return 0;
     }
     case "dev": {
       if (!needFile()) return 1;

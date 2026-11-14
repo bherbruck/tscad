@@ -381,7 +381,7 @@ export class Viewport {
     this.clearSelection();
     this.#refreshBounds();
     this.#rebuildCaps();
-    if (!this.#hasFitted && this.parts.size) {
+    if (!this.#hasFitted && (this.parts.size || this.drawings.size)) {
       this.#hasFitted = true;
       this.setView("iso", false);
     }
@@ -524,9 +524,47 @@ export class Viewport {
     this.#needsRender = true;
   }
 
+  /** Flat `<drawing>` outlines, drawn as lines on z = 0. */
+  readonly drawings = new Map<string, { line: LineSegments2; box: THREE.Box3; visible: boolean; color: string }>();
+
+  setDrawings(list: { name: string; color?: string; segments: Float32Array }[]) {
+    const old = this.drawings;
+    for (const d of old.values()) {
+      d.line.removeFromParent();
+      d.line.geometry.dispose();
+      this.#dropLineMat(d.line.material);
+    }
+    const visible = new Map([...old].map(([k, v]) => [k, v.visible]));
+    old.clear();
+    list.forEach((d, i) => {
+      if (!d.segments.length) return;
+      const g = new LineSegmentsGeometry();
+      g.setPositions(d.segments);
+      const color = d.color ?? ["#ffb020", "#3ecf8e", "#f471b5", "#38bdf8"][i % 4]!;
+      const line = new LineSegments2(g, this.#lineMat(new THREE.Color(color), 2.2, true));
+      line.renderOrder = 15;
+      line.userData.drawing = d.name;
+      const box = new THREE.Box3().setFromBufferAttribute(new THREE.BufferAttribute(d.segments, 3));
+      const vis = visible.get(d.name) ?? true;
+      line.visible = vis;
+      this.model.add(line);
+      this.drawings.set(d.name, { line, box, visible: vis, color });
+    });
+    this.#needsRender = true;
+  }
+
+  setDrawingVisible(name: string, visible: boolean) {
+    const d = this.drawings.get(name);
+    if (!d) return;
+    d.visible = visible;
+    d.line.visible = visible;
+    this.#needsRender = true;
+  }
+
   #refreshBounds() {
     const box = new THREE.Box3();
     for (const v of this.parts.values()) if (v.mesh.geometry.boundingBox) box.union(v.mesh.geometry.boundingBox);
+    for (const d of this.drawings.values()) box.union(d.box);
     if (!box.isEmpty()) this.#bounds.copy(box);
     // Keep the key light's shadow camera snug around the model.
     const s = this.#bounds.getBoundingSphere(new THREE.Sphere());
@@ -552,6 +590,7 @@ export class Viewport {
   #visibleSphere(): THREE.Sphere {
     const box = new THREE.Box3();
     for (const v of this.parts.values()) if (v.visible && v.mesh.geometry.boundingBox) box.union(v.mesh.geometry.boundingBox);
+    for (const d of this.drawings.values()) if (d.visible) box.union(d.box);
     if (box.isEmpty()) box.copy(this.#bounds);
     return box.getBoundingSphere(new THREE.Sphere());
   }

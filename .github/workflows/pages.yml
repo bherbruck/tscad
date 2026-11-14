@@ -1,6 +1,7 @@
 name: Playground
 
-# Builds the release wasm and the static playground (dist/playground) and deploys it to
+# Builds the release wasm, the static playground (dist/playground) and the docs site
+# (dist/site, with the playground at play/), and deploys dist/site to
 # GitHub Pages. Enable Pages with "Source: GitHub Actions" in the repo settings.
 on:
   push:
@@ -36,10 +37,20 @@ jobs:
         run: bun scripts/build-playground.ts
       - name: Smoke-test the static build
         run: bun test tests/app.playground.test.ts
+      # The site root is dist/site (docs); the playground is mounted at play/ by build-docs.
+      - name: Build docs site
+        run: |
+          if [ -f scripts/build-docs.ts ]; then
+            bun scripts/build-docs.ts
+          else
+            mkdir -p dist/site && cp -r dist/playground dist/site/play
+            printf '<!doctype html><meta http-equiv="refresh" content="0; url=play/">' > dist/site/index.html
+            touch dist/site/.nojekyll
+          fi
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist/playground
+          path: dist/site
 
   deploy:
     needs: build

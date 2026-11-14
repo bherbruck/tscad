@@ -10,6 +10,9 @@ import { exportModel } from "../export";
 import type { Document, PartResult } from "../ir";
 import type { EvalData, FromWorker, Loc, ParamSchemaData, ParamValuesData, PartData, StageError, ToWorker } from "./protocol";
 import { codeFrame, parseStack, SourceMap, stripQuery } from "./sourcemap";
+import type { DrawingData } from "./protocol";
+import { flattenNurbs } from "../drawing/common";
+import { polylineLoops, section, toDXF, toSVG } from "../drawing";
 
 declare const self: DedicatedWorkerGlobalScope;
 
@@ -22,6 +25,20 @@ let lastSchema: ParamSchemaData = {};
 let pending = false;
 let running = false;
 let seq = 0;
+let lastDrawings: any[] = [];
+let lastBoxes = new Map<string, PartData["bbox"]>();
+
+/** DXF/SVG: the model's `<drawing>`s, else the parts cut at mid-height. */
+async function export2D(k: KernelHost, parts: { name: string }[], format: "dxf" | "svg"): Promise<string> {
+  let layers: { name: string; loops: any[] }[] = lastDrawings;
+  if (!layers.length) {
+    const boxes = parts.map((p) => lastBoxes.get(p.name)).filter((b) => !!b);
+    const z = (Math.min(...boxes.map((b) => b![0][2])) + Math.max(...boxes.map((b) => b![1][2]))) / 2;
+    layers = [];
+    for (const p of parts) layers.push({ name: p.name, loops: polylineLoops(section(await k.meshAt(p.name, 0.01), { origin: [0, 0, z], normal: [0, 0, 1] }).loops) });
+  }
+  return format === "dxf" ? toDXF(layers as any) : toSVG(layers as any);
+}
 
 function post(msg: FromWorker, transfer: Transferable[] = []) {
   self.postMessage(msg, transfer);
@@ -73,7 +90,10 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
       case "export": {
         const k = await requireKernel();
         try {
-          const data = await exportModel(k, msg.parts, msg.format, { tolerance: msg.tolerance });
+          const data =
+            msg.format === "dxf" || msg.format === "svg"
+              ? await export2D(k, msg.parts, msg.format)
+              : await exportModel(k, msg.parts, msg.format, { tolerance: msg.tolerance });
           post({ type: "export", id: msg.id, data }, typeof data === "string" ? [] : [data.buffer as ArrayBuffer]);
         } catch (err) {
           post({ type: "export", id: msg.id, error: String((err as Error)?.message ?? err) });
@@ -168,10 +188,20 @@ async function run() {
     }
     parts.push(data);
   }
+  const drawings: DrawingData[] = [];
+  for (const d of (rendered.drawings as any[] | undefined) ?? []) {
+    if (d.thickness) continue; // already a part
+    const segments = drawingSegments(d.loops);
+    drawings.push({ name: d.name, color: d.color, loops: d.loops.length, segments });
+    transfer.push(segments.buffer as ArrayBuffer);
+  }
   const t3 = performance.now();
   lastSchema = rendered.params ?? {};
+  lastDrawings = (rendered.drawings as any[] | undefined) ?? [];
+  lastBoxes = new Map(parts.map((p) => [p.name, p.bbox]));
   const data: EvalData = {
     parts,
+    drawings,
     schema: lastSchema,
     values: rendered.values ?? values,
     warnings: (rendered.warnings as string[]) ?? [],
@@ -181,6 +211,27 @@ async function run() {
     seq: ++seq,
   };
   post({ type: "result", data }, transfer);
+}
+
+/** 2D loops (lines, arcs, NURBS) → line segments on z = 0. */
+function drawingSegments(loops: any[][]): Float32Array {
+  const out: number[] = [];
+  const push = (pts: [number, number][]) => {
+    for (let i = 0; i + 1 < pts.length; i++) out.push(pts[i]![0], pts[i]![1], 0, pts[i + 1]![0], pts[i + 1]![1], 0);
+  };
+  for (const loop of loops) {
+    for (const s of loop) {
+      if (s.kind === "line") push([s.a, s.b]);
+      else if (s.kind === "arc") {
+        const n = Math.max(8, Math.ceil((Math.abs(s.a1 - s.a0) / (Math.PI * 2)) * 96));
+        push(Array.from({ length: n + 1 }, (_, i) => {
+          const t = s.a0 + ((s.a1 - s.a0) * i) / n;
+          return [s.c[0] + s.r * Math.cos(t), s.c[1] + s.r * Math.sin(t)] as [number, number];
+        }));
+      } else if (s.kind === "nurbs") push(flattenNurbs(s, 0.02) as [number, number][]);
+    }
+  }
+  return new Float32Array(out);
 }
 
 function schemaOf(m: any): ParamSchemaData {

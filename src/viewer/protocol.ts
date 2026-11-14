@@ -5,7 +5,7 @@
 import type { MeshArrays } from "../kernel";
 import type { EvalError, PickInfo } from "../ir";
 
-export type ExportFormat = "step" | "stl" | "3mf" | "glb" | "obj";
+export type ExportFormat = "step" | "stl" | "3mf" | "glb" | "obj" | "dxf" | "svg";
 
 /** A TSX source position (1-based line and column). */
 export interface Loc {
@@ -59,8 +59,18 @@ export interface PartData {
   mesh?: MeshArrays;
 }
 
+/** A flat `<drawing>` (no thickness): its loops as line segments on z = 0. */
+export interface DrawingData {
+  name: string;
+  color?: string;
+  loops: number;
+  /** xyz xyz per segment. */
+  segments: Float32Array;
+}
+
 export interface EvalData {
   parts: PartData[];
+  drawings: DrawingData[];
   schema: ParamSchemaData;
   values: ParamValuesData;
   warnings: string[];

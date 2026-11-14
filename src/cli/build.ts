@@ -1,13 +1,16 @@
 /** `tscad build` and `tscad info`. */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, extname, relative, resolve, basename } from "node:path";
-import { exportModel, type ExportFormat } from "../export";
+import { exportModel, type ExportFormat as MeshFormat } from "../export";
+import { section, polylineLoops, toDXF, toSVG } from "../drawing";
 import type { PartResult } from "../ir";
 import { describeError, describePartError, rel, runModel, type ModelRun } from "./model";
 import { c, fmtBytes, fmtMs, fmtNum, fmtVolume, sym, table } from "./ui";
 
-export const FORMATS: ExportFormat[] = ["step", "stl", "3mf", "glb", "obj"];
-const EXT_ALIASES: Record<string, ExportFormat> = { stp: "step", step: "step", stl: "stl", "3mf": "3mf", glb: "glb", obj: "obj" };
+export type ExportFormat = MeshFormat | "dxf" | "svg";
+export const FORMATS: ExportFormat[] = ["step", "stl", "3mf", "glb", "obj", "dxf", "svg"];
+const EXT_ALIASES: Record<string, ExportFormat> = { stp: "step", step: "step", stl: "stl", "3mf": "3mf", glb: "glb", obj: "obj", dxf: "dxf", svg: "svg" };
+const is2D = (f: ExportFormat): f is "dxf" | "svg" => f === "dxf" || f === "svg";
 
 export function formatOf(path: string, explicit?: string): ExportFormat {
   const f = (explicit ?? extname(path).slice(1)).toLowerCase();
@@ -26,6 +29,8 @@ export interface BuildOptions {
   ascii?: boolean;
   quiet?: boolean;
   json?: boolean;
+  /** DXF/SVG of a model without `<drawing>`s: slice the parts at this Z (default: mid-height). */
+  sectionZ?: number;
 }
 
 /** Returns the process exit code. */
@@ -39,7 +44,7 @@ export async function build(opts: BuildOptions): Promise<number> {
     console.error(`${sym.err} ${(e as Error).message}`);
     return 2;
   }
-  const onlyStep = formats.every((f) => f === "step");
+  const onlyStep = formats.every((f) => f === "step" || is2D(f));
   let run: ModelRun;
   try {
     run = await runModel(opts.file, opts.params, { noMesh: onlyStep });
@@ -59,13 +64,16 @@ export async function build(opts: BuildOptions): Promise<number> {
     }
     parts = parts.filter((p) => opts.parts!.includes(p.name));
   }
-  if (!opts.quiet && !opts.json) printParts(parts, rendered.parts, run);
+  const drawings = (rendered.drawings ?? []).filter((d) => !opts.parts?.length || opts.parts.includes(d.name));
+  const onlyDrawings = formats.every(is2D) && drawings.length > 0;
+  if (!opts.quiet && !opts.json && parts.length) printParts(parts, rendered.parts, run);
+  if (!opts.quiet && !opts.json && drawings.length) console.log(`\n  ${c.bold("drawings")} ${drawings.map((d) => `${d.name} ${c.gray(`(${d.loops.length} loop${d.loops.length === 1 ? "" : "s"})`)}`).join(", ")}`);
 
   const failed = parts.filter((p) => !p.ok);
   for (const p of failed) console.error(`\n${sym.err} ${describePartError(p, rendered.sourceMap as any)}`);
   if (failed.length) return 1;
   const good = parts.filter((p) => !p.empty);
-  if (!good.length) {
+  if (!good.length && !onlyDrawings) {
     console.error(`${sym.err} nothing to export: every part is empty`);
     return 1;
   }
@@ -77,12 +85,15 @@ export async function build(opts: BuildOptions): Promise<number> {
     const t = performance.now();
     let data: Uint8Array | string;
     try {
-      data = await exportModel(
-        run.kernel,
-        good.map((p) => ({ name: p.name, color: colors.get(p.name) })),
-        formats[i]!,
-        { tolerance: opts.tolerance, binary: !opts.ascii },
-      );
+      const fmt = formats[i]!;
+      if (is2D(fmt)) {
+        const layers = drawings.length ? drawings : await sectionLayers(run, good, opts.sectionZ, opts.tolerance);
+        if (!layers.some((l) => l.loops.length)) throw new Error(drawings.length ? "the drawings are empty" : `the section at z = ${fmtNum(sectionZOf(good, opts.sectionZ))} cuts nothing (try --section-z)`);
+        data = fmt === "dxf" ? toDXF(layers) : toSVG(layers);
+      } else {
+        if (!good.length) throw new Error("no solid parts (this model only has drawings — export .dxf or .svg)");
+        data = await exportModel(run.kernel, good.map((p) => ({ name: p.name, color: colors.get(p.name) })), fmt, { tolerance: opts.tolerance, binary: !opts.ascii });
+      }
     } catch (e) {
       console.error(`${sym.err} export to ${formats[i]} failed: ${(e as Error).message}`);
       return 1;
@@ -161,4 +172,22 @@ export async function info(opts: { file: string; params: Record<string, unknown>
   for (const w of rendered.warnings) console.error(`${sym.warn} ${c.yellow(w)}`);
   console.log();
   return result.ok ? 0 : 1;
+}
+
+/** Z of the default section: the middle of the parts' combined height. */
+function sectionZOf(parts: PartResult[], z?: number): number {
+  if (z !== undefined) return z;
+  const lo = Math.min(...parts.map((p) => p.bbox?.[0][2] ?? 0)), hi = Math.max(...parts.map((p) => p.bbox?.[1][2] ?? 0));
+  return (lo + hi) / 2;
+}
+
+/** One layer per part: its outline cut by the plane z = `sectionZ`. */
+async function sectionLayers(run: ModelRun, parts: PartResult[], sectionZ: number | undefined, tolerance = 0.01) {
+  const z = sectionZOf(parts, sectionZ);
+  const out = [];
+  for (const p of parts) {
+    const mesh = await run.kernel.meshAt(p.name, tolerance);
+    out.push({ name: p.name, loops: polylineLoops(section(mesh, { origin: [0, 0, z], normal: [0, 0, 1] }).loops) });
+  }
+  return out;
 }
