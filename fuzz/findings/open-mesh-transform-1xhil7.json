@@ -11,6 +11,10 @@
     4872,
     6846
   ],
+  "signature": "open-mesh|transform|mesh has open edges",
+  "status": "still failing",
+  "statusDetail": "mesh has open edges — 4 open edges of 4612 triangles",
+  "checked": "2026-11-14T12:17:31.962Z",
   "replay": "bun scripts/fuzz/fuzz.ts --replay 4275",
   "minimal": {
     "parts": [

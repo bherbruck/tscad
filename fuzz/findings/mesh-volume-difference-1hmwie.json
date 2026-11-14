@@ -5,7 +5,7 @@
   "message": "mesh volume differs from kernel volume",
   "detail": "difference: kernel 0.0070, mesh 0.0072 (2.43%)",
   "minimalDetail": "kernel 0.0054, mesh 0.0055 (2.35%)",
-  "count": 11,
+  "count": 24,
   "seeds": [
     553,
     2204,
@@ -17,6 +17,10 @@
     13601
   ],
   "mode": "coplanar",
+  "signature": "mesh-volume|difference|mesh volume differs from kernel volume",
+  "status": "still failing",
+  "statusDetail": "mesh volume differs from kernel volume — kernel 0.0054, mesh 0.0055 (2.35%)",
+  "checked": "2026-11-14T12:17:19.869Z",
   "replay": "bun scripts/fuzz/fuzz.ts --replay 553",
   "minimal": {
     "parts": [

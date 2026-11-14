@@ -3,7 +3,7 @@
   "oracle": "mesh-error",
   "op": "meshAt",
   "message": "the part has no record",
-  "count": 112,
+  "count": 114,
   "seeds": [
     24,
     719,
@@ -14,6 +14,10 @@
     1443,
     1519
   ],
+  "signature": "mesh-error|meshAt|the part has no record",
+  "status": "fixed",
+  "statusDetail": "evaluates cleanly",
+  "checked": "2026-11-14T12:17:32.659Z",
   "replay": "bun scripts/fuzz/fuzz.ts --replay 24",
   "minimal": {
     "parts": [

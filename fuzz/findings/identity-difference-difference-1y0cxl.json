@@ -14,6 +14,10 @@
     13795
   ],
   "mode": "identical",
+  "signature": "identity-difference|difference|vol(A−B) ≠ vol(A) − vol(A∩B)",
+  "status": "still failing",
+  "statusDetail": "vol(A−B) ≠ vol(A) − vol(A∩B) — A=12053.5329 B=12053.5329 union=12053.5329 intersection=12053.5329 difference=12053.5329 (off by 100.00%)",
+  "checked": "2026-11-14T12:17:38.348Z",
   "replay": "bun scripts/fuzz/fuzz.ts --replay 5633",
   "minimal": {
     "identity": true,

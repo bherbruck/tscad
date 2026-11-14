@@ -5,7 +5,7 @@
   "message": "mesh has open edges",
   "detail": "union: 2 open edges of 1208 triangles",
   "minimalDetail": "2 open edges of 1208 triangles",
-  "count": 45,
+  "count": 78,
   "seeds": [
     333,
     426,
@@ -17,6 +17,10 @@
     3172
   ],
   "mode": "tangent-cyl",
+  "signature": "open-mesh|union|mesh has open edges",
+  "status": "still failing",
+  "statusDetail": "mesh has open edges — 2 open edges of 1208 triangles",
+  "checked": "2026-11-14T12:17:33.018Z",
   "replay": "bun scripts/fuzz/fuzz.ts --replay 333",
   "minimal": {
     "parts": [

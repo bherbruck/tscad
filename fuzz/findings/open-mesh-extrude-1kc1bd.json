@@ -9,6 +9,10 @@
   "seeds": [
     4938
   ],
+  "signature": "open-mesh|extrude|mesh has open edges",
+  "status": "still failing",
+  "statusDetail": "mesh has open edges — 4 open edges of 716 triangles",
+  "checked": "2026-11-14T12:17:34.798Z",
   "replay": "bun scripts/fuzz/fuzz.ts --replay 4938",
   "minimal": {
     "parts": [

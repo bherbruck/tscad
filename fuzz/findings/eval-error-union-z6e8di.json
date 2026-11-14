@@ -1,0 +1,225 @@
+{
+  "id": "eval-error-union-z6e8di",
+  "oracle": "eval-error",
+  "op": "union",
+  "message": "mass::enclosure: a face whose sides are not one material region and one void",
+  "count": 1,
+  "seeds": [
+    106555
+  ],
+  "signature": "eval-error|union|mass::enclosure: a face whose sides are not one material region and one void",
+  "status": "still failing",
+  "statusDetail": "mass::enclosure: a face whose sides are not one material region and one void",
+  "checked": "2026-11-14T12:17:28.962Z",
+  "replay": "bun scripts/fuzz/fuzz.ts --replay 106555",
+  "minimal": {
+    "parts": [
+      {
+        "name": "f",
+        "node": {
+          "type": "union",
+          "children": [
+            {
+              "type": "cylinder",
+              "radius": 12,
+              "height": 25
+            },
+            {
+              "type": "union",
+              "children": [
+                {
+                  "type": "transform",
+                  "matrix": [
+                    1,
+                    0,
+                    0,
+                    13,
+                    0,
+                    1,
+                    0,
+                    -1,
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  "children": [
+                    {
+                      "type": "box",
+                      "size": [
+                        37.922,
+                        30,
+                        32.97
+                      ],
+                      "center": true
+                    }
+                  ]
+                },
+                {
+                  "type": "transform",
+                  "matrix": [
+                    1,
+                    0,
+                    0,
+                    41.461,
+                    0,
+                    1,
+                    0,
+                    -1,
+                    0,
+                    0,
+                    1,
+                    -7.5,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  "children": [
+                    {
+                      "type": "cylinder",
+                      "radius": 9.5,
+                      "height": 15
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "original": {
+    "parts": [
+      {
+        "name": "f",
+        "node": {
+          "type": "union",
+          "children": [
+            {
+              "type": "transform",
+              "matrix": [
+                0.978864,
+                -0.067519,
+                0.193044,
+                0,
+                -0.114602,
+                -0.962898,
+                0.244324,
+                0,
+                -0.169385,
+                0.261283,
+                0.950284,
+                5,
+                0,
+                0,
+                0,
+                1
+              ],
+              "children": [
+                {
+                  "type": "cylinder",
+                  "radius": 12,
+                  "height": 25.494
+                }
+              ]
+            },
+            {
+              "type": "transform",
+              "matrix": [
+                1,
+                0,
+                0,
+                -13.942235,
+                0,
+                1,
+                0,
+                4.114402,
+                0,
+                0,
+                1,
+                17.113271,
+                0,
+                0,
+                0,
+                1
+              ],
+              "children": [
+                {
+                  "type": "union",
+                  "children": [
+                    {
+                      "type": "transform",
+                      "matrix": [
+                        1,
+                        0,
+                        0,
+                        13,
+                        0,
+                        0,
+                        -1,
+                        -1,
+                        0,
+                        1,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        1
+                      ],
+                      "children": [
+                        {
+                          "type": "box",
+                          "size": [
+                            37.922,
+                            30,
+                            32.97
+                          ],
+                          "center": true
+                        }
+                      ]
+                    },
+                    {
+                      "type": "transform",
+                      "matrix": [
+                        1,
+                        0,
+                        0,
+                        41.461,
+                        0,
+                        1,
+                        0,
+                        -1,
+                        0,
+                        0,
+                        1,
+                        -7.5,
+                        0,
+                        0,
+                        0,
+                        1
+                      ],
+                      "children": [
+                        {
+                          "type": "cylinder",
+                          "radius": 9.5,
+                          "height": 15
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

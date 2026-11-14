@@ -9,10 +9,10 @@
  * Feature errors (fillet/chamfer/shell) are tallied as refusals, not bugs.
  * Output: fuzz/findings/<id>.json, fuzz/stats.json, docs/FUZZ.md.
  */
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Node } from "../../src/ir";
-import { makeCase, type Case } from "./gen";
+import { makeCase, setGenOptions, type Case } from "./gen";
 import type { EvalReply } from "./worker";
 
 const root = join(import.meta.dir, "..", "..");
@@ -25,6 +25,12 @@ const MINUTES = arg("--minutes", 25);
 const WORKERS = arg("--workers", 6);
 const SEED0 = arg("--seed", 1);
 const REPLAY = argv.includes("--replay") ? arg("--replay", 0) : undefined;
+const REPLAY_FINDINGS = argv.includes("--replay-findings");
+const BIAS = (() => {
+  const i = argv.indexOf("--bias");
+  return i >= 0 ? argv[i + 1] ?? "" : "";
+})();
+if (BIAS.includes("no-torus")) setGenOptions({ torus: false });
 const SLOW_MS = 30_000;
 const HARD_MS = 120_000;
 const MESH_TOL = 0.02;
@@ -265,11 +271,19 @@ interface Finding {
   minimalDetail?: string;
   minimizeEvals?: number;
   millis: number;
+  signature: string;
+  /** From `--replay-findings`: does the minimal repro still fail on the current wasm? */
+  status?: "still failing" | "fixed" | "changed" | "unchecked";
+  statusDetail?: string;
+  checked?: string;
 }
 
 const findings = new Map<string, Finding>();
 const refusals = new Map<string, number>();
-const stats = { started: new Date().toISOString(), cases: 0, ok: 0, empty: 0, refused: 0, bugs: 0, slow: 0, identity: 0, evalMillis: [] as number[], workers: WORKERS, seed0: SEED0 };
+const stats = { started: new Date().toISOString(), cases: 0, ok: 0, empty: 0, refused: 0, bugs: 0, slow: 0, identity: 0, newFindings: 0, evalMillis: [] as number[], workers: WORKERS, seed0: SEED0, minutes: MINUTES, bias: BIAS || "none" };
+type RunStats = Omit<typeof stats, "evalMillis"> & { p50?: number; p90?: number; p99?: number; max?: number };
+/** Earlier campaigns (from fuzz/stats.json). */
+let pastRuns: RunStats[] = [];
 
 function hash(s: string) {
   let h = 2166136261;
@@ -292,6 +306,10 @@ function save(f: Finding) {
       count: f.count,
       seeds: f.seeds,
       mode: f.mode,
+      signature: f.signature,
+      status: f.status,
+      statusDetail: f.statusDetail,
+      checked: f.checked,
       replay: `bun scripts/fuzz/fuzz.ts --replay ${f.seeds[0]}`,
       minimal: f.minimal ? docOf(f.minimal) : undefined,
       original: docOf(f.original),
@@ -300,6 +318,29 @@ function save(f: Finding) {
     2,
   ));
 }
+function caseOf(doc: any, seed: number): Case {
+  if (doc.identity) return { seed, kind: "identity", a: doc.parts[0].node, b: doc.parts[1].node };
+  return { seed, kind: "single", node: doc.parts[0].node };
+}
+
+/** Load every saved finding (so campaigns accumulate and dedupe against earlier ones). */
+function loadState() {
+  try {
+    const st = JSON.parse(readFileSync(join(root, "fuzz", "stats.json"), "utf8"));
+    pastRuns = st.runs ?? (st.started ? [{ ...st, refusals: undefined, findings: undefined, evalMillis: undefined }] : []);
+    for (const [k, n] of Object.entries(st.refusals ?? {})) refusals.set(k, n as number);
+  } catch {}
+  for (const file of readdirSync(findingsDir).filter((f) => f.endsWith(".json"))) {
+    const j = JSON.parse(readFileSync(join(findingsDir, file), "utf8"));
+    const sig = j.signature ?? `${j.oracle}|${j.op}|${norm(j.message)}`;
+    findings.set(sig, {
+      id: j.id, oracle: j.oracle, op: j.op, message: j.message, detail: j.detail, minimalDetail: j.minimalDetail,
+      count: j.count, seeds: j.seeds, mode: j.mode, original: caseOf(j.original, j.seeds[0]), minimal: j.minimal ? caseOf(j.minimal, j.seeds[0]) : undefined,
+      millis: 0, signature: sig, status: j.status, statusDetail: j.statusDetail, checked: j.checked,
+    });
+  }
+}
+
 function docOf(c: Case) {
   if (c.kind === "single") return { parts: [{ name: "f", node: c.node }] };
   return { identity: true, parts: [{ name: "A", node: c.a }, { name: "B", node: c.b }] };
@@ -309,25 +350,31 @@ function writeReport(final: boolean) {
   const sorted = [...findings.values()].sort((a, b) => b.count - a.count);
   const ms = [...stats.evalMillis].sort((a, b) => a - b);
   const pct = (q: number) => (ms.length ? (ms[Math.min(ms.length - 1, Math.floor(q * ms.length))]! / 1000).toFixed(2) : "–");
-  writeFileSync(join(root, "fuzz", "stats.json"), JSON.stringify({ ...stats, evalMillis: undefined, refusals: Object.fromEntries(refusals), findings: sorted.map((f) => ({ id: f.id, oracle: f.oracle, op: f.op, count: f.count })) }, null, 2));
+  const { evalMillis: _ms, ...rest } = stats;
+  const current: RunStats | undefined = stats.cases ? { ...rest, p50: +pct(0.5) || 0, p90: +pct(0.9) || 0, p99: +pct(0.99) || 0, max: +pct(1) || 0 } : undefined;
+  const runs = [...pastRuns, ...(current ? [current] : [])];
+  writeFileSync(join(root, "fuzz", "stats.json"), JSON.stringify({ runs, refusals: Object.fromEntries(refusals), findings: sorted.map((f) => ({ id: f.id, oracle: f.oracle, op: f.op, count: f.count, status: f.status ?? "unchecked" })) }, null, 2));
   const L: string[] = [];
   L.push("# Kernel fuzzing", "");
   L.push("`scripts/fuzz/fuzz.ts` generates seeded random IR trees (primitives with random sizes and rigid/mirrored placements; booleans arranged to overlap, touch, share planes, contain, coincide, nearly coincide or be tangent; extrudes of star polygons, rounded rectangles and circles, with draft; revolves; lofts; fillets/chamfers with random selectors and radii; shells), evaluates them on solidcore in worker sessions and checks:", "");
   L.push("| Oracle | Bug when |", "|---|---|");
   L.push("| `panic` | the kernel panics (wasm trap) |", "| `eval-error` | a boolean, primitive, sweep or transform fails — the generator only makes valid input |", "| `bad-volume` | `ok` but volume ≤ 0 or NaN |", "| `mesh-volume` | divergence-theorem volume of the export mesh differs from the kernel's by > 2% |", "| `open-mesh` | the export mesh is not closed (an edge not shared by exactly two triangles after welding) |", "| `mesh-error` / `warning` | meshing fails, or evaluation reports warnings |", "| `identity-union` / `identity-difference` | vol(A∪B)+vol(A∩B) ≠ vol(A)+vol(B), or vol(A−B) ≠ vol(A)−vol(A∩B) (0.2%) |", "| `slow` / `hang` | one evaluation takes > 30 s / > 120 s |", "");
   L.push("Fillet/chamfer/shell errors are counted as **refusals** (often legitimate: radius too large) and tallied below. Every bug is delta-minimized (hoist children, drop operands, simplify transforms, selectors and numbers) while it keeps the same (oracle, op, message) signature, and deduplicated by that signature.", "");
-  L.push("Run: `bun scripts/fuzz/fuzz.ts --minutes 25 --workers 6 --seed 1`; replay one case: `--replay <seed>`. Findings: `fuzz/findings/<id>.json` (minimal + original IR, seeds).", "");
-  L.push(`## Run ${final ? "" : "(in progress) "}— ${stats.started.slice(0, 16).replace("T", " ")} UTC`, "");
-  L.push(`${stats.cases} cases (${stats.identity} identity checks) on ${WORKERS} workers from seed ${SEED0}: ${stats.ok} clean, ${stats.empty} empty results, ${stats.refused} refusals, ${stats.bugs} bug hits in **${findings.size} distinct findings**. Evaluation time p50 ${pct(0.5)} s, p90 ${pct(0.9)} s, p99 ${pct(0.99)} s, max ${pct(1)} s.`, "");
+  L.push("Run a campaign: `bun scripts/fuzz/fuzz.ts --minutes 25 --workers 8 --seed 1 [--bias no-torus]` (findings accumulate across campaigns and are deduplicated against earlier ones). Replay one case: `--replay <seed>`. Re-check every saved minimal repro against the current wasm: `--replay-findings` (fills the Status column and writes `fuzz/regressions.json`). Findings: `fuzz/findings/<id>.json` (minimal + original IR, seeds).", "");
+  L.push("## Campaigns", "", "| Started (UTC) | Seed | Workers | Bias | Cases | Identity checks | Clean | Empty | Refusals | Bug hits | New findings | Eval p50 / p99 / max |", "|---|---|---|---|---|---|---|---|---|---|---|---|");
+  for (const r of runs) L.push(`| ${r.started.slice(0, 16).replace("T", " ")}${r === current && !final ? " (running)" : ""} | ${r.seed0} | ${r.workers} | ${r.bias ?? "none"} | ${r.cases} | ${r.identity} | ${r.ok} | ${r.empty} | ${r.refused} | ${r.bugs} | ${r.newFindings ?? "–"} | ${r.p50 ?? "–"} / ${r.p99 ?? "–"} / ${r.max ?? "–"} s |`);
+  const by = (st: string) => sorted.filter((f) => (f.status ?? "unchecked") === st).length;
+  L.push("", `**${findings.size} distinct findings**: ${by("still failing")} still failing, ${by("fixed")} fixed, ${by("changed")} changed, ${by("unchecked")} not re-checked yet (status from the last \`--replay-findings\`).`, "");
   L.push("## Findings", "");
-  L.push("| # | Oracle | Op | Count | Message | Minimal repro |", "|---|---|---|---|---|---|");
+  L.push("| # | Status | Oracle | Op | Count | Message | Minimal repro |", "|---|---|---|---|---|---|---|");
   sorted.forEach((f, i) => {
     const min = f.minimal ? docOf(f.minimal) : docOf(f.original);
     const json = JSON.stringify(min.parts.length === 1 ? min.parts[0]!.node : { A: min.parts[0]!.node, B: min.parts[1]!.node });
     const msg = `${f.message}${f.minimalDetail ?? f.detail ? ` — ${f.minimalDetail ?? f.detail}` : ""}`.replace(/\|/g, "\\|").replace(/\n/g, " ");
-    L.push(`| ${i + 1} | \`${f.oracle}\` | ${f.op} | ${f.count} | ${msg} | [${f.id}](../fuzz/findings/${f.id}.json): \`${json.length > 900 ? json.slice(0, 900) + "…" : json}\` |`);
+    const status = f.status === "fixed" ? "✅ fixed" : f.status === "changed" ? `⚠️ changed: ${(f.statusDetail ?? "").replace(/\|/g, "\\|").slice(0, 160)}` : f.status === "still failing" ? "❌ failing" : "–";
+    L.push(`| ${i + 1} | ${status} | \`${f.oracle}\` | ${f.op} | ${f.count} | ${msg} | [${f.id}](../fuzz/findings/${f.id}.json): \`${json.length > 900 ? json.slice(0, 900) + "…" : json}\` |`);
   });
-  if (!sorted.length) L.push("| – | – | – | – | none | – |");
+  if (!sorted.length) L.push("| – | – | – | – | – | none | – |");
   L.push("", "## Refusals (fillet / chamfer / shell errors)", "", "| Count | Message |", "|---|---|");
   for (const [m, n] of [...refusals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 25)) L.push(`| ${n} | ${m.replace(/\|/g, "\\|")} |`);
   L.push("");
@@ -351,6 +398,81 @@ if (REPLAY !== undefined) {
   console.log(JSON.stringify(docOf(c)));
   console.log(await judge(slot, c));
   process.exit(0);
+}
+
+loadState();
+
+if (REPLAY_FINDINGS) {
+  const list = [...findings.values()];
+  const slots = Array.from({ length: Math.min(WORKERS, list.length) }, () => new Slot());
+  const regressions: object[] = [];
+  let next = 0;
+  await Promise.all(
+    slots.map(async (slot) => {
+      while (next < list.length) {
+        const f = list[next++]!;
+        const c = f.minimal ?? f.original;
+        const v = await judge(slot, c);
+        const before = f.status;
+        if (!v.oracle) {
+          f.status = "fixed";
+          f.statusDetail = v.refusal ? `now a refusal: ${v.refusal}` : v.empty ? "evaluates (empty result)" : "evaluates cleanly";
+        } else if (signature(v) === f.signature) {
+          f.status = "still failing";
+          f.statusDetail = `${v.message ?? ""}${v.detail ? ` — ${v.detail}` : ""}`;
+        } else {
+          f.status = "changed";
+          f.statusDetail = `${v.oracle}/${v.op}: ${v.message ?? ""}${v.detail ? ` — ${v.detail}` : ""}`;
+        }
+        f.checked = new Date().toISOString();
+        save(f);
+        if (f.status !== "fixed")
+          regressions.push({
+            id: f.id,
+            oracle: v.oracle,
+            op: v.op,
+            message: v.message,
+            detail: v.detail,
+            originalOracle: f.oracle,
+            expect: expectation(f.oracle),
+            ir: docOf(c),
+          });
+        console.log(`${f.status.padEnd(13)} ${f.id}${before && before !== f.status ? ` (was ${before})` : ""}: ${f.statusDetail?.slice(0, 120)}`);
+      }
+    }),
+  );
+  regressions.sort((a: any, b: any) => a.id.localeCompare(b.id));
+  writeFileSync(
+    join(root, "fuzz", "regressions.json"),
+    JSON.stringify({ about: "Minimal IR repros of solidcore bugs found by scripts/fuzz/fuzz.ts that still fail on the current wasm. Evaluate each `ir` document (Engine::evaluate); `expect` says what correct behaviour is, `oracle`/`message` what happens today. Identity entries hold parts A and B: evaluate A, B, union(A,B), intersection(A,B) and difference(A,B) and check the volume identities.", checked: new Date().toISOString(), count: regressions.length, regressions }, null, 2),
+  );
+  writeReport(true);
+  process.exit(0);
+}
+
+function expectation(oracle: string): string {
+  switch (oracle) {
+    case "panic":
+      return "evaluates without panicking";
+    case "eval-error":
+      return "evaluates ok (valid input)";
+    case "bad-volume":
+      return "ok with a positive, finite volume";
+    case "mesh-volume":
+      return "export mesh volume within 2% of the kernel volume";
+    case "open-mesh":
+      return "export mesh is closed (every edge shared by exactly two triangles)";
+    case "mesh-error":
+      return "meshAt succeeds";
+    case "warning":
+      return "evaluates with no warnings (a record is built)";
+    case "identity-union":
+      return "vol(A∪B) + vol(A∩B) = vol(A) + vol(B) within 0.2%";
+    case "identity-difference":
+      return "vol(A−B) = vol(A) − vol(A∩B) within 0.2%";
+    default:
+      return "evaluates ok";
+  }
 }
 
 const deadline = performance.now() + MINUTES * 60_000;
@@ -384,7 +506,8 @@ async function run(slot: Slot) {
         if (f.seeds.length < 8) f.seeds.push(seed);
         save(f);
       } else {
-        f = { id: `${v.oracle}-${v.op}-${hash(sig)}`, oracle: v.oracle, op: v.op ?? "?", message: v.message ?? "", detail: v.detail, count: 1, seeds: [seed], mode: c.mode, original: c, millis: v.millis };
+        f = { id: `${v.oracle}-${v.op}-${hash(sig)}`, oracle: v.oracle, op: v.op ?? "?", message: v.message ?? "", detail: v.detail, count: 1, seeds: [seed], mode: c.mode, original: c, millis: v.millis, signature: sig, status: "unchecked" };
+        stats.newFindings++;
         findings.set(sig, f);
         save(f);
         console.log(`[${stats.cases}] NEW ${f.id}: ${f.message.slice(0, 120)} (seed ${seed})`);

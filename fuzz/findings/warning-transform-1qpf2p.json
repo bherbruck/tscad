@@ -17,6 +17,10 @@
     612
   ],
   "mode": "touch",
+  "signature": "warning|transform|record: record: the body's tolerance is not finite and positive",
+  "status": "fixed",
+  "statusDetail": "evaluates cleanly",
+  "checked": "2026-11-14T12:17:33.875Z",
   "replay": "bun scripts/fuzz/fuzz.ts --replay 106",
   "minimal": {
     "identity": true,

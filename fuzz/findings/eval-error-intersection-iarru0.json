@@ -9,6 +9,10 @@
     8297,
     9291
   ],
+  "signature": "eval-error|intersection|mass::enclosure: a face whose sides are not one material region and one void",
+  "status": "fixed",
+  "statusDetail": "evaluates (empty result)",
+  "checked": "2026-11-14T12:17:22.182Z",
   "replay": "bun scripts/fuzz/fuzz.ts --replay 5130",
   "minimal": {
     "parts": [

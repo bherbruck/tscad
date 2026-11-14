@@ -3,7 +3,7 @@
   "oracle": "eval-error",
   "op": "difference",
   "message": "mass::enclosure: a face whose sides are not one material region and one void",
-  "count": 7,
+  "count": 8,
   "seeds": [
     2644,
     3254,
@@ -11,8 +11,13 @@
     5547,
     8480,
     11217,
-    12063
+    12063,
+    105691
   ],
+  "signature": "eval-error|difference|mass::enclosure: a face whose sides are not one material region and one void",
+  "status": "still failing",
+  "statusDetail": "mass::enclosure: a face whose sides are not one material region and one void",
+  "checked": "2026-11-14T12:17:28.130Z",
   "replay": "bun scripts/fuzz/fuzz.ts --replay 2644",
   "minimal": {
     "parts": [

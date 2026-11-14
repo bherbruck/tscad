@@ -10,6 +10,10 @@
     10427,
     13673
   ],
+  "signature": "bad-volume|intersection|volume #",
+  "status": "fixed",
+  "statusDetail": "evaluates (empty result)",
+  "checked": "2026-11-14T12:17:31.460Z",
   "replay": "bun scripts/fuzz/fuzz.ts --replay 5809",
   "minimal": {
     "parts": [

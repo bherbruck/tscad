@@ -10,6 +10,10 @@
     1187
   ],
   "mode": "contain",
+  "signature": "warning|union|record: not supported yet: a face between two material regions or two empty ones",
+  "status": "fixed",
+  "statusDetail": "evaluates cleanly",
+  "checked": "2026-11-14T12:17:38.221Z",
   "replay": "bun scripts/fuzz/fuzz.ts --replay 1187",
   "minimal": {
     "identity": true,

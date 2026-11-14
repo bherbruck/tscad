@@ -4,13 +4,21 @@
   "op": "union",
   "message": "not supported yet: SmFace::PointClassify",
   "detail": "union",
-  "count": 3,
+  "count": 7,
   "seeds": [
     1168,
     1258,
-    10406
+    10406,
+    100231,
+    101151,
+    103910,
+    108033
   ],
   "mode": "tangent-cyl",
+  "signature": "eval-error|union|not supported yet: SmFace::PointClassify",
+  "status": "still failing",
+  "statusDetail": "not supported yet: SmFace::PointClassify",
+  "checked": "2026-11-14T12:17:36.855Z",
   "replay": "bun scripts/fuzz/fuzz.ts --replay 1168",
   "minimal": {
     "parts": [

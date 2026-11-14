@@ -4,7 +4,7 @@
   "op": "union",
   "message": "solidcore failed (status 1001)",
   "detail": "union",
-  "count": 45,
+  "count": 75,
   "seeds": [
     184,
     376,
@@ -16,6 +16,10 @@
     2784
   ],
   "mode": "nudge",
+  "signature": "eval-error|union|solidcore failed (status #)",
+  "status": "still failing",
+  "statusDetail": "solidcore failed (status 1001)",
+  "checked": "2026-11-14T12:17:31.895Z",
   "replay": "bun scripts/fuzz/fuzz.ts --replay 184",
   "minimal": {
     "parts": [

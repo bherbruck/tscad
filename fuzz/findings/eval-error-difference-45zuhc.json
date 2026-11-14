@@ -4,7 +4,7 @@
   "op": "difference",
   "message": "the result is not a closed solid",
   "detail": "difference",
-  "count": 220,
+  "count": 343,
   "seeds": [
     19,
     45,
@@ -16,6 +16,10 @@
     369
   ],
   "mode": "tangent-cyl",
+  "signature": "eval-error|difference|the result is not a closed solid",
+  "status": "still failing",
+  "statusDetail": "the result is not a closed solid",
+  "checked": "2026-11-14T12:17:29.023Z",
   "replay": "bun scripts/fuzz/fuzz.ts --replay 19",
   "minimal": {
     "parts": [

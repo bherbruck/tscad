@@ -3,10 +3,16 @@
   "oracle": "eval-error",
   "op": "intersection",
   "message": "not supported yet: SmFace::PointClassify",
-  "count": 1,
+  "count": 3,
   "seeds": [
-    11290
+    11290,
+    101000,
+    101765
   ],
+  "signature": "eval-error|intersection|not supported yet: SmFace::PointClassify",
+  "status": "still failing",
+  "statusDetail": "not supported yet: SmFace::PointClassify",
+  "checked": "2026-11-14T12:17:25.781Z",
   "replay": "bun scripts/fuzz/fuzz.ts --replay 11290",
   "minimal": {
     "parts": [

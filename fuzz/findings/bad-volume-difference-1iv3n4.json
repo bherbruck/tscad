@@ -16,6 +16,10 @@
     13212
   ],
   "mode": "nudge",
+  "signature": "bad-volume|difference|volume #",
+  "status": "fixed",
+  "statusDetail": "evaluates cleanly",
+  "checked": "2026-11-14T12:17:27.277Z",
   "replay": "bun scripts/fuzz/fuzz.ts --replay 503",
   "minimal": {
     "parts": [

@@ -9,6 +9,10 @@
     6017
   ],
   "mode": "identical",
+  "signature": "eval-error|union|topology::proto_topology::p#: proto edge is deleted",
+  "status": "still failing",
+  "statusDetail": "topology::proto_topology::p3: proto edge is deleted",
+  "checked": "2026-11-14T12:17:35.091Z",
   "replay": "bun scripts/fuzz/fuzz.ts --replay 6017",
   "minimal": {
     "parts": [

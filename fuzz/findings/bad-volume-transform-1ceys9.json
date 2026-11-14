@@ -11,6 +11,10 @@
     11824
   ],
   "mode": "contain",
+  "signature": "bad-volume|transform|volume #",
+  "status": "fixed",
+  "statusDetail": "evaluates cleanly",
+  "checked": "2026-11-14T12:17:34.853Z",
   "replay": "bun scripts/fuzz/fuzz.ts --replay 1570",
   "minimal": {
     "parts": [

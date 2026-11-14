@@ -3,7 +3,7 @@
   "oracle": "eval-error",
   "op": "intersection",
   "message": "solidcore failed (status 1001)",
-  "count": 19,
+  "count": 24,
   "seeds": [
     456,
     668,
@@ -14,6 +14,10 @@
     4601,
     5218
   ],
+  "signature": "eval-error|intersection|solidcore failed (status #)",
+  "status": "still failing",
+  "statusDetail": "solidcore failed (status 1001)",
+  "checked": "2026-11-14T12:17:27.783Z",
   "replay": "bun scripts/fuzz/fuzz.ts --replay 456",
   "minimal": {
     "parts": [

@@ -5,7 +5,7 @@
   "message": "mesh has open edges",
   "detail": "intersection: 2 open edges of 1258 triangles",
   "minimalDetail": "2 open edges of 1296 triangles",
-  "count": 7,
+  "count": 9,
   "seeds": [
     217,
     1318,
@@ -13,9 +13,14 @@
     4158,
     5345,
     9310,
-    12429
+    12429,
+    103513
   ],
   "mode": "overlap",
+  "signature": "open-mesh|intersection|mesh has open edges",
+  "status": "still failing",
+  "statusDetail": "mesh has open edges — 2 open edges of 1296 triangles",
+  "checked": "2026-11-14T12:17:20.570Z",
   "replay": "bun scripts/fuzz/fuzz.ts --replay 217",
   "minimal": {
     "parts": [

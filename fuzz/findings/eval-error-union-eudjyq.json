@@ -4,14 +4,19 @@
   "op": "union",
   "message": "the result is empty",
   "detail": "union",
-  "count": 4,
+  "count": 5,
   "seeds": [
     1344,
     2943,
     4116,
-    9588
+    9588,
+    106705
   ],
   "mode": "nudge",
+  "signature": "eval-error|union|the result is empty",
+  "status": "still failing",
+  "statusDetail": "the result is empty",
+  "checked": "2026-11-14T12:17:25.116Z",
   "replay": "bun scripts/fuzz/fuzz.ts --replay 1344",
   "minimal": {
     "parts": [

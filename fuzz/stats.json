@@ -1,243 +1,320 @@
 {
-  "started": "2026-11-14T04:46:55.855Z",
-  "cases": 15549,
-  "ok": 10549,
-  "empty": 1025,
-  "refused": 3008,
-  "bugs": 967,
-  "slow": 1,
-  "identity": 4733,
-  "workers": 8,
-  "seed0": 1,
+  "runs": [
+    {
+      "started": "2026-11-14T04:46:55.855Z",
+      "cases": 15549,
+      "ok": 10549,
+      "empty": 1025,
+      "refused": 3008,
+      "bugs": 967,
+      "slow": 1,
+      "identity": 4733,
+      "workers": 8,
+      "seed0": 1
+    },
+    {
+      "started": "2026-11-14T05:16:50.927Z",
+      "cases": 8355,
+      "ok": 5803,
+      "empty": 551,
+      "refused": 1610,
+      "bugs": 391,
+      "slow": 0,
+      "identity": 2480,
+      "newFindings": 3,
+      "workers": 8,
+      "seed0": 100000,
+      "minutes": 15,
+      "bias": "no-torus",
+      "p50": 0.29,
+      "p90": 1.98,
+      "p99": 6.82,
+      "max": 42.53
+    }
+  ],
   "refusals": {
-    "chamfer: the edge selector matched no edges": 908,
-    "fillet: the edge selector matched no edges": 1167,
-    "shell: the result is empty": 28,
-    "shell: the offset is refused: an exact curve between extended faces could not be cut": 2,
+    "chamfer: the edge selector matched no edges": 1416,
+    "fillet: the edge selector matched no edges": 1833,
+    "shell: the result is empty": 43,
+    "shell: the offset is refused: an exact curve between extended faces could not be cut": 3,
     "shell: record: the body's tolerance is not finite and positive": 20,
-    "fillet: solidcore failed (status #)": 150,
-    "chamfer: the result is not a closed solid": 21,
-    "shell: the offset is refused: a gap in its offset's loops cannot be bridged within tolerance": 7,
-    "fillet: too large: the largest Radius that fits is #": 116,
-    "shell: no room": 47,
-    "shell: not supported yet: a vertex moved past the other end of an edge": 25,
-    "shell: the offset is refused: the body built is not a manifold solid, as its input was": 64,
-    "chamfer: too large: the largest Distance that fits is #": 88,
-    "shell: the offset is refused at face #: its offset by # is not proved regular": 21,
-    "extrude (draft): the result is not a closed solid": 12,
+    "fillet: solidcore failed (status #)": 218,
+    "chamfer: the result is not a closed solid": 46,
+    "shell: the offset is refused: a gap in its offset's loops cannot be bridged within tolerance": 13,
+    "fillet: too large: the largest Radius that fits is #": 174,
+    "shell: no room": 68,
+    "shell: not supported yet: a vertex moved past the other end of an edge": 42,
+    "shell: the offset is refused: the body built is not a manifold solid, as its input was": 92,
+    "chamfer: too large: the largest Distance that fits is #": 131,
+    "shell: the offset is refused at face #: its offset by # is not proved regular": 28,
+    "extrude (draft): the result is not a closed solid": 21,
     "chamfer: record: the body's tolerance is not finite and positive": 47,
-    "fillet: the result is not a closed solid": 33,
-    "shell: solidcore failed (status #)": 11,
+    "fillet: the result is not a closed solid": 52,
+    "shell: solidcore failed (status #)": 20,
     "fillet: record: the body's tolerance is not finite and positive": 44,
-    "extrude (draft): the draft corner at Some([#, #, #]) is refused: WallCloses": 7,
-    "shell: the wall folds (largest Some(#))": 29,
-    "chamfer: edge # has no blend": 6,
-    "chamfer: solidcore failed (status #)": 71,
-    "shell: invalid argument": 19,
-    "fillet: edge # has no blend": 8,
-    "shell: the offset is refused at face #: a gap in its offset's loops cannot be bridged within tolerance": 16,
-    "shell: the result is not a closed solid": 13,
-    "shell: the offset is refused: its offset by # is not proved regular": 1,
-    "chamfer: not supported yet: TrimSrfCache::build_tree_with_face for a face-owned surface": 6,
+    "extrude (draft): the draft corner at Some([#, #, #]) is refused: WallCloses": 9,
+    "shell: the wall folds (largest Some(#))": 45,
+    "chamfer: edge # has no blend": 8,
+    "chamfer: solidcore failed (status #)": 129,
+    "shell: invalid argument": 20,
+    "fillet: edge # has no blend": 12,
+    "shell: the offset is refused at face #: a gap in its offset's loops cannot be bridged within tolerance": 22,
+    "shell: the result is not a closed solid": 20,
+    "shell: the offset is refused: its offset by # is not proved regular": 2,
+    "chamfer: not supported yet: TrimSrfCache::build_tree_with_face for a face-owned surface": 10,
     "fillet: mass::enclosure: a face whose sides are not one material region and one void": 1,
     "shell: the offset is refused at face #: its offset by # collapses (a radius of curvature #)": 1,
-    "fillet: not supported yet: SmFace::PointClassify": 5,
-    "fillet: no room": 2,
-    "fillet: not supported yet: TrimSrfCache::build_tree_with_face for a face-owned surface": 2,
+    "fillet: not supported yet: SmFace::PointClassify": 6,
+    "fillet: no room": 5,
+    "fillet: not supported yet: TrimSrfCache::build_tree_with_face for a face-owned surface": 3,
     "extrude (draft): the draft corner at Some([#, #, #]) is refused: Apart": 1,
     "shell: the offset is refused: its offset by # collapses (a radius of curvature #)": 1,
     "chamfer: edge # has no blend (Smooth)": 3,
     "fillet: not supported yet: a face between two material regions or two empty ones": 1,
-    "chamfer: mass::enclosure: a face whose sides are not one material region and one void": 2,
+    "chamfer: mass::enclosure: a face whose sides are not one material region and one void": 3,
     "shell: not supported yet: SmFace::PointClassify": 1,
-    "fillet: edge # has no blend (Smooth)": 1
+    "fillet: edge # has no blend (Smooth)": 2,
+    "chamfer: no room": 1,
+    "chamfer: the rounds leave a face whose boundary crosses itself at [[#, #, #], [#, #, #], [#, #, #], [#, #, #], [#, #, #], [#, #, #], [#, #, #], [#, #, #]] (largest None)": 1
   },
   "findings": [
     {
       "id": "eval-error-difference-45zuhc",
       "oracle": "eval-error",
       "op": "difference",
-      "count": 220
-    },
-    {
-      "id": "warning-transform-1qpf2p",
-      "oracle": "warning",
-      "op": "transform",
-      "count": 179
+      "count": 343,
+      "status": "still failing"
     },
     {
       "id": "eval-error-union-12i29k",
       "oracle": "eval-error",
       "op": "union",
-      "count": 142
+      "count": 244,
+      "status": "still failing"
+    },
+    {
+      "id": "warning-transform-1qpf2p",
+      "oracle": "warning",
+      "op": "transform",
+      "count": 179,
+      "status": "fixed"
     },
     {
       "id": "mesh-error-meshAt-1xtnt3",
       "oracle": "mesh-error",
       "op": "meshAt",
-      "count": 112
-    },
-    {
-      "id": "eval-error-union-1krj4p",
-      "oracle": "eval-error",
-      "op": "union",
-      "count": 45
+      "count": 114,
+      "status": "fixed"
     },
     {
       "id": "open-mesh-union-1u6l54",
       "oracle": "open-mesh",
       "op": "union",
-      "count": 45
+      "count": 78,
+      "status": "still failing"
+    },
+    {
+      "id": "eval-error-union-1krj4p",
+      "oracle": "eval-error",
+      "op": "union",
+      "count": 75,
+      "status": "still failing"
     },
     {
       "id": "eval-error-intersection-16ioib",
       "oracle": "eval-error",
       "op": "intersection",
-      "count": 38
-    },
-    {
-      "id": "eval-error-difference-vl1xum",
-      "oracle": "eval-error",
-      "op": "difference",
-      "count": 30
-    },
-    {
-      "id": "eval-error-cone-rsb28j",
-      "oracle": "eval-error",
-      "op": "cone",
-      "count": 27
+      "count": 66,
+      "status": "still failing"
     },
     {
       "id": "open-mesh-difference-etrll9",
       "oracle": "open-mesh",
       "op": "difference",
-      "count": 27
+      "count": 44,
+      "status": "still failing"
     },
     {
-      "id": "eval-error-intersection-sqt0xg",
+      "id": "eval-error-difference-vl1xum",
       "oracle": "eval-error",
-      "op": "intersection",
-      "count": 19
+      "op": "difference",
+      "count": 40,
+      "status": "fixed"
+    },
+    {
+      "id": "eval-error-cone-rsb28j",
+      "oracle": "eval-error",
+      "op": "cone",
+      "count": 39,
+      "status": "still failing"
     },
     {
       "id": "mesh-volume-difference-1hmwie",
       "oracle": "mesh-volume",
       "op": "difference",
-      "count": 11
+      "count": 24,
+      "status": "still failing"
     },
     {
-      "id": "bad-volume-difference-1iv3n4",
-      "oracle": "bad-volume",
-      "op": "difference",
-      "count": 9
+      "id": "eval-error-intersection-sqt0xg",
+      "oracle": "eval-error",
+      "op": "intersection",
+      "count": 24,
+      "status": "still failing"
     },
     {
       "id": "eval-error-difference-1rmnn7",
       "oracle": "eval-error",
       "op": "difference",
-      "count": 9
+      "count": 10,
+      "status": "still failing"
     },
     {
       "id": "open-mesh-intersection-16m0al",
       "oracle": "open-mesh",
       "op": "intersection",
-      "count": 7
+      "count": 9,
+      "status": "still failing"
+    },
+    {
+      "id": "bad-volume-difference-1iv3n4",
+      "oracle": "bad-volume",
+      "op": "difference",
+      "count": 9,
+      "status": "fixed"
     },
     {
       "id": "eval-error-difference-1fr1u1",
       "oracle": "eval-error",
       "op": "difference",
-      "count": 7
-    },
-    {
-      "id": "identity-difference-difference-1y0cxl",
-      "oracle": "identity-difference",
-      "op": "difference",
-      "count": 5
-    },
-    {
-      "id": "eval-error-union-eudjyq",
-      "oracle": "eval-error",
-      "op": "union",
-      "count": 4
-    },
-    {
-      "id": "bad-volume-intersection-1m8ajc",
-      "oracle": "bad-volume",
-      "op": "intersection",
-      "count": 4
-    },
-    {
-      "id": "mesh-volume-intersection-12lrxr",
-      "oracle": "mesh-volume",
-      "op": "intersection",
-      "count": 3
+      "count": 8,
+      "status": "still failing"
     },
     {
       "id": "eval-error-union-2rn907",
       "oracle": "eval-error",
       "op": "union",
-      "count": 3
+      "count": 7,
+      "status": "still failing"
     },
     {
-      "id": "bad-volume-transform-1ceys9",
-      "oracle": "bad-volume",
-      "op": "transform",
-      "count": 3
-    },
-    {
-      "id": "mesh-volume-union-1dgftq",
+      "id": "mesh-volume-intersection-12lrxr",
       "oracle": "mesh-volume",
-      "op": "union",
-      "count": 3
-    },
-    {
-      "id": "open-mesh-transform-1xhil7",
-      "oracle": "open-mesh",
-      "op": "transform",
-      "count": 3
-    },
-    {
-      "id": "eval-error-intersection-iarru0",
-      "oracle": "eval-error",
       "op": "intersection",
-      "count": 3
+      "count": 5,
+      "status": "still failing"
+    },
+    {
+      "id": "eval-error-union-eudjyq",
+      "oracle": "eval-error",
+      "op": "union",
+      "count": 5,
+      "status": "still failing"
+    },
+    {
+      "id": "identity-difference-difference-1y0cxl",
+      "oracle": "identity-difference",
+      "op": "difference",
+      "count": 5,
+      "status": "still failing"
+    },
+    {
+      "id": "bad-volume-intersection-1m8ajc",
+      "oracle": "bad-volume",
+      "op": "intersection",
+      "count": 4,
+      "status": "fixed"
     },
     {
       "id": "mesh-error-meshAt-1smk7c",
       "oracle": "mesh-error",
       "op": "meshAt",
-      "count": 3
+      "count": 3,
+      "status": "still failing"
     },
     {
-      "id": "warning-intersection-147m1i",
-      "oracle": "warning",
-      "op": "intersection",
-      "count": 2
-    },
-    {
-      "id": "warning-union-u3x9uf",
-      "oracle": "warning",
-      "op": "union",
-      "count": 1
-    },
-    {
-      "id": "open-mesh-extrude-1kc1bd",
-      "oracle": "open-mesh",
-      "op": "extrude",
-      "count": 1
-    },
-    {
-      "id": "eval-error-union-p8rb0n",
+      "id": "eval-error-intersection-iarru0",
       "oracle": "eval-error",
-      "op": "union",
-      "count": 1
+      "op": "intersection",
+      "count": 3,
+      "status": "fixed"
     },
     {
       "id": "eval-error-intersection-1cmf4z",
       "oracle": "eval-error",
       "op": "intersection",
-      "count": 1
+      "count": 3,
+      "status": "still failing"
+    },
+    {
+      "id": "mesh-volume-union-1dgftq",
+      "oracle": "mesh-volume",
+      "op": "union",
+      "count": 3,
+      "status": "changed"
+    },
+    {
+      "id": "open-mesh-transform-1xhil7",
+      "oracle": "open-mesh",
+      "op": "transform",
+      "count": 3,
+      "status": "still failing"
+    },
+    {
+      "id": "bad-volume-transform-1ceys9",
+      "oracle": "bad-volume",
+      "op": "transform",
+      "count": 3,
+      "status": "fixed"
+    },
+    {
+      "id": "warning-intersection-147m1i",
+      "oracle": "warning",
+      "op": "intersection",
+      "count": 2,
+      "status": "fixed"
+    },
+    {
+      "id": "mesh-volume-transform-ez4dsa",
+      "oracle": "mesh-volume",
+      "op": "transform",
+      "count": 1,
+      "status": "still failing"
+    },
+    {
+      "id": "warning-union-7u3v7n",
+      "oracle": "warning",
+      "op": "union",
+      "count": 1,
+      "status": "still failing"
+    },
+    {
+      "id": "eval-error-union-p8rb0n",
+      "oracle": "eval-error",
+      "op": "union",
+      "count": 1,
+      "status": "still failing"
+    },
+    {
+      "id": "eval-error-union-z6e8di",
+      "oracle": "eval-error",
+      "op": "union",
+      "count": 1,
+      "status": "still failing"
+    },
+    {
+      "id": "open-mesh-extrude-1kc1bd",
+      "oracle": "open-mesh",
+      "op": "extrude",
+      "count": 1,
+      "status": "still failing"
+    },
+    {
+      "id": "warning-union-u3x9uf",
+      "oracle": "warning",
+      "op": "union",
+      "count": 1,
+      "status": "fixed"
     }
   ]
 }

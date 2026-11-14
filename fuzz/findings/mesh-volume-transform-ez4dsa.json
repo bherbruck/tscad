@@ -1,0 +1,405 @@
+{
+  "id": "mesh-volume-transform-ez4dsa",
+  "oracle": "mesh-volume",
+  "op": "transform",
+  "message": "mesh volume differs from kernel volume",
+  "detail": "kernel 0.2858, mesh 0.3060 (7.05%)",
+  "minimalDetail": "kernel 0.2858, mesh 0.3060 (7.05%)",
+  "count": 1,
+  "seeds": [
+    100265
+  ],
+  "signature": "mesh-volume|transform|mesh volume differs from kernel volume",
+  "status": "still failing",
+  "statusDetail": "mesh volume differs from kernel volume — kernel 0.2858, mesh 0.3060 (7.05%)",
+  "checked": "2026-11-14T12:17:23.138Z",
+  "replay": "bun scripts/fuzz/fuzz.ts --replay 100265",
+  "minimal": {
+    "parts": [
+      {
+        "name": "f",
+        "node": {
+          "type": "transform",
+          "matrix": [
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          "children": [
+            {
+              "type": "difference",
+              "children": [
+                {
+                  "type": "revolve",
+                  "profile": [
+                    {
+                      "type": "line",
+                      "start": [
+                        3.5,
+                        0,
+                        0
+                      ],
+                      "end": [
+                        16,
+                        0,
+                        0
+                      ]
+                    },
+                    {
+                      "type": "line",
+                      "start": [
+                        16,
+                        0,
+                        0
+                      ],
+                      "end": [
+                        6.219,
+                        0,
+                        18.007
+                      ]
+                    },
+                    {
+                      "type": "line",
+                      "start": [
+                        6.219,
+                        0,
+                        18.007
+                      ],
+                      "end": [
+                        3.5,
+                        0,
+                        18.007
+                      ]
+                    },
+                    {
+                      "type": "line",
+                      "start": [
+                        3.5,
+                        0,
+                        18.007
+                      ],
+                      "end": [
+                        3.5,
+                        0,
+                        0
+                      ]
+                    }
+                  ],
+                  "origin": [
+                    0,
+                    0,
+                    0
+                  ],
+                  "axis": [
+                    0,
+                    0,
+                    1
+                  ],
+                  "angle": 3.256
+                },
+                {
+                  "type": "transform",
+                  "matrix": [
+                    1,
+                    0,
+                    0,
+                    0.001,
+                    0,
+                    1,
+                    0,
+                    0,
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  "children": [
+                    {
+                      "type": "revolve",
+                      "profile": [
+                        {
+                          "type": "line",
+                          "start": [
+                            3.5,
+                            0,
+                            0
+                          ],
+                          "end": [
+                            16,
+                            0,
+                            0
+                          ]
+                        },
+                        {
+                          "type": "line",
+                          "start": [
+                            16,
+                            0,
+                            0
+                          ],
+                          "end": [
+                            6.219,
+                            0,
+                            18.007
+                          ]
+                        },
+                        {
+                          "type": "line",
+                          "start": [
+                            6.219,
+                            0,
+                            18.007
+                          ],
+                          "end": [
+                            3.5,
+                            0,
+                            18.007
+                          ]
+                        },
+                        {
+                          "type": "line",
+                          "start": [
+                            3.5,
+                            0,
+                            18.007
+                          ],
+                          "end": [
+                            3.5,
+                            0,
+                            0
+                          ]
+                        }
+                      ],
+                      "origin": [
+                        0,
+                        0,
+                        0
+                      ],
+                      "axis": [
+                        0,
+                        0,
+                        1
+                      ],
+                      "angle": 3.256
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "original": {
+    "parts": [
+      {
+        "name": "f",
+        "node": {
+          "type": "transform",
+          "matrix": [
+            1,
+            0,
+            0,
+            -1,
+            0,
+            1,
+            0,
+            1,
+            0,
+            0,
+            1,
+            4,
+            0,
+            0,
+            0,
+            1
+          ],
+          "children": [
+            {
+              "type": "difference",
+              "children": [
+                {
+                  "type": "revolve",
+                  "profile": [
+                    {
+                      "type": "line",
+                      "start": [
+                        3.5,
+                        0,
+                        0
+                      ],
+                      "end": [
+                        16,
+                        0,
+                        0
+                      ]
+                    },
+                    {
+                      "type": "line",
+                      "start": [
+                        16,
+                        0,
+                        0
+                      ],
+                      "end": [
+                        6.219,
+                        0,
+                        18.007
+                      ]
+                    },
+                    {
+                      "type": "line",
+                      "start": [
+                        6.219,
+                        0,
+                        18.007
+                      ],
+                      "end": [
+                        3.5,
+                        0,
+                        18.007
+                      ]
+                    },
+                    {
+                      "type": "line",
+                      "start": [
+                        3.5,
+                        0,
+                        18.007
+                      ],
+                      "end": [
+                        3.5,
+                        0,
+                        0
+                      ]
+                    }
+                  ],
+                  "origin": [
+                    0,
+                    0,
+                    0
+                  ],
+                  "axis": [
+                    0,
+                    0,
+                    1
+                  ],
+                  "angle": 3.256
+                },
+                {
+                  "type": "transform",
+                  "matrix": [
+                    1,
+                    0,
+                    0,
+                    0.001,
+                    0,
+                    1,
+                    0,
+                    0,
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  "children": [
+                    {
+                      "type": "revolve",
+                      "profile": [
+                        {
+                          "type": "line",
+                          "start": [
+                            3.5,
+                            0,
+                            0
+                          ],
+                          "end": [
+                            16,
+                            0,
+                            0
+                          ]
+                        },
+                        {
+                          "type": "line",
+                          "start": [
+                            16,
+                            0,
+                            0
+                          ],
+                          "end": [
+                            6.219,
+                            0,
+                            18.007
+                          ]
+                        },
+                        {
+                          "type": "line",
+                          "start": [
+                            6.219,
+                            0,
+                            18.007
+                          ],
+                          "end": [
+                            3.5,
+                            0,
+                            18.007
+                          ]
+                        },
+                        {
+                          "type": "line",
+                          "start": [
+                            3.5,
+                            0,
+                            18.007
+                          ],
+                          "end": [
+                            3.5,
+                            0,
+                            0
+                          ]
+                        }
+                      ],
+                      "origin": [
+                        0,
+                        0,
+                        0
+                      ],
+                      "axis": [
+                        0,
+                        0,
+                        1
+                      ],
+                      "angle": 3.256
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

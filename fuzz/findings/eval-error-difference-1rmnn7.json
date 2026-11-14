@@ -3,7 +3,7 @@
   "oracle": "eval-error",
   "op": "difference",
   "message": "not supported yet: SmFace::PointClassify",
-  "count": 9,
+  "count": 10,
   "seeds": [
     701,
     3856,
@@ -14,6 +14,10 @@
     14434,
     14944
   ],
+  "signature": "eval-error|difference|not supported yet: SmFace::PointClassify",
+  "status": "still failing",
+  "statusDetail": "not supported yet: SmFace::PointClassify",
+  "checked": "2026-11-14T12:17:20.525Z",
   "replay": "bun scripts/fuzz/fuzz.ts --replay 701",
   "minimal": {
     "parts": [

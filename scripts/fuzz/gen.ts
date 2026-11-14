@@ -9,6 +9,12 @@ import type { Curve, Node, Selector } from "../../src/ir";
 
 export type V3 = [number, number, number];
 
+/** Generator knobs (set from the command line). */
+const opts = { torus: true };
+export function setGenOptions(o: Partial<typeof opts>) {
+  Object.assign(opts, o);
+}
+
 /** mulberry32 */
 export function rng(seed: number) {
   let a = seed >>> 0;
@@ -164,6 +170,7 @@ export function primitive(R: Rng): Gen {
     return { node: { type: "cone", bottomRadius: r1, topRadius: r2, height: h }, lo: [-m, -m, 0], hi: [m, m, h] };
   }
   if (k < 0.58) {
+    if (!opts.torus) return primitive(R);
     const R0 = R.nice(3, 20), r = Math.min(R0 - 0.2, R.nice(0.5, 8));
     return { node: { type: "torus", majorRadius: R0, minorRadius: r }, lo: [-R0 - r, -R0 - r, -r], hi: [R0 + r, R0 + r, r] };
   }

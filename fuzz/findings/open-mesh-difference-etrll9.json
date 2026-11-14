@@ -5,7 +5,7 @@
   "message": "mesh has open edges",
   "detail": "2 open edges of 5080 triangles",
   "minimalDetail": "3 open edges of 4586 triangles",
-  "count": 27,
+  "count": 44,
   "seeds": [
     256,
     575,
@@ -16,6 +16,10 @@
     4131,
     4789
   ],
+  "signature": "open-mesh|difference|mesh has open edges",
+  "status": "still failing",
+  "statusDetail": "mesh has open edges — 1 open edges of 4616 triangles",
+  "checked": "2026-11-14T12:17:36.884Z",
   "replay": "bun scripts/fuzz/fuzz.ts --replay 256",
   "minimal": {
     "parts": [

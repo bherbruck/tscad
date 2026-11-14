@@ -11,6 +11,10 @@
     7741
   ],
   "mode": "overlap",
+  "signature": "warning|intersection|record: not supported yet: a face between two material regions or two empty ones",
+  "status": "fixed",
+  "statusDetail": "evaluates cleanly",
+  "checked": "2026-11-14T12:17:34.734Z",
   "replay": "bun scripts/fuzz/fuzz.ts --replay 2856",
   "minimal": {
     "identity": true,

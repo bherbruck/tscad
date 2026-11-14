@@ -9,6 +9,10 @@
     10517,
     14445
   ],
+  "signature": "mesh-error|meshAt|tessellate: the operation failed: not supported yet: tessellation: face # (rational spline): edge #: node #: its pcurve is # mm off the edge at t = #",
+  "status": "still failing",
+  "statusDetail": "tessellate: the operation failed: not supported yet: tessellation: face 0 (rational spline): edge 1: node 63: its pcurve is 3.626507603376018 mm off the edge at t = 0.984375",
+  "checked": "2026-11-14T12:17:18.661Z",
   "replay": "bun scripts/fuzz/fuzz.ts --replay 9554",
   "minimal": {
     "parts": [

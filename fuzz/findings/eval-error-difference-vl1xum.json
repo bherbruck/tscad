@@ -3,7 +3,7 @@
   "oracle": "eval-error",
   "op": "difference",
   "message": "solidcore failed (status 1001)",
-  "count": 30,
+  "count": 40,
   "seeds": [
     485,
     730,
@@ -14,6 +14,10 @@
     4713,
     5313
   ],
+  "signature": "eval-error|difference|solidcore failed (status #)",
+  "status": "fixed",
+  "statusDetail": "evaluates cleanly",
+  "checked": "2026-11-14T12:17:21.357Z",
   "replay": "bun scripts/fuzz/fuzz.ts --replay 485",
   "minimal": {
     "parts": [

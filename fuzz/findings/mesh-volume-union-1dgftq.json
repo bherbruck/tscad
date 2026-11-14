@@ -12,6 +12,10 @@
     8740
   ],
   "mode": "tangent-cyl",
+  "signature": "mesh-volume|union|mesh volume differs from kernel volume",
+  "status": "changed",
+  "statusDetail": "mesh-error/meshAt: the part has no record",
+  "checked": "2026-11-14T12:17:22.557Z",
   "replay": "bun scripts/fuzz/fuzz.ts --replay 3497",
   "minimal": {
     "parts": [

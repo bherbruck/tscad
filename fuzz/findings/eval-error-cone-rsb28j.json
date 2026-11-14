@@ -3,7 +3,7 @@
   "oracle": "eval-error",
   "op": "cone",
   "message": "invalid argument",
-  "count": 27,
+  "count": 39,
   "seeds": [
     148,
     229,
@@ -14,6 +14,10 @@
     1907,
     2367
   ],
+  "signature": "eval-error|cone|invalid argument",
+  "status": "still failing",
+  "statusDetail": "invalid argument",
+  "checked": "2026-11-14T12:17:29.024Z",
   "replay": "bun scripts/fuzz/fuzz.ts --replay 148",
   "minimal": {
     "parts": [

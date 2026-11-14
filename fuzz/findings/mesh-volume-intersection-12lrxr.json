@@ -5,13 +5,19 @@
   "message": "mesh volume differs from kernel volume",
   "detail": "intersection: kernel 0.0001, mesh 0.0000 (-2.58%)",
   "minimalDetail": "kernel 0.0001, mesh 0.0000 (-2.58%)",
-  "count": 3,
+  "count": 5,
   "seeds": [
     665,
     3076,
-    7579
+    7579,
+    104230,
+    106663
   ],
   "mode": "coplanar",
+  "signature": "mesh-volume|intersection|mesh volume differs from kernel volume",
+  "status": "still failing",
+  "statusDetail": "mesh volume differs from kernel volume — kernel 0.0001, mesh 0.0000 (-2.58%)",
+  "checked": "2026-11-14T12:17:25.119Z",
   "replay": "bun scripts/fuzz/fuzz.ts --replay 665",
   "minimal": {
     "parts": [

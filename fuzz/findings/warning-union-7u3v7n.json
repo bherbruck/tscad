@@ -1,0 +1,401 @@
+{
+  "id": "warning-union-7u3v7n",
+  "oracle": "warning",
+  "op": "union",
+  "message": "record: curve::from_parameters::record_of: a conic's NURBS is off its own frame and radii",
+  "detail": "A",
+  "minimalDetail": "A",
+  "count": 1,
+  "seeds": [
+    106044
+  ],
+  "mode": "touch",
+  "signature": "warning|union|record: curve::from_parameters::record_of: a conic's NURBS is off its own frame and radii",
+  "status": "still failing",
+  "statusDetail": "record: curve::from_parameters::record_of: a conic's NURBS is off its own frame and radii — A",
+  "checked": "2026-11-14T12:17:23.001Z",
+  "replay": "bun scripts/fuzz/fuzz.ts --replay 106044",
+  "minimal": {
+    "identity": true,
+    "parts": [
+      {
+        "name": "A",
+        "node": {
+          "type": "union",
+          "children": [
+            {
+              "type": "intersection",
+              "children": [
+                {
+                  "type": "box",
+                  "size": [
+                    37.8,
+                    38,
+                    21.4
+                  ]
+                },
+                {
+                  "type": "transform",
+                  "matrix": [
+                    1,
+                    0,
+                    0,
+                    38.150408,
+                    0,
+                    1,
+                    0,
+                    12.866874,
+                    0,
+                    0,
+                    1,
+                    5.099944,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  "children": [
+                    {
+                      "type": "transform",
+                      "matrix": [
+                        0.848916,
+                        -0.379173,
+                        -0.368197,
+                        -14.764,
+                        0.524678,
+                        0.688512,
+                        0.500663,
+                        0,
+                        0.06367,
+                        -0.618206,
+                        0.783433,
+                        -4,
+                        0,
+                        0,
+                        0,
+                        1
+                      ],
+                      "children": [
+                        {
+                          "type": "cylinder",
+                          "radius": 10,
+                          "height": 24.5
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "intersection",
+              "children": [
+                {
+                  "type": "box",
+                  "size": [
+                    38,
+                    38,
+                    21
+                  ]
+                },
+                {
+                  "type": "transform",
+                  "matrix": [
+                    1,
+                    0,
+                    0,
+                    38.150408,
+                    0,
+                    1,
+                    0,
+                    12.866874,
+                    0,
+                    0,
+                    1,
+                    5.099944,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  "children": [
+                    {
+                      "type": "transform",
+                      "matrix": [
+                        0.848916,
+                        -0.379173,
+                        -0.368197,
+                        -14.764,
+                        0.524678,
+                        0.688512,
+                        0.500663,
+                        0,
+                        0.06367,
+                        -0.618206,
+                        0.783433,
+                        -4,
+                        0,
+                        0,
+                        0,
+                        1
+                      ],
+                      "children": [
+                        {
+                          "type": "cylinder",
+                          "radius": 10,
+                          "height": 24.5
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "B",
+        "node": {
+          "type": "box",
+          "size": [
+            21,
+            9,
+            14
+          ]
+        }
+      }
+    ]
+  },
+  "original": {
+    "identity": true,
+    "parts": [
+      {
+        "name": "A",
+        "node": {
+          "type": "union",
+          "children": [
+            {
+              "type": "intersection",
+              "children": [
+                {
+                  "type": "box",
+                  "size": [
+                    37.752,
+                    38,
+                    21.394
+                  ]
+                },
+                {
+                  "type": "transform",
+                  "matrix": [
+                    1,
+                    0,
+                    0,
+                    38.150408,
+                    0,
+                    1,
+                    0,
+                    12.866874,
+                    0,
+                    0,
+                    1,
+                    5.099944,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  "children": [
+                    {
+                      "type": "transform",
+                      "matrix": [
+                        0.848916,
+                        -0.379173,
+                        -0.368197,
+                        -14.764,
+                        0.524678,
+                        0.688512,
+                        0.500663,
+                        0,
+                        0.06367,
+                        -0.618206,
+                        0.783433,
+                        -4,
+                        0,
+                        0,
+                        0,
+                        1
+                      ],
+                      "children": [
+                        {
+                          "type": "cylinder",
+                          "radius": 10,
+                          "height": 24.5
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "transform",
+              "matrix": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                -0.000001,
+                0,
+                0,
+                0,
+                1
+              ],
+              "children": [
+                {
+                  "type": "intersection",
+                  "children": [
+                    {
+                      "type": "box",
+                      "size": [
+                        37.752,
+                        38,
+                        21.394
+                      ]
+                    },
+                    {
+                      "type": "transform",
+                      "matrix": [
+                        1,
+                        0,
+                        0,
+                        38.150408,
+                        0,
+                        1,
+                        0,
+                        12.866874,
+                        0,
+                        0,
+                        1,
+                        5.099944,
+                        0,
+                        0,
+                        0,
+                        1
+                      ],
+                      "children": [
+                        {
+                          "type": "transform",
+                          "matrix": [
+                            0.848916,
+                            -0.379173,
+                            -0.368197,
+                            -14.764,
+                            0.524678,
+                            0.688512,
+                            0.500663,
+                            0,
+                            0.06367,
+                            -0.618206,
+                            0.783433,
+                            -4,
+                            0,
+                            0,
+                            0,
+                            1
+                          ],
+                          "children": [
+                            {
+                              "type": "cylinder",
+                              "radius": 10,
+                              "height": 24.5
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "B",
+        "node": {
+          "type": "transform",
+          "matrix": [
+            1,
+            0,
+            0,
+            15.376,
+            0,
+            1,
+            0,
+            28.5755,
+            0,
+            0,
+            1,
+            24.112813,
+            0,
+            0,
+            0,
+            1
+          ],
+          "children": [
+            {
+              "type": "shell",
+              "thickness": 0.42965,
+              "faces": {
+                "type": "max",
+                "axis": "x"
+              },
+              "children": [
+                {
+                  "type": "transform",
+                  "matrix": [
+                    1,
+                    0,
+                    0,
+                    -7,
+                    0,
+                    1,
+                    0,
+                    -13.872,
+                    0,
+                    0,
+                    1,
+                    3,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  "children": [
+                    {
+                      "type": "box",
+                      "size": [
+                        21,
+                        8.593,
+                        14.076
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
