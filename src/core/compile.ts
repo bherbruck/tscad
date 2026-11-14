@@ -719,7 +719,7 @@ class Compiler {
       this.ops[this.ops.length - 1]!.push(h);
       node = null;
     } else node = this.build(h);
-    if (node && h.props.ghost === true) this.ghosts.set(node, { host: h, label: h.ref ? refPath(h.ref) : `<${h.tag}>` });
+    if (node && h.props.ghost === true) this.ghosts.set(node, { host: h, label: h.ref ? refPath(h.ref) : h.instance?.ref ? refPath(h.instance.ref) : `<${h.tag}>` });
     if (node && h.ref) {
       this.named.set(h.ref, node);
       // a named group stays one node (a transform must not dissolve it into its children)
