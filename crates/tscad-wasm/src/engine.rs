@@ -178,11 +178,16 @@ impl Engine {
                         }
                     };
                     let mut mesh = None;
+                    // the exact box (surfaces included): a sphere's poles are its only vertices
+                    out.bbox = body.bounds().ok().map(|(lo, hi)| [lo, hi]);
                     if let Some(r) = &record {
-                        let (lo, hi) = eval::bounds(r);
-                        out.bbox = Some([lo, hi]);
+                        if out.bbox.is_none() {
+                            let (lo, hi) = eval::bounds(r);
+                            out.bbox = Some([lo, hi]);
+                        }
                         if !opts.no_mesh {
-                            match mesh_of(r, opts.tolerance, &mut out.warnings) {
+                            let size = out.bbox.map(|[lo, hi]| (0..3).map(|i| hi[i] - lo[i]).fold(0.0_f64, f64::max));
+                            match mesh_of(r, opts.tolerance, size, &mut out.warnings) {
                                 Ok(m) => mesh = Some(m),
                                 Err(e) => out.warnings.push(e),
                             }
@@ -212,7 +217,8 @@ impl Engine {
     pub fn mesh_at(&self, part: &str, tolerance: f64) -> Result<MeshData, String> {
         let p = self.parts.get(part).ok_or_else(|| format!("no part named {part}"))?;
         let r = p.record.as_ref().ok_or("the part has no record")?;
-        mesh_of(r, Some(tolerance), &mut Vec::new())
+        let size = p.body.bounds().ok().map(|(lo, hi)| (0..3).map(|i| hi[i] - lo[i]).fold(0.0_f64, f64::max));
+        mesh_of(r, Some(tolerance), size, &mut Vec::new())
     }
 
     /// STEP AP242 text for the named parts (all when empty).
@@ -361,9 +367,12 @@ fn suggest(r: &Record, it: &eval::Item, index: usize, face: bool, cands: Vec<Sel
     hits
 }
 
-fn mesh_of(record: &Record, tolerance: Option<f64>, warnings: &mut Vec<String>) -> Result<MeshData, String> {
-    let (lo, hi) = eval::bounds(record);
-    let size = (0..3).map(|i| hi[i] - lo[i]).fold(0.0_f64, f64::max).max(1e-6);
+fn mesh_of(record: &Record, tolerance: Option<f64>, size: Option<f64>, warnings: &mut Vec<String>) -> Result<MeshData, String> {
+    let size = size.unwrap_or_else(|| {
+        let (lo, hi) = eval::bounds(record);
+        (0..3).map(|i| hi[i] - lo[i]).fold(0.0_f64, f64::max)
+    });
+    let size = size.max(1e-6);
     let t = match tolerance {
         Some(c) if c > 0.0 => solidcore_tess::MeshTolerance::display(c),
         _ => solidcore_tess::MeshTolerance::display_of(size),

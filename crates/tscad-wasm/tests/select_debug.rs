@@ -76,3 +76,14 @@ fn pick_tangent_edge_is_smooth() {
     }
     assert!(smooth > 0);
 }
+
+#[test]
+fn sphere_bbox_is_exact() {
+    let d: Document = serde_json::from_str(r#"{"parts":[{"name":"s","node":{"type":"sphere","radius":2}}]}"#).unwrap();
+    let mut e = Engine::new(None);
+    let r = e.evaluate(&d, &EvalOptions::default());
+    let [lo, hi] = r.parts[0].bbox.unwrap();
+    for i in 0..3 {
+        assert!((lo[i] + 2.0).abs() < 1e-6 && (hi[i] - 2.0).abs() < 1e-6, "{lo:?} {hi:?}");
+    }
+}

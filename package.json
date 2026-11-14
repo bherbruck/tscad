@@ -32,7 +32,8 @@
     "./ir": "./src/ir.ts",
     "./parts": "./src/parts/index.ts",
     "./render": "./src/render/index.ts",
-    "./drawing": "./src/drawing/index.ts"
+    "./drawing": "./src/drawing/index.ts",
+    "./mcp": "./src/mcp/index.ts"
   },
   "files": [
     "src",
