@@ -39,11 +39,14 @@
   },
   "files": [
     "src",
+    "!src/playground",
     "wasm",
     "assets",
+    "examples/*.tsx",
     "README.md",
     "LICENSE-MIT",
-    "LICENSE-APACHE"
+    "LICENSE-APACHE",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "build:wasm": "bun scripts/build-wasm.ts",

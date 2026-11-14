@@ -169,6 +169,7 @@ export class AssemblyRecorder {
   /** A loose solid (outside any part), model matrix `m`: its anchors go to the implicit part. */
   loose(h: Host, m: Mat4): void {
     this.looseHosts.add(h);
+    if (SKETCH_CONSUMERS.has(h.tag)) return; // 2D inside: no anchors
     if (h.tag === "anchor") this.part(h, m, h);
     else this.part(h, mul(mul(m, this.hooks.placement(h)), ownMatrix(h)), h);
   }
