@@ -43,7 +43,7 @@ export default function PhoneStand(p: ParamValues<typeof params>) {
   return (
     <part name="stand" color="#6b8f71">
       <difference>
-        <fillet radius={1.2} edges={edges.parallel("y")}>
+        <fillet radius={Math.min(2, t * 0.4)} edges={edges.parallel("y")}>
           {/* side profile sketched on the XZ plane, extruded symmetrically to width */}
           <extrude height={p.width} plane="XZ" center>
             <polygon points={profile} />

@@ -69,7 +69,9 @@ export default function BoardMount(p: ParamValues<typeof params>) {
     <part name="board-mount" color="#3d5a80">
       <difference>
         <union>
-          <RoundedPlate w={W} d={D} t={p.plate} r={5} />
+          <fillet radius={1} edges={edges.top()}>
+            <RoundedPlate w={W} d={D} t={p.plate} r={5} />
+          </fillet>
           {board.holes.map(([x, y]) => (
             <Standoff height={p.standoff} x={p.margin + x} y={p.margin + y} z={p.plate} />
           ))}

@@ -75,9 +75,9 @@ To add tscad to an existing bun project: `bun add tscad`, then set
 
 | Example | Shows off |
 |---|---|
-| [`bracket.tsx`](examples/bracket.tsx) | L-bracket: unions, a gusset sketch, filleted corners, `gridPattern` holes, slots |
+| [`bracket.tsx`](examples/bracket.tsx) | L-bracket: unions, a gusset sketch, rounded corners and an inside-bend fillet picked with combined selectors, `gridPattern` holes, slots |
 | [`spur-gear.tsx`](examples/spur-gear.tsx) | involute gear profile computed from the math, hub, `polarPattern` lightening holes |
-| [`enclosure.tsx`](examples/enclosure.tsx) | `<assembly>` of body + lid, a `<Boss>` component, a grid of vent slots cut in one extrusion, chamfered lid, countersinks |
+| [`enclosure.tsx`](examples/enclosure.tsx) | `<assembly>` of body + lid, a `<Boss>` component, a grid of vent slots cut in one extrusion, filleted edges, countersinks |
 | [`vase.tsx`](examples/vase.tsx) | smooth Bézier silhouette from an SVG `path`, `revolve`, `shell` |
 | [`bolt-and-nut.tsx`](examples/bolt-and-nut.tsx) | ISO metric table as a `choice` param, chamfered hex via intersection, cosmetic thread via `linearPattern` |
 | [`coaster.tsx`](examples/coaster.tsx) | honeycomb from two interleaved `gridPattern`s, clipped with `intersection` |
@@ -197,17 +197,18 @@ for the internals.
 
 ## Status
 
-tscad is young (v0.1). Things to know:
+tscad is young (v0.1). Known gaps, mostly in the kernel (details and repros in
+[docs/KERNEL_ISSUES.md](docs/KERNEL_ISSUES.md)):
 
-- Boolean-heavy models take seconds, not milliseconds, on the first build (the bundled examples
-  evaluate in roughly 1–20 s each); after that the subtree cache makes most parameter changes
-  much faster. Prefer one cut with many shapes (holes in a sketch, or one `<extrude>` of many
-  slots) over many separate cuts.
-- Some fillet cases fail in the kernel today: rounding vertical edges with a radius larger than
-  about half the edge's length, and filleting or chamfering tangent edge chains (such as the top
-  outline of an extruded `roundedRect`). Prefer `roundedRect`/`slot` sketches for rounded
-  outlines.
-- `<sweep>` along a `helix()` does not yet produce a closed solid, so threads are cosmetic for now.
+- **Speed.** Booleans cost around a second each on the first build (the bundled examples take
+  roughly 1–20 s); after that the subtree cache makes most parameter changes much faster. Prefer
+  one cut with many shapes (holes in a sketch, or one `<extrude>` of many slots) over many
+  separate cuts.
+- **Shell** fails inward across tangent walls (e.g. an extruded `roundedRect`); use `outward`, or
+  build the cavity with a `<difference>`. Shelling boxes, cylinders and revolved profiles works.
+- **Sweep** along a `helix()` doesn't produce a closed solid yet, and polyline paths with sharp
+  corners fail — threads are cosmetic for now.
+- **STEP import** of models with blended corners isn't supported (export is fine).
 
 ## Credits
 

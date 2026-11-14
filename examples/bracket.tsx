@@ -29,8 +29,11 @@ export default function Bracket(p: ParamValues<typeof params>) {
   return (
     <part name="bracket" color="#4f7cac">
       <difference>
-        <fillet radius={p.cornerRadius} edges={edges.parallel("z").max("y")}>
-          <union>
+        {/* round the outer corners: the base's front corners and the upright's top corners */}
+        <fillet radius={p.cornerRadius} edges={edges.parallel("z").max("y").or(edges.parallel("y").max("z"))}>
+          {/* a fillet in the inside bend, as wide as the plate */}
+          <fillet radius={t} edges={edges.parallel("x").within([-1, t - 0.01, t - 0.01], [p.width + 1, t + 0.01, t + 0.01])}>
+            <union>
             {/* base plate (x: width, y: depth) */}
             <box size={[p.width, p.depth, t]} center={false} />
             {/* upright along the back edge */}
@@ -41,7 +44,8 @@ export default function Bracket(p: ParamValues<typeof params>) {
                 <polygon points={[[0, 0], [gussetSize, 0], [0, gussetSize]]} />
               </extrude>
             )}
-          </union>
+            </union>
+          </fillet>
         </fillet>
 
         {/* mounting holes through the base */}

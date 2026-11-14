@@ -166,9 +166,8 @@ that name it and how many edges each one matches; copy the most specific one.
 Selectors act on the solid *as it is at that point of the tree*: fillet before you drill holes
 when you only want the outer corners rounded, after when you want the holes rounded too.
 
-The kernel's fillets have limits today: very large radii on short edges (more than about half the
-edge length) and tangent edge chains (the top outline of an extruded `roundedRect`) can fail.
-For rounded outlines, sketch them rounded (`roundedRect`, `slot`, `path` arcs) instead.
+Broad selectors skip edges that can't be rounded (seams, and edges between tangent faces), so
+`edges.top()` on an extruded `roundedRect` rounds the whole top outline in one go.
 
 ## 7. Patterns
 

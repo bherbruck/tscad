@@ -50,9 +50,11 @@ export default function Enclosure(p: ParamValues<typeof params>) {
           <union>
             {/* a rounded tub: the outer outline minus the inner one, raised by the floor */}
             <difference>
-              <extrude height={H} x={W / 2} y={D / 2}>
-                <roundedRect w={W} h={D} r={p.radius} />
-              </extrude>
+              <fillet radius={Math.min(2, p.wall)} edges={edges.bottom()}>
+                <extrude height={H} x={W / 2} y={D / 2}>
+                  <roundedRect w={W} h={D} r={p.radius} />
+                </extrude>
+              </fillet>
               <extrude height={H} x={W / 2} y={D / 2} z={p.wall}>
                 <roundedRect w={p.width} h={p.depth} r={Math.max(0.5, p.radius - p.wall)} />
               </extrude>
@@ -71,11 +73,11 @@ export default function Enclosure(p: ParamValues<typeof params>) {
 
       <part name="lid" color="#e8edf2" z={p.exploded ? H + 15 : H}>
         <difference>
-          <chamfer distance={0.6} edges={edges.top().parallel("x").or(edges.top().parallel("y"))}>
+          <fillet radius={lidT * 0.5} edges={edges.top()}>
             <extrude height={lidT} x={W / 2} y={D / 2}>
               <roundedRect w={W} h={D} r={p.radius} />
             </extrude>
-          </chamfer>
+          </fillet>
           {/* vent slots: one extrusion of a whole grid of slot outlines, cut in one go */}
           {p.ventRows > 0 && (
             <extrude height={lidT * 3} x={W / 2} y={D / 2} z={-lidT}>
