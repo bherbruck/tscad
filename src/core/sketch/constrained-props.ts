@@ -157,6 +157,11 @@ export interface DimensionProps extends Pair {
   distance?: number;
   /** Alias of `distance`. */
   value?: number;
+  /**
+   * For a distance from a line: which side of it (looking from its `from` to its `to`) the
+   * other point/line lies. Default: the side it is drawn on.
+   */
+  side?: "left" | "right";
   /** Signed horizontal distance `b.x − a.x`, mm. */
   dx?: number;
   /** Signed vertical distance `b.y − a.y`, mm. */
@@ -173,6 +178,8 @@ export interface DimensionProps extends Pair {
 export interface DistanceProps extends Pair {
   /** Distance, mm. */
   value?: number;
+  /** For a distance from a line: `"left"` / `"right"` of it (from → to). Default: as drawn. */
+  side?: "left" | "right";
   /** Alias of `value`. */
   distance?: number;
   dx?: number;

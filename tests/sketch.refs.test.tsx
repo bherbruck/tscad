@@ -57,9 +57,9 @@ describe("sketch refs", () => {
     } catch (e) {
       err = e as TscadError;
     }
-    expect(err?.detail).toBe("tangent={arc} refers to nothing in this sketch");
+    expect(err?.detail).toBe("tangent: handle .arc is used but never attached in this sketch");
     expect(err?.loc?.line).toBeGreaterThan(0);
-    expect(err?.hint).toContain("ref={…s.arc}".replace("s.", "."));
+    expect(err?.hint).toContain("<line ref={….arc} …/>");
   });
 
   test("a declared point nothing uses warns at its declaration", () => {
@@ -104,5 +104,53 @@ describe("sketch refs", () => {
     // @ts-expect-error parallel takes lines
     const bad3 = <parallel a={s.c} b={s.l} />;
     expect([ok, bad1, bad2, bad3].length).toBe(4);
+  });
+});
+
+describe("solve cache and side", () => {
+  const model = (w: number, extra: number) => {
+    const s = sketchRefs("o", "base");
+    return (
+      <part name="p">
+        <extrude height={1}>
+          <sketch>
+            <point ref={s.o} fixed />
+            <line ref={s.base} from={s.o} to="a" horizontal length={w} />
+            <line from="a" to="b" vertical length={10} />
+            <line from="b" to={s.o} />
+          </sketch>
+        </extrude>
+        <box size={extra} />
+      </part>
+    );
+  };
+  test("an unchanged sketch (fresh handles each render) reuses the solve", () => {
+    const a = compile(model(20, 3)).sketches[0]!;
+    const b = compile(model(20, 7)).sketches[0]!;
+    const c = compile(model(25, 3)).sketches[0]!;
+    expect(b.entities).toBe(a.entities); // same cached solve
+    expect(c.entities).not.toBe(a.entities);
+    expect(c.points.find((p) => p.id === "a")!.x).toBe(25);
+  });
+  test("cached solves replay their warnings", () => {
+    const el = () => <extrude height={1}><sketch><circle center={[0, 0]} r={3} /></sketch></extrude>;
+    const w1 = compile(el()).warnings, w2 = compile(el()).warnings;
+    expect(w1.length).toBe(1);
+    expect(w2).toEqual(w1);
+  });
+  test("side picks the side of a line regardless of the drawing", () => {
+    const at = (side: "left" | "right") =>
+      compile(
+        <extrude height={1}>
+          <sketch allowFree>
+            <point id="o" fixed />
+            <line id="base" from="o" to="a" horizontal length={20} construction />
+            <circle id="c" center={[10, 5]} r={2} />
+            <dimension a="c" b="base" distance={8} side={side} />
+          </sketch>
+        </extrude>,
+      ).sketches[0]!.entities.find((e) => e.id === "c") as { center: [number, number] };
+    expect(at("left").center[1]).toBeCloseTo(8, 9);
+    expect(at("right").center[1]).toBeCloseTo(-8, 9);
   });
 });

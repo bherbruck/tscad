@@ -4,6 +4,10 @@ Draw rough 2D geometry, say how it relates (horizontal, tangent, 40 mm long...),
 solver place it exactly — the Fusion / Onshape / SolveSpace workflow, as JSX. Dimensions are
 ordinary expressions, so they bind straight to params.
 
+The same sketch in the two reference styles. They mix freely, even in one sketch.
+
+**String ids:**
+
 ```tsx
 <extrude height={p.thickness}>
   <sketch>
@@ -15,6 +19,28 @@ ordinary expressions, so they bind straight to params.
     <circle id="hole" center="h" diameter={p.hole} />
     <dimension a="h" b="base" distance={p.height * 0.6} />
     <dimension a="o" b="h" dx={p.width / 2} />
+  </sketch>
+</extrude>
+```
+
+**Typed handles** (React-style refs; a wrong kind such as `tangent={s.o}` is a type error):
+
+```tsx
+const s = sketchRefs<{
+  o: "point"; a: "point"; b: "point"; c: "point"; h: "point"
+  base: "line"; right: "line"; top: "arc"; hole: "circle"
+}>()
+
+<extrude height={p.thickness}>
+  <sketch>
+    <point ref={s.o} x={0} y={0} fixed />
+    <line ref={s.base}  from={s.o} to={s.a} horizontal length={p.width} />
+    <line ref={s.right} from={s.a} to={s.b} vertical length={p.height} />
+    <arc  ref={s.top}   from={s.b} to={s.c} tangent={s.right} radius={p.width / 2} />
+    <line from={s.top.end} to={s.o} tangent={s.top} />
+    <circle ref={s.hole} center={s.h} diameter={p.hole} />
+    <dimension a={s.h} b={s.base} distance={p.height * 0.6} />
+    <dimension a={s.o} b={s.h} dx={p.width / 2} />
   </sketch>
 </extrude>
 ```
@@ -61,6 +87,7 @@ use `.start`, `.end`, `.center`, so don't put dots in your own ids.
 | Element | Meaning |
 |---|---|
 | `<dimension a b distance>` | point–point distance; point–line: perpendicular distance; line–line: distance between (hence parallel) lines. An arc/circle stands for its centre. |
+| `<dimension a b distance side="left" \| "right">` | for a distance from a line: which side of it (looking from → to) the other thing is on. Default: the side it's drawn on |
 | `<dimension a b dx dy>` | **signed** `b.x − a.x` / `b.y − a.y` (use these to pick a side deterministically) |
 | `<dimension of radius/diameter/length>` | |
 | `<dimension a b angle>` / `<angle a b value>` | angle from line a's ray to line b's ray, CCW. Rays leave the shared vertex when the lines meet, else point from → to. |
@@ -107,7 +134,7 @@ const s = sketchRefs<{ o: "point"; a: "point"; b: "point"; c: "point"; base: "li
 
 - `handle.start`, `.end`, `.center` are the curve's points, like `"base.end"`. A closed chain may
   name points of curves declared later (`from={s.upper.end}` before `<line ref={s.upper}>`).
-- Messages show handles by name: `tangent={arc} refers to nothing in this sketch`.
+- Messages show handles by property name: `tangent: handle .lower is used but never attached in this sketch`, at the element's source location.
 - Like string ids, a handle used as a point (`from`, `to`, `center`) that is never attached is
   created as a new point. A handle used where a curve is needed and never attached is an
   error at the use. A `<point>` that nothing refers to warns at its declaration (usually a typo
@@ -133,6 +160,16 @@ tangent curves continue smoothly; arcs with only a centre bulge away from the re
 drawing; arcs default to 180° when tangent, else 90°. Unsigned values (`length`, `distance`,
 `radius`) have two branches: give a rough `x`/`y`, or use signed `dx`/`dy`/`angle`, when the
 default walk picks the wrong one.
+
+**Which solution.** Unsigned values have mirror-image solutions. The solver starts from the
+drawn and laid-out guesses and takes minimum-norm steps, so it lands on the solution nearest
+the drawing. Point–line and line–line distances and tangencies keep the side they are drawn
+on, or the one `side` names.
+
+**Cache.** Solves are cached (LRU, 128) by a canonical key: each solved element's tag, props
+and source location. Handles are renumbered, so fresh `sketchRefs()` per render still hit.
+A param change that doesn't touch a sketch skips its solve, and cached warnings are replayed.
+`clearSketchCache()` (from `src/core/sketch/constrained`) empties the cache.
 
 ## Diagnostics
 

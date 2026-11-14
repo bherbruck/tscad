@@ -152,8 +152,8 @@ type SpecBody =
   | { k: "hv"; p: Pt; q: Pt; axis: 0 | 1 }
   | { k: "dist"; p: Pt; q: Pt; v: number }
   | { k: "dxy"; p: Pt; q: Pt; axis: 0 | 1; v: number }
-  | { k: "ptLine"; p: Pt; l: LineE; v: number }
-  | { k: "lineLine"; l1: LineE; l2: LineE; v: number }
+  | { k: "ptLine"; p: Pt; l: LineE; v: number; side?: 1 | -1 }
+  | { k: "lineLine"; l1: LineE; l2: LineE; v: number; side?: 1 | -1 }
   | { k: "angAbs"; l: LineE; v: number }
   | { k: "ang"; l1: LineE; l2: LineE; v: number }
   | { k: "angle"; l1: LineE; l2: LineE; v: number; f1: boolean; f2: boolean }
@@ -252,7 +252,7 @@ class Model {
     if (!decl) {
       if (this.pointsById.has(id)) this.fail(h, `${prop}="${id}" is a point, not a line/arc/circle`);
       const guess = closest(id, [...this.decls.keys()]);
-      if (id.includes(REF_MARK)) this.fail(h, `${prop}={${id}} refers to nothing in this sketch`, `attach the handle to a curve: <line ref={…${display(id).replace(/^.*?(\w+)$/, ".$1")}} …/> (or <arc>/<circle>)`);
+      if (id.includes(REF_MARK)) this.fail(h, `${prop}: handle .${id} is used but never attached in this sketch`, `attach it to a curve with ref: <line ref={….${id}} …/> (or <arc>/<circle>), or check the property name`);
       this.fail(h, `unknown sketch entity "${id}"`, guess ? `did you mean "${guess}"?` : "give the line/arc/circle an id");
     }
     if (this.building.has(id)) this.fail(h, `"${id}" refers to itself through its own points`);
@@ -654,13 +654,20 @@ function constraintElement(m: Model, h: Host): void {
       const v = num(raw);
       if (v === undefined || v < 0) m.fail(h, `distance must be a number ≥ 0 (got ${show(raw)})`);
       const dim: Dim = { kind: "distance", value: v };
+      /** `side`: which side of the line (seen along from → to) the other thing lies. */
+      const side = (): { side?: 1 | -1 } => {
+        if (p.side === undefined) return {};
+        if (p.side !== "left" && p.side !== "right") m.fail(h, `side must be "left" or "right" (got ${show(p.side)})`);
+        if (a.kind !== "line" && b.kind !== "line") m.fail(h, "side only applies to a distance from a line", `<dimension a="p" b="someLine" distance={5} side="left" />`);
+        return { side: p.side === "left" ? 1 : -1 };
+      };
       if (a.kind === "line" && b.kind === "line") {
         if (v === 0) m.fail(h, "distance 0 between lines", "use <collinear>");
-        m.add({ k: "lineLine", l1: a, l2: b, v, host: h, label, dim });
+        m.add({ k: "lineLine", l1: a, l2: b, v, ...side(), host: h, label, dim });
       } else if (a.kind === "line" || b.kind === "line") {
         const l = (a.kind === "line" ? a : b) as LineE;
         const o = a.kind === "line" ? b : a;
-        m.add({ k: "ptLine", p: asPoint(m, o, h, a.kind === "line" ? "b" : "a"), l, v, host: h, label, dim });
+        m.add({ k: "ptLine", p: asPoint(m, o, h, a.kind === "line" ? "b" : "a"), l, v, ...side(), host: h, label, dim });
       } else {
         const pa = asPoint(m, a, h, "a"), pb = asPoint(m, b, h, "b");
         if (pa === pb) m.fail(h, "measures a point to itself");
@@ -1091,14 +1098,14 @@ function equations(m: Model, x0: Float64Array, S: number): Constraint[] {
         break;
       }
       case "ptLine": {
-        const ip = P(s.p), ia = P(s.l.a), ib = P(s.l.b), v = s.v, sg = sign(sd0(g(s.p), s.l));
+        const ip = P(s.p), ia = P(s.l.a), ib = P(s.l.b), v = s.v, sg = s.side ?? sign(sd0(g(s.p), s.l));
         ev = (x) => [v === 0 ? sd(at(x, ip), at(x, ia), at(x, ib)) : d.addc(d.sc(sd(at(x, ip), at(x, ia), at(x, ib)), sg), -v)];
         break;
       }
       case "lineLine": {
         const p1 = P(s.l1.a), p2 = P(s.l1.b), ia = P(s.l2.a), ib = P(s.l2.b), v = s.v;
         const mid0 = vsc(vadd(g(s.l1.a), g(s.l1.b)), 0.5);
-        const sg = sign(sd0(mid0, s.l2));
+        const sg = s.side ?? sign(sd0(mid0, s.l2));
         ev = (x) => [
           d.addc(d.sc(sd(at(x, p1), at(x, ia), at(x, ib)), sg), -v),
           d.addc(d.sc(sd(at(x, p2), at(x, ia), at(x, ib)), sg), -v),
@@ -1516,8 +1523,83 @@ function profile(sol: Solved): Loop2[] {
 
 /** Solve a constraint `<sketch>` host: its closed loops (sketch coords) and the unsolved children. */
 export function solveSketch(sketch: Host, outer: SolveHooks): { loops: Loop2[]; rest: Host[]; info: SolvedSketch } {
+  const key = cacheKey(sketch);
+  const cached = key !== undefined ? cache.get(key) : undefined;
+  const rest = sketch.children.filter((c) => !isSolvedTag(c.tag));
+  if (cached) {
+    cache.delete(key!);
+    cache.set(key!, cached); // LRU: most recent last
+    for (const w of cached.warnings) outer.warn({ tag: w.tag, props: {}, children: [], key: null, ...(w.loc ? { loc: w.loc } : {}) }, w.msg);
+    return { loops: cached.loops, rest, info: cached.info };
+  }
+  const warnings: CachedWarning[] = [];
   // messages show handles by name (`{base}`), not by their internal keys
-  const hooks: SolveHooks = { warn: (h, msg) => outer.warn(h, display(msg)) };
+  const hooks: SolveHooks = {
+    warn: (h, msg) => {
+      warnings.push({ tag: h.tag, ...(h.loc ? { loc: h.loc } : {}), msg: display(msg) });
+      outer.warn(h, display(msg));
+    },
+  };
+  const r = solveUncached(sketch, hooks);
+  if (key !== undefined) {
+    cache.set(key, { loops: r.loops, info: r.info, warnings });
+    if (cache.size > CACHE_SIZE) cache.delete(cache.keys().next().value!);
+  }
+  return { ...r, rest };
+}
+
+function isSolvedTag(tag: string): boolean {
+  return CONSTRAINT_TAGS.has(tag) || tag === "circle";
+}
+
+interface CachedWarning {
+  tag: string;
+  loc?: SourceLoc;
+  msg: string;
+}
+const CACHE_SIZE = 128;
+/** Solved sketches by structure + values + source locations: param changes elsewhere skip the solve. */
+const cache = new Map<string, { loops: Loop2[]; info: SolvedSketch; warnings: CachedWarning[] }>();
+
+/** Forget cached sketch solves (tests, memory). */
+export function clearSketchCache(): void {
+  cache.clear();
+}
+
+/**
+ * A canonical text of everything the solve depends on, or undefined when a prop can't be
+ * serialised. Handle keys are renumbered by first appearance, so a fresh `sketchRefs()` per
+ * render still hits.
+ */
+function cacheKey(sketch: Host): string | undefined {
+  const renum = new Map<string, number>();
+  let ok = true;
+  const ser = (v: unknown): string => {
+    if (v === null || v === undefined) return "_";
+    if (typeof v === "number") return Object.is(v, -0) ? "0" : String(v);
+    if (typeof v === "boolean") return v ? "T" : "F";
+    if (typeof v === "string") return JSON.stringify(v);
+    if (isSketchRef(v)) {
+      const base = v.key.split(".")[0]!, sub = v.key.slice(base.length);
+      if (!renum.has(base)) renum.set(base, renum.size);
+      return `@${display(base)}#${renum.get(base)}${sub}`;
+    }
+    if (Array.isArray(v)) return `[${v.map(ser).join(",")}]`;
+    ok = false;
+    return "?";
+  };
+  const loc = (l?: SourceLoc) => (l ? `${l.file}:${l.line}:${l.column}` : "");
+  const props = (p: Record<string, any>) =>
+    Object.keys(p)
+      .sort()
+      .map((k) => `${k}=${ser(p[k])}`)
+      .join(" ");
+  const parts = [`sketch ${loc(sketch.loc)} ${props({ strict: sketch.props.strict, allowFree: sketch.props.allowFree })}`];
+  for (const c of sketch.children) if (isSolvedTag(c.tag)) parts.push(`${c.tag} ${loc(c.loc)} ${props(c.props)}`);
+  return ok ? parts.join("\n") : undefined;
+}
+
+function solveUncached(sketch: Host, hooks: SolveHooks): { loops: Loop2[]; info: SolvedSketch } {
   let sol: Solved, loops: Loop2[];
   try {
     sol = solve(sketch, hooks);
@@ -1536,7 +1618,7 @@ export function solveSketch(sketch: Host, outer: SolveHooks): { loops: Loop2[]; 
   if (hit) {
     hooks.warn(sketch, `the profile crosses itself near (${fmt(Number(hit[0].toFixed(4)))}, ${fmt(Number(hit[1].toFixed(4)))}): a constraint probably solved to its other branch (an unsigned length or distance flipped)`);
   }
-  return { loops, rest: sol.rest, info: sol.info };
+  return { loops, info: sol.info };
 }
 
 /** A point where two loop edges properly cross (each loop as a polyline), if any. */
