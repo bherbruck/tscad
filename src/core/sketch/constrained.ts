@@ -10,7 +10,7 @@ import { TscadError, type SourceLoc } from "../errors";
 import { mul as mul4, type Mat4, type Vec2 } from "../math";
 import type { Host } from "../render";
 import type { Frame } from "./place";
-import { arc as arcSeg, line as lineSeg, polyline, reverseSeg, TAU, transformLoop, type Affine2, type Loop2, type Seg2 } from "./seg";
+import { arc as arcSeg, line as lineSeg, polyline, reverseSeg, signedArea, TAU, transformLoop, type Affine2, type Loop2, type Seg2 } from "./seg";
 import { display, isSketchRef, REF_MARK } from "./refs";
 import * as d from "./solver/dual";
 import { analyze, findConflict, lm, type Constraint, type System } from "./solver/solve";
@@ -19,11 +19,32 @@ import { analyze, findConflict, lm, type Constraint, type System } from "./solve
 // Public metadata (CompileResult.sketches)
 
 /** A solved sketch entity, in sketch coordinates (mm). */
-export type SketchEntityInfo =
+export type SketchEntityInfo = (
   | { kind: "line"; id?: string; from: Vec2; to: Vec2; fromId: string; toId: string; construction: boolean }
   | { kind: "arc"; id?: string; center: Vec2; from: Vec2; to: Vec2; radius: number; ccw: boolean; construction: boolean }
   | { kind: "circle"; id?: string; center: Vec2; radius: number; construction: boolean }
-  | { kind: "spline"; id?: string; points: Vec2[]; degree: number; construction: boolean };
+  | { kind: "spline"; id?: string; points: Vec2[]; degree: number; construction: boolean }
+) & {
+  /** Made by an in-sketch pattern: the original's index in `entities`, and which copy (1, 2...). */
+  copyOf?: { index: number; pattern: number; copy: number };
+};
+
+/** An in-sketch pattern (`<mirrorEntities>`, `<circularPattern>`, `<linearPattern of>`). */
+export interface SketchPatternInfo {
+  kind: "mirror" | "circular" | "linear";
+  /** Indices in `entities` of the originals. */
+  of: number[];
+  /** For each copy (1, 2...), the indices of its entities, in `of` order. */
+  copies: number[][];
+  /** circular: centre and the angle between copies (degrees). */
+  center?: Vec2;
+  angle?: number;
+  /** mirror: two points on the mirror line. */
+  axis?: [Vec2, Vec2];
+  /** linear: offset between copies. */
+  step?: Vec2;
+  loc?: SourceLoc;
+}
 
 /**
  * A driving dimension for overlay drawing. `points` (sketch coordinates) by kind:
@@ -56,6 +77,8 @@ export interface SolvedSketch {
   points: { id: string; x: number; y: number; free: boolean }[];
   entities: SketchEntityInfo[];
   dimensions: SketchDimensionInfo[];
+  /** In-sketch patterns and mirrors (their copies stay constrained to the originals). */
+  patterns: SketchPatternInfo[];
 }
 
 /** A solved sketch placed in the model: `CompileResult.sketches[i]`. */
@@ -73,7 +96,12 @@ const ENTITY_TAGS = new Set(["point", "line", "arc", "spline"]);
 const CONSTRAINT_ELEMENT_TAGS = new Set([
   "dimension", "distance", "angle", "coincident", "equal", "parallel", "perpendicular", "tangent", "collinear",
   "concentric", "horizontal", "vertical", "symmetric", "midpoint", "onCurve", "fix",
+  "mirrorEntities", "circularPattern",
 ]);
+/** In-sketch patterns: copies stay constrained to the originals. (`<linearPattern of>` too.) */
+const PATTERN_TAGS = new Set(["mirrorEntities", "circularPattern"]);
+/** `<linearPattern>` is a solid pattern, unless it has `of` (then it patterns sketch entities). */
+const isSketchLinear = (h: Host) => h.tag === "linearPattern" && h.props.of !== undefined;
 /** Every tag that only exists in constraint sketches. */
 export const CONSTRAINT_TAGS: ReadonlySet<string> = new Set([...ENTITY_TAGS, ...CONSTRAINT_ELEMENT_TAGS]);
 
@@ -84,7 +112,7 @@ function isSolvedCircle(h: Host): boolean {
 
 /** Does this `<sketch>` hold constraint-sketch elements (and so needs solving)? */
 export function isConstrainedSketch(h: Host): boolean {
-  return h.children.some((c) => CONSTRAINT_TAGS.has(c.tag) || isSolvedCircle(c));
+  return h.children.some((c) => CONSTRAINT_TAGS.has(c.tag) || isSolvedCircle(c) || isSketchLinear(c));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -161,7 +189,9 @@ type SpecBody =
   | { k: "eqRad"; c1: Round; c2: Round }
   | { k: "radius"; c: Round; v: number }
   | { k: "sweep"; a: ArcE; v: number }
-  | { k: "tanLC"; l: LineE; c: Round }
+  | { k: "tanLC"; l: LineE; c: Round; side?: 1 | -1 }
+  | { k: "rot"; p: Pt; q: Pt; c: Pt; ang: number }
+  | { k: "shift"; p: Pt; q: Pt; d: Vec2 }
   | { k: "tanCC"; c1: Round; c2: Round }
   | { k: "onCircle"; p: Pt; c: Round }
   | { k: "midpoint"; p: Pt; l: LineE }
@@ -184,6 +214,11 @@ class Model {
   readonly building = new Set<string>();
   /** Points pinned by `fixed` / `<fix>`. */
   readonly fixed = new Set<Pt>();
+  /** Pattern copies → their original. */
+  readonly copyOf = new Map<Curve, { orig: Curve; pattern: number; copy: number }>();
+  readonly patterns: { kind: SketchPatternInfo["kind"]; of: Curve[]; copies: Curve[][]; center?: Pt; angle?: number; axis?: LineE; step?: Vec2; host: Host }[] = [];
+  /** Branch hints: checked on the solution (a solve violating one is retried). */
+  readonly hints: ({ k: "arcSize"; a: ArcE; major: boolean; host: Host } | { k: "side"; l: LineE; c: Round; side: 1 | -1; host: Host } | { k: "orient"; ccw: boolean; host: Host })[] = [];
   anon = 0;
 
   constructor(readonly sketch: Host) {}
@@ -410,9 +445,10 @@ function parse(sketch: Host, hooks: SolveHooks): { m: Model; rest: Host[] } {
   const rest: Host[] = [];
   const entities: Host[] = [];
   const order: Host[] = [];
+  const patternHosts: Host[] = [];
   // declarations first so references can come before definitions
   for (const raw of sketch.children) {
-    const solved = CONSTRAINT_TAGS.has(raw.tag) || raw.tag === "circle";
+    const solved = CONSTRAINT_TAGS.has(raw.tag) || raw.tag === "circle" || isSketchLinear(raw);
     const c = solved ? normalize(m, raw) : raw;
     if (c.tag === "point") {
       const p = c.props;
@@ -436,13 +472,28 @@ function parse(sketch: Host, hooks: SolveHooks): { m: Model; rest: Host[] } {
       }
       entities.push(c);
       order.push(c);
-    } else if (CONSTRAINT_ELEMENT_TAGS.has(c.tag)) order.push(c);
+    } else if (PATTERN_TAGS.has(c.tag) || isSketchLinear(c)) patternHosts.push(c);
+    else if (CONSTRAINT_ELEMENT_TAGS.has(c.tag)) order.push(c);
     else rest.push(c);
   }
   const built = new Map<Host, Curve>();
   for (const h of entities) {
     const id = h.props.id;
     built.set(h, id ? m.curve(id, h, "id") : m.build(h));
+  }
+  // in-sketch patterns: constrained copies of entities (before structural equations, so the
+  // copies get theirs)
+  for (const h of patternHosts) pattern(m, h);
+  // branch hints
+  for (const [h, c] of built) {
+    if (c.kind !== "arc") continue;
+    if (h.props.major && h.props.minor) m.fail(h, "an arc can't be both major and minor");
+    if (h.props.major || h.props.minor) m.hints.push({ k: "arcSize", a: c, major: !!h.props.major, host: h });
+  }
+  const pref = sketch.props.prefer;
+  if (pref !== undefined) {
+    if (pref !== "ccw" && pref !== "cw") m.fail(sketch, `prefer must be "ccw" or "cw" (got ${show(pref)})`);
+    m.hints.push({ k: "orient", ccw: pref === "ccw", host: sketch });
   }
   // structural equations
   for (const c of m.curves) {
@@ -451,6 +502,8 @@ function parse(sketch: Host, hooks: SolveHooks): { m: Model; rest: Host[] } {
       m.add({ k: "onCircle", p: c.e, c, host: c.host, label: `${c.name} (end on its circle)`, structural: true });
     }
   }
+  // a patterned circle's radius follows its original
+  for (const [c, { orig }] of m.copyOf) if (c.kind === "circle" && orig.kind === "circle") m.add({ k: "eqRad", c1: orig, c2: c, host: c.host, label: `${c.name} (pattern copy of ${orig.name})`, structural: true });
   for (const p of m.fixed) m.add({ k: "fix", p, ...(guessOf(m, p) ? { at: guessOf(m, p)! } : {}), host: p.host ?? sketch, label: `fixed ${pname(p)}` });
   // constraints in source order
   for (const h of order) {
@@ -473,6 +526,123 @@ function parse(sketch: Host, hooks: SolveHooks): { m: Model; rest: Host[] } {
   for (const sp of m.specs) if (!(sp.k === "fix" && sp.p.host === sp.host)) for (const v of Object.values(sp)) mark(v);
   for (const p of m.points) if (p.host && !used.has(p)) hooks.warn(p.host, `${pname(p)} is declared but nothing uses it`);
   return { m, rest };
+}
+
+/** `<mirrorEntities>`, `<circularPattern>`, `<linearPattern of>`: constrained copies. */
+function pattern(m: Model, h: Host): void {
+  const p = h.props;
+  const ids = refs(p.of);
+  if (!ids.length) m.fail(h, "needs of: the entities to copy", `<${h.tag} of={["lug", "lugTop"]} ... />`);
+  const of = ids.map((id, i) => m.curve(id, h, `of[${i}]`));
+  const kind: SketchPatternInfo["kind"] = h.tag === "mirrorEntities" ? "mirror" : h.tag === "circularPattern" ? "circular" : "linear";
+  const label = summary(h);
+  const index = m.patterns.length;
+  // point naming: a mirror copy of "p" is "p'"; pattern copy k of "p" (or "p~j") is "p~(j+k)"
+  const orbit = (pt: Pt): [string, number] => {
+    const mm = /^(.*)~(\d+)$/.exec(pt.name);
+    return mm ? [mm[1]!, Number(mm[2])] : [pt.name, 0];
+  };
+  const pointNamed = (name: string): Pt => {
+    let q = m.pointsById.get(name);
+    if (!q) {
+      q = m.newPoint(name, undefined, undefined);
+      m.pointsById.set(name, q);
+    }
+    return q;
+  };
+  const copyCurve = (c: Curve, map: (q: Pt) => Pt, suffix: string, flip: boolean, copy: number): Curve => {
+    const id = c.id ? `${c.id}${suffix}` : undefined;
+    if (id && (m.curvesById.has(id) || m.decls.has(id))) m.fail(h, `the copy's id "${id}" is already taken`);
+    const name = id ? `${c.kind} "${id}"` : `${c.name}${suffix}`;
+    const base = { name, ...(id ? { id } : {}), construction: c.construction, host: h };
+    let n: Curve;
+    switch (c.kind) {
+      case "line":
+        n = { kind: "line", ...base, a: map(c.a), b: map(c.b) };
+        break;
+      case "arc":
+        n = { kind: "arc", ...base, c: map(c.c), s: map(c.s), e: map(c.e), ir: m.newVar(), ccw: flip ? !c.ccw : c.ccw, ccwExplicit: true };
+        break;
+      case "circle":
+        n = { kind: "circle", ...base, c: map(c.c), ir: m.newVar() };
+        break;
+      case "spline":
+        n = { kind: "spline", ...base, pts: c.pts.map(map), degree: c.degree };
+        break;
+    }
+    if (id) m.curvesById.set(id, n);
+    m.curves.push(n);
+    m.copyOf.set(n, { orig: c, pattern: index, copy });
+    return n;
+  };
+  const pointsOf = (c: Curve): Pt[] => (c.kind === "line" ? [c.a, c.b] : c.kind === "arc" ? [c.s, c.e, c.c] : c.kind === "circle" ? [c.c] : c.pts);
+  if (kind === "mirror") {
+    if (p.about === undefined) m.fail(h, "needs about: the mirror line", `<mirrorEntities about="axis" of={[...]} />`);
+    const axis = m.line(p.about, h, "about");
+    const done = new Set<string>();
+    const mirrorOf = (q: Pt): Pt => {
+      const other = pointNamed(q.name.endsWith("'") ? q.name.slice(0, -1) : `${q.name}'`);
+      const key = [q.ix, other.ix].sort().join(",");
+      if (!done.has(key)) {
+        done.add(key);
+        m.add({ k: "symLine", p: q, q: other, l: axis, host: h, label: `${label} (${pname(q)})` });
+      }
+      return other;
+    };
+    m.patterns.push({ kind, of, copies: [of.map((c) => copyCurve(c, mirrorOf, "'", true, 1))], axis, host: h });
+    return;
+  }
+  const count = num(p.count);
+  if (count === undefined || !Number.isInteger(count) || count < 2) m.fail(h, `count must be a whole number ≥ 2 (got ${show(p.count)})`);
+  let center: Pt | undefined, step: Vec2 = [0, 0], dAng = 0;
+  if (kind === "circular") {
+    if (p.center === undefined) m.fail(h, "needs center: the point to turn about", `<circularPattern center="o" count={6} of={["hole"]} />`);
+    center = m.point(p.center, h, "center", false);
+    const total = num(p.angle) ?? 360;
+    dAng = Math.abs(Math.abs(total) - 360) < 1e-9 ? total / count : total / (count - 1);
+  } else {
+    step = [num(p.dx) ?? 0, num(p.dy) ?? 0];
+    if (!step[0] && !step[1]) m.fail(h, "needs dx and/or dy: the offset between copies");
+  }
+  const wrap = kind === "circular" && Math.abs(Math.abs(num(p.angle) ?? 360) - 360) < 1e-9;
+  const members = new Map<string, Pt[]>(); // orbit base → members by index
+  const originals = new Map<string, Pt>(); // orbit base → the original point (implicit points aren't registered by name)
+  for (const c of of) for (const q of pointsOf(c)) {
+    const [base, j] = orbit(q);
+    if (j === 0) originals.set(base, q);
+  }
+  const member = (base: string, k: number): Pt => {
+    const idx = wrap ? ((k % count) + count) % count : k;
+    const pt = idx === 0 ? originals.get(base) ?? pointNamed(base) : pointNamed(`${base}~${idx}`);
+    const list = members.get(base) ?? [];
+    list[idx] = pt;
+    members.set(base, list);
+    return pt;
+  };
+  for (const c of of) for (const q of pointsOf(c)) {
+    if (q === center) continue;
+    const [base, j] = orbit(q);
+    member(base, j);
+  }
+  const copies: Curve[][] = [];
+  for (let k = 1; k < count; k++) {
+    const map = (q: Pt): Pt => {
+      if (q === center) return q;
+      const [base, j] = orbit(q);
+      return member(base, j + k);
+    };
+    copies.push(of.map((c) => copyCurve(c, map, `~${k}`, false, k)));
+  }
+  // every orbit member is tied to member 0 by the pattern's rotation / translation
+  for (const [base, list] of members) {
+    const p0 = list[0] ?? pointNamed(base);
+    list.forEach((q, i) => {
+      if (i === 0 || !q) return;
+      if (kind === "circular") m.add({ k: "rot", p: p0, q, c: center!, ang: i * dAng * DEG, host: h, label: `${label} (${pname(q)})` });
+      else m.add({ k: "shift", p: p0, q, d: [step[0] * i, step[1] * i], host: h, label: `${label} (${pname(q)})` });
+    });
+  }
+  m.patterns.push({ kind, of, copies, ...(center ? { center } : {}), ...(kind === "circular" ? { angle: dAng } : { step }), host: h });
 }
 
 function guessOf(m: Model, p: Pt): Vec2 | undefined {
@@ -511,11 +681,14 @@ function meeting(m: Model, self: Curve, p: Pt): Curve | undefined {
   return m.curves.find((c) => c !== self && !c.construction && (startOf(c) === p || endOf(c) === p)) ?? m.curves.find((c) => c !== self && (startOf(c) === p || endOf(c) === p));
 }
 
-function tangent(m: Model, a: Curve, b: Curve, h: Host, label: string): void {
+function tangent(m: Model, a: Curve, b: Curve, h: Host, label: string, side?: 1 | -1): void {
   if (a.kind === "spline" || b.kind === "spline") m.fail(h, "tangency to a spline isn't supported", "constrain the spline's control points instead");
   if (a.kind === "line" && b.kind === "line") m.fail(h, "two lines can't be tangent", "use parallel or collinear");
-  if (a.kind === "line") m.add({ k: "tanLC", l: a, c: b as Round, host: h, label });
-  else if (b.kind === "line") m.add({ k: "tanLC", l: b, c: a, host: h, label });
+  const line = a.kind === "line" ? a : b.kind === "line" ? b : undefined;
+  if (side && !line) m.fail(h, "side applies to a line–arc/circle tangency", `<tangent a="line" b="arc" side="left" />`);
+  if (line && side) m.hints.push({ k: "side", l: line, c: (line === a ? b : a) as Round, side, host: h });
+  if (a.kind === "line") m.add({ k: "tanLC", l: a, c: b as Round, host: h, label, ...(side ? { side } : {}) });
+  else if (b.kind === "line") m.add({ k: "tanLC", l: b, c: a, host: h, label, ...(side ? { side } : {}) });
   else m.add({ k: "tanCC", c1: a, c2: b as Round, host: h, label });
 }
 
@@ -709,7 +882,8 @@ function constraintElement(m: Model, h: Host): void {
     case "tangent": {
       const [a, b] = two("a line and an arc/circle, or two arcs/circles");
       if (a.kind === "point" || b.kind === "point") m.fail(h, "relates curves, not points");
-      tangent(m, a, b, h, label);
+      if (p.side !== undefined && p.side !== "left" && p.side !== "right") m.fail(h, `side must be "left" or "right" (got ${show(p.side)})`);
+      tangent(m, a, b, h, label, p.side === "left" ? 1 : p.side === "right" ? -1 : undefined);
       return;
     }
     case "concentric": {
@@ -934,7 +1108,8 @@ function layout(m: Model): void {
       // a tangent arc (slot end, boss) turns about half way round; a plain one (a keyhole's
       // head between two lines) most of the way
       const tangentArc = m.specs.some((x) => (x.k === "tanLC" && x.c === a) || (x.k === "tanCC" && (x.c1 === a || x.c2 === a)));
-      const sw = sweepOf.get(a) ?? (tangentArc ? Math.PI : 1.5 * Math.PI);
+      const size = m.hints.find((x) => x.k === "arcSize" && x.a === a) as { major: boolean } | undefined;
+      const sw = sweepOf.get(a) ?? (size ? (size.major ? 1.5 * Math.PI : 0.5 * Math.PI) : tangentArc ? Math.PI : 1.5 * Math.PI);
       bulged.set(a, sw);
       const half = (sw / 2) * (a.ccw ? 1 : -1);
       const t0 = Math.atan2(away[1], away[0]) - half;
@@ -982,11 +1157,33 @@ function layout(m: Model): void {
     return true;
   };
 
+  // pattern copies and mirror images follow their originals
+  for (const [c, { orig }] of m.copyOf) if ((c.kind === "arc" || c.kind === "circle") && radiusOf.has(orig as Round)) radiusOf.set(c, radiusOf.get(orig as Round)!);
+  const follow = (sp: Spec): boolean => {
+    if (sp.k === "rot" && known(sp.c)) {
+      const c = get(sp.c);
+      if (known(sp.p) && !known(sp.q)) return set(sp.q, rotAbout(get(sp.p), c, sp.ang)), true;
+      if (known(sp.q) && !known(sp.p)) return set(sp.p, rotAbout(get(sp.q), c, -sp.ang)), true;
+    } else if (sp.k === "shift") {
+      if (known(sp.p) && !known(sp.q)) return set(sp.q, vadd(get(sp.p), sp.d)), true;
+      if (known(sp.q) && !known(sp.p)) return set(sp.p, vsub(get(sp.q), sp.d)), true;
+    } else if (sp.k === "symLine" && known(sp.l.a) && known(sp.l.b)) {
+      const A = get(sp.l.a), u = unit(vsub(get(sp.l.b), A));
+      const refl = (v: Vec2): Vec2 => {
+        const w = vsub(v, A), along = vsc(u, vdot(w, u));
+        return vadd(A, vsub(vsc(along, 2), w));
+      };
+      if (known(sp.p) && !known(sp.q)) return set(sp.q, refl(get(sp.p))), true;
+      if (known(sp.q) && !known(sp.p)) return set(sp.p, refl(get(sp.q))), true;
+    }
+    return false;
+  };
   // point-to-point dimensions first (a second centre at a set distance, along an axis...)
   for (let pass = 0; pass < m.points.length; pass++) {
     let moved = false;
     for (const sp of m.specs) {
-      if (sp.k === "dxy") {
+      if (follow(sp)) moved = true;
+      else if (sp.k === "dxy") {
         const [a, b] = [sp.p, sp.q];
         const k = sp.axis;
         if (known(a) && !known(b)) {
@@ -1010,8 +1207,6 @@ function layout(m: Model): void {
     }
     if (!moved) break;
   }
-  layoutLoops(m, { known, get, set, lineDirs, isTangent, lengthOf, radiusOf, sweepOf, L0 });
-
   // a fillet arc between two arcs with known centres and radii: its centre is where the two
   // offset circles cross (R + ρ for a concave fillet, |ρ − R| for a convex blend), on the
   // outside of the drawing; its ends lie on the centre lines
@@ -1038,12 +1233,14 @@ function layout(m: Model): void {
     set(f.s, tp(cA, radiusOf.get(A)!));
     set(f.e, tp(cB, radiusOf.get(B)!));
   }
+  layoutLoops(m, { known, get, set, lineDirs, isTangent, lengthOf, radiusOf, sweepOf, L0, prefer: m.hints.find((x) => x.k === "orient") });
 
   let seeds = 0;
   for (let pass = 0; pass < 10 * (m.points.length + 1); pass++) {
     let progress = false;
     for (const s of m.specs) {
-      if (s.k === "coincident") {
+      if (follow(s)) progress = true;
+      else if (s.k === "coincident") {
         if (known(s.p) && !known(s.q)) set(s.q, get(s.p)), (progress = true);
         else if (known(s.q) && !known(s.p)) set(s.p, get(s.q)), (progress = true);
       } else if (s.k === "midpoint" && !known(s.p) && known(s.l.a) && known(s.l.b)) {
@@ -1109,6 +1306,8 @@ interface LoopTools {
   radiusOf: Map<Round, number>;
   sweepOf: Map<ArcE, number>;
   L0: number;
+  /** `<sketch prefer>`: which way round loops are drawn (in declaration order). */
+  prefer?: { k: string; ccw?: boolean } | undefined;
 }
 
 /**
@@ -1313,6 +1512,12 @@ function layoutLoops(m: Model, t: LoopTools): void {
         shift = [cx - mx, cy - my];
       }
     }
+    if (t.prefer && t.prefer.ccw === false) {
+      // drawn clockwise: mirror the provisional layout (and the arcs' turning)
+      for (const [p, v] of pos) pos.set(p, [v[0], -v[1]]);
+      for (const w of walk) if (w.c.kind === "arc" && !w.c.ccwExplicit) w.c.ccw = !w.c.ccw;
+      if (anchors.length) shift = vsub(t.get(anchors[0]!), pos.get(anchors[0]!)!);
+    }
     for (const [p, v] of pos) if (!t.known(p)) t.set(p, vadd(v, shift));
   }
 }
@@ -1456,7 +1661,7 @@ function equations(m: Model, x0: Float64Array, S: number): Constraint[] {
           };
           break;
         }
-        const sg = sign(sd0(g(s.c.c), s.l));
+        const sg = s.side ?? sign(sd0(g(s.c.c), s.l));
         ev = (x) => [d.sub(d.sc(sd(at(x, ic), at(x, ia), at(x, ib)), sg), x[r]!)];
         break;
       }
@@ -1504,6 +1709,22 @@ function equations(m: Model, x0: Float64Array, S: number): Constraint[] {
         ev = (x) => ([0, 1] as const).map((k) => d.sub(d.add(x[ip[k]!]!, x[iq[k]!]!), d.sc(x[im[k]!]!, 2)));
         break;
       }
+      case "rot": {
+        const ip = P(s.p), iq = P(s.q), ic = P(s.c), cs = Math.cos(s.ang), sn = Math.sin(s.ang);
+        ev = (x) => {
+          const dx = d.sub(x[ip[0]]!, x[ic[0]]!), dy = d.sub(x[ip[1]]!, x[ic[1]]!);
+          return [
+            d.sub(x[iq[0]]!, d.add(x[ic[0]]!, d.sub(d.sc(dx, cs), d.sc(dy, sn)))),
+            d.sub(x[iq[1]]!, d.add(x[ic[1]]!, d.add(d.sc(dx, sn), d.sc(dy, cs)))),
+          ];
+        };
+        break;
+      }
+      case "shift": {
+        const ip = P(s.p), iq = P(s.q), dv = s.d;
+        ev = (x) => [d.addc(d.sub(x[iq[0]]!, x[ip[0]]!), -dv[0]), d.addc(d.sub(x[iq[1]]!, x[ip[1]]!), -dv[1])];
+        break;
+      }
       case "symAxis": {
         const ip = P(s.p), iq = P(s.q), im = s.m ? P(s.m) : null, k = s.axis, o = (1 - k) as 0 | 1;
         ev = (x) => [
@@ -1535,6 +1756,33 @@ function snapVal(v: number): number {
   return Math.abs(v - r) < 1e-9 * Math.max(1, Math.abs(v)) ? r + 0 : v;
 }
 
+/** The branch hints a solution doesn't honour. */
+function violated(m: Model, x: Float64Array): Model["hints"] {
+  const P = (p: Pt): Vec2 => [x[p.ix]!, x[p.ix + 1]!];
+  return m.hints.filter((h) => {
+    if (h.k === "arcSize") {
+      const C = P(h.a.c), S = P(h.a.s), E = P(h.a.e);
+      let sweep = Math.atan2(E[1] - C[1], E[0] - C[0]) - Math.atan2(S[1] - C[1], S[0] - C[0]);
+      if (!h.a.ccw) sweep = -sweep;
+      sweep = ((sweep % TAU) + TAU) % TAU;
+      return h.major ? sweep < Math.PI : sweep > Math.PI;
+    }
+    if (h.k === "side") {
+      const A = P(h.l.a), B = P(h.l.b), C = P(h.c.c);
+      const cr = (B[0] - A[0]) * (C[1] - A[1]) - (B[1] - A[1]) * (C[0] - A[0]);
+      return Math.sign(cr) !== h.side;
+    }
+    // orientation of the loops as drawn (first curve forwards)
+    try {
+      const info = { points: m.points.map((p) => ({ id: p.name, x: x[p.ix]!, y: x[p.ix + 1]!, free: false })) } as unknown as SolvedSketch;
+      const loops = profile({ m, x, info, rest: [] }, "loops");
+      return loops.some((l) => l.length > 1 && (signedArea(polyline(l)) > 0) !== h.ccw);
+    } catch {
+      return false;
+    }
+  });
+}
+
 /** A converged solution worth keeping: no collapsed line or arc, no self-crossing profile. */
 function acceptable(m: Model, x: Float64Array, S: number): boolean {
   const P = (p: Pt): Vec2 => [x[p.ix]!, x[p.ix + 1]!];
@@ -1544,6 +1792,7 @@ function acceptable(m: Model, x: Float64Array, S: number): boolean {
     if (c.kind === "arc" && (vlen(vsub(P(c.s), P(c.e))) < tiny || !(x[c.ir]! > tiny))) return false;
     if (c.kind === "circle" && !(x[c.ir]! > tiny)) return false;
   }
+  if (violated(m, x).length) return false;
   try {
     const info = { points: m.points.map((p) => ({ id: p.name, x: x[p.ix]!, y: x[p.ix + 1]!, free: false })) } as unknown as SolvedSketch;
     const loops = profile({ m, x, info, rest: [] }, "loops");
@@ -1625,11 +1874,18 @@ function solve(sketch: Host, hooks: SolveHooks): Solved {
     throw new TscadError(`the sketch couldn't be solved (residual ${r.residual.toPrecision(3)} mm)`, { ...(sketch.loc ? { loc: sketch.loc } : {}), hint: "start the points closer to the intended shape" });
   }
   const x = r.x;
+  for (const h of violated(m, x)) {
+    const what = h.k === "arcSize" ? `${h.major ? "major" : "minor"} on ${h.a.name}` : h.k === "side" ? `side on the tangency of ${h.l.name} and ${h.c.name}` : `prefer="${h.ccw ? "ccw" : "cw"}"`;
+    hooks.warn(h.host, `couldn't honour ${what}: no solution near the start takes that branch`);
+  }
   const an = analyze(sys, x, order);
   for (const red of an.redundant) {
     const s = constraints[red.constraint]!.data as Spec;
     if (s.structural) continue;
     const by = red.partners.map((i) => constraints[i]!.data as Spec).filter((p) => !p.structural);
+    // equations of one element implying each other (a pattern's rotations), or implied only by
+    // the curves' own structure (a mirrored point that also lies on an arc), aren't news
+    if (!by.length || by.every((p) => p.host === s.host)) continue;
     hooks.warn(s.host, `redundant constraint: ${s.label} is already implied by ${by.length ? by.map((p) => `${p.label}${where(p.host.loc)}`).join(", ") : "the others"}`);
   }
   const FREE = 1e-6;
@@ -1657,8 +1913,23 @@ function solve(sketch: Host, hooks: SolveHooks): Solved {
     residual: r.residual,
     iterations: r.iterations,
     points: m.points.map((p) => ({ id: p.name, x: x[p.ix]!, y: x[p.ix + 1]!, free: freePts.has(p) })),
-    entities: m.curves.map((c) => entityInfo(c, x)),
+    entities: m.curves.map((c) => {
+      const e = entityInfo(c, x);
+      const cp = m.copyOf.get(c);
+      if (cp) e.copyOf = { index: m.curves.indexOf(cp.orig), pattern: cp.pattern, copy: cp.copy };
+      return e;
+    }),
     dimensions: m.specs.flatMap((s) => (s.dim ? [dimInfo(s, x)] : [])),
+    patterns: m.patterns.map((pt) => ({
+      kind: pt.kind,
+      of: pt.of.map((c) => m.curves.indexOf(c)),
+      copies: pt.copies.map((cs) => cs.map((c) => m.curves.indexOf(c))),
+      ...(pt.center ? { center: ptOf(x, pt.center) } : {}),
+      ...(pt.angle !== undefined ? { angle: pt.angle } : {}),
+      ...(pt.axis ? { axis: [ptOf(x, pt.axis.a), ptOf(x, pt.axis.b)] as [Vec2, Vec2] } : {}),
+      ...(pt.kind === "linear" && pt.step ? { step: pt.step } : {}),
+      ...(pt.host.loc ? { loc: pt.host.loc } : {}),
+    })),
   };
   return { m, x, info, rest };
 }
@@ -1905,7 +2176,7 @@ export function solveSketch(sketch: Host, outer: SolveHooks, mode: "loops" | "pa
   const k0 = cacheKey(sketch);
   const key = k0 === undefined ? undefined : `${mode}\n${k0}`;
   const cached = key !== undefined ? cache.get(key) : undefined;
-  const rest = sketch.children.filter((c) => !isSolvedTag(c.tag));
+  const rest = sketch.children.filter((c) => !isSolvedTag(c.tag, c));
   if (cached) {
     cache.delete(key!);
     cache.set(key!, cached); // LRU: most recent last
@@ -1928,8 +2199,8 @@ export function solveSketch(sketch: Host, outer: SolveHooks, mode: "loops" | "pa
   return { ...r, rest };
 }
 
-function isSolvedTag(tag: string): boolean {
-  return CONSTRAINT_TAGS.has(tag) || tag === "circle";
+function isSolvedTag(tag: string, h?: Host): boolean {
+  return CONSTRAINT_TAGS.has(tag) || tag === "circle" || (!!h && isSketchLinear(h));
 }
 
 interface CachedWarning {
@@ -1974,8 +2245,8 @@ function cacheKey(sketch: Host): string | undefined {
       .sort()
       .map((k) => `${k}=${ser(p[k])}`)
       .join(" ");
-  const parts = [`sketch ${loc(sketch.loc)} ${props({ strict: sketch.props.strict, allowFree: sketch.props.allowFree })}`];
-  for (const c of sketch.children) if (isSolvedTag(c.tag)) parts.push(`${c.tag} ${loc(c.loc)} ${props(c.props)}`);
+  const parts = [`sketch ${loc(sketch.loc)} ${props({ strict: sketch.props.strict, allowFree: sketch.props.allowFree, prefer: sketch.props.prefer })}`];
+  for (const c of sketch.children) if (isSolvedTag(c.tag, c)) parts.push(`${c.tag} ${loc(c.loc)} ${props(c.props)}`);
   return ok ? parts.join("\n") : undefined;
 }
 

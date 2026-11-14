@@ -111,6 +111,10 @@ export interface ArcProps extends Entity<ArcHandle> {
   equal?: Refs<Round>;
   /** Same centre as this arc/circle. */
   concentric?: Ref<Round>;
+  /** Hint: the long way round (sweep over 180°). Picks the branch when nothing is drawn. */
+  major?: boolean;
+  /** Hint: the short way round (sweep under 180°). */
+  minor?: boolean;
 }
 
 /**
@@ -203,7 +207,41 @@ export interface ParallelProps extends Pair<LineHandle> {
 /** Two lines perpendicular. */
 export interface PerpendicularProps extends Pair<LineHandle> {}
 /** Tangent: line–arc/circle or arc/circle–arc/circle. */
-export interface TangentProps extends Pair<LineHandle | Round> {}
+export interface TangentProps extends Pair<LineHandle | Round> {
+  /** Line–arc/circle: the side of the line (looking from → to) the centre lies on. */
+  side?: "left" | "right";
+}
+
+/**
+ * Mirrored copies of entities across a line, kept symmetric by constraints: edit one side and
+ * the other follows. A mirrored point is named with a `'` (`"p"` → `"p'"`), and a copy's id
+ * gets a `'` too (`"lug"` → `"lug'"`). Points on the mirror line meet their own image, so a
+ * mirrored half profile closes.
+ * @example <mirrorEntities about="axis" of={["lugTop", "lugEnd", "lugBottom"]} />
+ */
+export interface MirrorEntitiesProps extends Common {
+  /** The mirror line (usually construction). */
+  about: Ref<LineHandle>;
+  /** Entities to mirror. */
+  of: Refs<LineHandle | ArcHandle | CircleHandle | SplineHandle>;
+}
+
+/**
+ * Copies of entities turned about a centre, tied by rotation constraints (not baked
+ * coordinates). Copy k of a point `"p"` is `"p~k"` (wrapping round for a full turn, so a chain
+ * can end on the next copy's start: `to="a~1"`), and copy k of `"lobe"` is `"lobe~k"`.
+ * @example <circularPattern center="o" count={6} of={["hole"]} />
+ */
+export interface CircularPatternProps extends Common {
+  /** The point to turn about. */
+  center: PointId;
+  /** Number of instances, the original included. */
+  count: number;
+  /** Total angle, degrees: 360 (default) spaces them evenly; less puts the last at `angle`. */
+  angle?: number;
+  /** Entities to copy. */
+  of: Refs<LineHandle | ArcHandle | CircleHandle | SplineHandle>;
+}
 /** Lines on one infinite line. */
 export interface CollinearProps extends Pair<LineHandle> {}
 /** Same centre. */
@@ -281,10 +319,16 @@ export interface ConstraintSketchElements {
   onCurve: OnCurveProps;
   /** Constraint sketch: fix a point. */
   fix: FixProps;
+  /** Constraint sketch: mirrored, constrained copies of entities. */
+  mirrorEntities: MirrorEntitiesProps;
+  /** Constraint sketch: copies turned about a centre, constrained. */
+  circularPattern: CircularPatternProps;
 }
 
 /** Extra `<sketch>` props for constraint sketches. */
 export interface ConstraintSketchOptions {
+  /** Hint: which way round the closed loops are drawn (in declaration order). */
+  prefer?: "ccw" | "cw";
   /** Make an under-constrained sketch an error instead of a warning. */
   strict?: boolean;
   /** Don't warn about remaining degrees of freedom. */

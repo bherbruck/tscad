@@ -106,6 +106,41 @@ Tangency where curves share an end point is a smooth joint (the radius to the jo
 the line; two arcs' centres line up with it). A line merely *touching* a circle without a
 `tangent` constraint is a double root: it solves, but the DOF check reports it as free.
 
+## In-sketch patterns (copies stay constrained)
+
+| Element | Copies |
+|---|---|
+| `<mirrorEntities about="axis" of={["lugEnd", "lugTop"]} />` | mirror images across a line, tied by symmetric constraints. A mirrored point is named `"p'"` and a copy's id gets a `'` (`"lugTop'"`). Points on the axis meet their image, so a mirrored half profile closes. |
+| `<circularPattern center="o" count={6} angle? of={["hole"]} />` | turned copies tied by rotation constraints. `angle` is the total (360 by default, evenly spaced). |
+| `<linearPattern count={4} dx={20} dy? of={["slot"]} />` | translated copies tied by offset constraints (with `of` it patterns sketch entities; without, it's the solid pattern). |
+
+A pattern copy k of point `"p"` is `"p~k"`, and of entity `"lobe"` is `"lobe~k"`. For a full
+turn the names wrap round, so a chain can end on the next copy's start. A three-lobe gasket is
+one lobe arc and one fillet:
+
+```tsx
+<arc id="L" center="c0" from="a0" to="b0" radius={12} />
+<arc id="F" from="b0" to="a0~1" tangent="L" radius={10} cw />
+<circularPattern center="g" count={3} of={["L", "F"]} />
+<tangent a="F" b="L~1" />
+```
+
+Copies are real entities (reference them, dimension them) whose points are driven by the
+originals: edit one side and the other follows. A circle copy's radius is tied to the
+original's. See `examples/sketch-flange.tsx` for mirrored lugs and a bolt-circle pattern.
+
+## Branch hints
+
+When nothing is drawn, some shapes have mirror-image solutions. Hints pick one. They are not
+equations: a solution that violates a hint is retried from other starts, and if none honours
+it you get a warning.
+
+- `<arc major>` / `<arc minor>`: the long way round (over 180°) or the short way.
+- `<tangent a="line" b="arc" side="left" | "right">`: which side of the line, looking from
+  `from` to `to`, the arc's centre is on. `<dimension ... side>` does the same for a distance
+  from a line.
+- `<sketch prefer="ccw" | "cw">`: which way round closed loops go, in declaration order.
+
 ## Two ways to reference: string ids or typed handles
 
 Everywhere an entity is referenced (`from`, `to`, `center`, `tangent`, `parallel`, `equal`,
@@ -243,6 +278,23 @@ interface SketchInfo {
 
 All coordinates are sketch coordinates; map with `plane`. Coordinates are snapped to 1e-6 mm
 when within 1e-9 of it, so solved values print cleanly. Types are exported from `tscad`.
+
+In-sketch patterns appear in the metadata too:
+
+```ts
+// every pattern copy in entities[] carries
+copyOf?: { index: number /* original's index in entities */; pattern: number /* index in patterns */; copy: number /* 1, 2... */ }
+// and SolvedSketch has
+patterns: {
+  kind: "mirror" | "circular" | "linear";
+  of: number[];          // indices of the originals in entities
+  copies: number[][];    // per copy, the indices of its entities (in `of` order)
+  center?: [x, y]; angle?: number;   // circular: centre, degrees between copies
+  axis?: [[x, y], [x, y]];           // mirror: two points on the mirror line
+  step?: [dx, dy];                   // linear
+  loc?: SourceLoc;
+}[]
+```
 
 ## `sketchPath()` — unconstrained fluent paths
 
