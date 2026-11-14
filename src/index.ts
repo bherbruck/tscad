@@ -48,6 +48,10 @@ export { massOf, materials, type Material, type MaterialName } from "./core/mate
 export type { SketchDimensionInfo, SketchEntityInfo, SketchInfo, SolvedSketch } from "./core/sketch/constrained";
 export type * from "./core/sketch/constrained-props";
 export { sketchPath, SketchPath } from "./core/sketch/builder";
+export {
+  sketchRef, sketchRefs, isSketchRef,
+  type ArcHandle, type CircleHandle, type CurveHandle, type LineHandle, type PointHandle, type RefKind, type RoundHandle, type SketchRef, type SplineHandle,
+} from "./core/sketch/refs";
 
 // element prop types
 export type * from "./core/intrinsics";

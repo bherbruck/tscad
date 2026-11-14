@@ -11,6 +11,7 @@ import { mul as mul4, type Mat4, type Vec2 } from "../math";
 import type { Host } from "../render";
 import type { Frame } from "./place";
 import { arc as arcSeg, line as lineSeg, polyline, reverseSeg, TAU, transformLoop, type Affine2, type Loop2, type Seg2 } from "./seg";
+import { display, isSketchRef, REF_MARK } from "./refs";
 import * as d from "./solver/dual";
 import { analyze, findConflict, lm, type Constraint, type System } from "./solver/solve";
 
@@ -218,6 +219,14 @@ class Model {
     const dot = ref.lastIndexOf(".");
     if (dot > 0 && !this.pointsById.has(ref)) {
       const base = ref.slice(0, dot), sub = ref.slice(dot + 1);
+      if (["start", "end", "from", "to", "center"].includes(sub) && (this.building.has(base) || (this.decls.has(base) && !this.curvesById.has(base)))) {
+        // a curve's point referenced before the curve is built (a closed chain of curves naming
+        // each other's ends): a placeholder, joined to the real point when the curve is built
+        const key = `${base}.${sub === "from" ? "start" : sub === "to" ? "end" : sub}`;
+        let ph = this.pointsById.get(key);
+        if (!ph) this.pointsById.set(key, (ph = this.newPoint(key)));
+        return ph;
+      }
       const c = this.curve(base, h, prop);
       const pick = sub === "start" || sub === "from" ? startOf(c) : sub === "end" || sub === "to" ? endOf(c) : sub === "center" ? centerOf(c) : undefined;
       if (!pick) this.fail(h, `${prop}: a ${c.kind} has no point ".${sub}"`, c.kind === "circle" ? `use "${base}.center"` : `use "${base}.start"${c.kind === "arc" ? `, "${base}.end" or "${base}.center"` : ` or "${base}.end"`}`);
@@ -243,6 +252,7 @@ class Model {
     if (!decl) {
       if (this.pointsById.has(id)) this.fail(h, `${prop}="${id}" is a point, not a line/arc/circle`);
       const guess = closest(id, [...this.decls.keys()]);
+      if (id.includes(REF_MARK)) this.fail(h, `${prop}={${id}} refers to nothing in this sketch`, `attach the handle to a curve: <line ref={…${display(id).replace(/^.*?(\w+)$/, ".$1")}} …/> (or <arc>/<circle>)`);
       this.fail(h, `unknown sketch entity "${id}"`, guess ? `did you mean "${guess}"?` : "give the line/arc/circle an id");
     }
     if (this.building.has(id)) this.fail(h, `"${id}" refers to itself through its own points`);
@@ -323,6 +333,10 @@ class Model {
         return this.fail(h, `<${h.tag}> is not a sketch curve`);
     }
     if (id) {
+      for (const [sub, pt] of [["start", startOf(c)], ["end", endOf(c)], ["center", centerOf(c)]] as const) {
+        const ph = this.pointsById.get(`${id}.${sub}`);
+        if (pt && ph && ph !== pt) this.add({ k: "coincident", p: ph, q: pt, host: h, label: `${name} (${sub})`, structural: true });
+      }
       this.building.delete(id);
       this.curvesById.set(id, c);
     }
@@ -366,20 +380,40 @@ function show(v: unknown): string {
 function summary(h: Host): string {
   const parts = Object.entries(h.props)
     .filter(([k, v]) => k !== "key" && (typeof v === "string" || typeof v === "number" || typeof v === "boolean" || Array.isArray(v)))
-    .map(([k, v]) => (v === true ? k : typeof v === "string" ? `${k}="${v}"` : `${k}=${typeof v === "number" ? fmt(v) : show(v)}`));
+    .map(([k, v]) => (v === true ? k : typeof v === "string" ? (v.includes(REF_MARK) ? `${k}={${v}}` : `${k}="${v}"`) : `${k}=${typeof v === "number" ? fmt(v) : show(v)}`));
   return `<${h.tag}${parts.length ? " " + parts.join(" ") : ""}>`;
 }
 
 // ---------------------------------------------------------------------------------------------
 // Elements → specs
 
-function parse(sketch: Host): { m: Model; rest: Host[] } {
+/** Handles → their keys; `ref={handle}` → `id`. */
+function normalize(m: Model, h: Host): Host {
+  const props: Record<string, any> = {};
+  const conv = (v: unknown): unknown => (isSketchRef(v) ? v.key : Array.isArray(v) ? v.map(conv) : v);
+  for (const [k, v] of Object.entries(h.props)) {
+    if (k === "ref") continue;
+    props[k] = conv(v);
+  }
+  const ref = h.props.ref;
+  if (ref !== undefined) {
+    if (!isSketchRef(ref)) m.fail(h, `ref must be a sketch handle from sketchRefs() / sketchRef() (got ${show(ref)})`);
+    if (h.props.id !== undefined) m.fail(h, "give either id or ref, not both");
+    if (ref.key.includes(".")) m.fail(h, `ref={${ref.label}} is a derived point; attach a plain handle`);
+    props.id = ref.key;
+  }
+  return { ...h, props };
+}
+
+function parse(sketch: Host, hooks: SolveHooks): { m: Model; rest: Host[] } {
   const m = new Model(sketch);
   const rest: Host[] = [];
   const entities: Host[] = [];
   const order: Host[] = [];
   // declarations first so references can come before definitions
-  for (const c of sketch.children) {
+  for (const raw of sketch.children) {
+    const solved = CONSTRAINT_TAGS.has(raw.tag) || raw.tag === "circle";
+    const c = solved ? normalize(m, raw) : raw;
     if (c.tag === "point") {
       const p = c.props;
       const id = p.id;
@@ -424,6 +458,20 @@ function parse(sketch: Host): { m: Model; rest: Host[] } {
     else if (built.has(h)) entityProps(m, built.get(h)!, h);
     else constraintElement(m, h);
   }
+  // declared points nothing refers to are almost always a typo'd reference
+  const used = new Set<Pt>();
+  const mark = (v: unknown): void => {
+    if (!v || typeof v !== "object") return;
+    const o = v as { kind?: string };
+    if (o.kind === "point") used.add(v as Pt);
+    else if (o.kind === "line" || o.kind === "arc" || o.kind === "circle" || o.kind === "spline") {
+      const c = v as Curve;
+      for (const q of c.kind === "line" ? [c.a, c.b] : c.kind === "arc" ? [c.s, c.e, c.c] : c.kind === "circle" ? [c.c] : c.pts) used.add(q);
+    }
+  };
+  for (const c of m.curves) mark(c);
+  for (const sp of m.specs) if (!(sp.k === "fix" && sp.p.host === sp.host)) for (const v of Object.values(sp)) mark(v);
+  for (const p of m.points) if (p.host && !used.has(p)) hooks.warn(p.host, `${pname(p)} is declared but nothing uses it`);
   return { m, rest };
 }
 
@@ -1206,7 +1254,7 @@ interface Solved {
 }
 
 function solve(sketch: Host, hooks: SolveHooks): Solved {
-  const { m, rest } = parse(sketch);
+  const { m, rest } = parse(sketch, hooks);
   layout(m);
   const x0 = Float64Array.from(m.x);
   const pts = m.points.map((p) => [x0[p.ix]!, x0[p.ix + 1]!] as Vec2);
@@ -1467,9 +1515,23 @@ function profile(sol: Solved): Loop2[] {
 // Compiler integration
 
 /** Solve a constraint `<sketch>` host: its closed loops (sketch coords) and the unsolved children. */
-export function solveSketch(sketch: Host, hooks: SolveHooks): { loops: Loop2[]; rest: Host[]; info: SolvedSketch } {
-  const sol = solve(sketch, hooks);
-  const loops = profile(sol);
+export function solveSketch(sketch: Host, outer: SolveHooks): { loops: Loop2[]; rest: Host[]; info: SolvedSketch } {
+  // messages show handles by name (`{base}`), not by their internal keys
+  const hooks: SolveHooks = { warn: (h, msg) => outer.warn(h, display(msg)) };
+  let sol: Solved, loops: Loop2[];
+  try {
+    sol = solve(sketch, hooks);
+    loops = profile(sol);
+  } catch (e) {
+    if (e instanceof TscadError && (e.detail.includes(REF_MARK) || e.hint?.includes(REF_MARK))) {
+      throw new TscadError(display(e.detail), { ...(e.loc ? { loc: e.loc } : {}), ...(e.hint ? { hint: display(e.hint) } : {}) });
+    }
+    throw e;
+  }
+  sol.info.points.forEach((p) => (p.id = display(p.id)));
+  sol.info.free = sol.info.free.map(display);
+  for (const e of sol.info.entities) if (e.id) e.id = display(e.id);
+  for (const e of sol.info.entities) if (e.kind === "line") (e.fromId = display(e.fromId)), (e.toId = display(e.toId));
   const hit = crossing(loops);
   if (hit) {
     hooks.warn(sketch, `the profile crosses itself near (${fmt(Number(hit[0].toFixed(4)))}, ${fmt(Number(hit[1].toFixed(4)))}): a constraint probably solved to its other branch (an unsigned length or distance flipped)`);

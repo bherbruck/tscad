@@ -131,7 +131,7 @@ const SOLID_TAGS = new Set([
 const SHAPE_TAGS = new Set(["text", "rect", "roundedRect", "circle", "ellipse", "polygon", "regularPolygon", "slot", "path", "star"]);
 const SKETCH_TAGS = new Set([...SHAPE_TAGS, "sketch", "section", "offset"]);
 const CONTAINER_TAGS = new Set(["part", "assembly", "drawing"]);
-const ALL_TAGS = [...SOLID_TAGS, ...SKETCH_TAGS, ...CONTAINER_TAGS];
+const ALL_TAGS = [...SOLID_TAGS, ...SKETCH_TAGS, ...CONTAINER_TAGS, ...CONSTRAINT_TAGS];
 /** Tags whose x/y/z mean something else (no universal placement). */
 const OWN_TRANSFORM = new Set(["translate", "rotate", "scale", "mirror"]);
 
@@ -385,6 +385,9 @@ class Compiler {
   solid(h: Host): Node | null {
     if (SHAPE_TAGS.has(h.tag) || h.tag === "sketch" || h.tag === "section" || h.tag === "offset") {
       this.fail(h, `<${h.tag}> is a 2D sketch shape and can't stand alone as a solid`, `put it inside <extrude height={...}>, <revolve>, <loft> or <sweep>`);
+    }
+    if (CONSTRAINT_TAGS.has(h.tag)) {
+      this.fail(h, `<${h.tag}> belongs in a constraint <sketch>`, `<extrude height={5}><sketch>...points, lines, arcs, constraints...</sketch></extrude>`);
     }
     if (CONTAINER_TAGS.has(h.tag)) {
       this.fail(h, `<${h.tag}> can't be nested inside a solid`, `<part> and <assembly> belong at the top of the model (assemblies may contain parts)`);

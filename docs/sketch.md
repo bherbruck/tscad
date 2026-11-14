@@ -79,8 +79,44 @@ Tangency where curves share an end point is a smooth joint (the radius to the jo
 the line; two arcs' centres line up with it). A line merely *touching* a circle without a
 `tangent` constraint is a double root: it solves, but the DOF check reports it as free.
 
-Sketch components compose like any other component; prefix ids (`${id}_l`) so several copies
-coexist — see `Slot` in `examples/sketch-link-arm.tsx`.
+## Two ways to reference: string ids or typed handles
+
+Everywhere an entity is referenced (`from`, `to`, `center`, `tangent`, `parallel`, `equal`,
+`a`/`b`, `about`, `of`, `point`, `curve`...) you can pass either a **string id** or a **handle**.
+Handles work like React refs: attach one with `ref={...}`, pass the same object elsewhere.
+
+```tsx
+import { sketchRefs } from "tscad"
+
+const s = sketchRefs<{ o: "point"; a: "point"; b: "point"; c: "point"; base: "line"; right: "line"; top: "arc" }>()
+<sketch>
+  <point ref={s.o} fixed />
+  <line ref={s.base} from={s.o} to={s.a} horizontal length={40} />
+  <line ref={s.right} from={s.base.end} to={s.b} vertical length={20} />
+  <arc ref={s.top} from={s.b} to={s.c} tangent={s.right} radius={20} />
+  <line from={s.top.end} to={s.o} tangent={s.top} />
+</sketch>
+```
+
+| Form | Checks |
+|---|---|
+| `sketchRefs<{ o: "point"; base: "line" }>()` | names **and kinds** checked by TypeScript: `tangent={s.o}` (a point) or `from={s.base}` (a line) don't compile |
+| `sketchRefs("o", "a", "base")` | names checked (at runtime, an unknown name throws); kinds open. Use this with `noUncheckedIndexedAccess`, where members of an open-ended bag read as possibly undefined |
+| `sketchRefs()` | anything goes; handles are created on first access |
+| `sketchRef<"circle">("hole")` | one handle |
+
+- `handle.start`, `.end`, `.center` are the curve's points, like `"base.end"`. A closed chain may
+  name points of curves declared later (`from={s.upper.end}` before `<line ref={s.upper}>`).
+- Messages show handles by name: `tangent={arc} refers to nothing in this sketch`.
+- Like string ids, a handle used as a point (`from`, `to`, `center`) that is never attached is
+  created as a new point. A handle used where a curve is needed and never attached is an
+  error at the use. A `<point>` that nothing refers to warns at its declaration (usually a typo
+  in the reference). Attaching one handle twice is a `duplicate id` error, and giving both `id`
+  and `ref` is an error.
+- Handles are unique objects, so sketch **components** can make their own private handles, and
+  several copies can sit in one sketch. With string ids, prefix them instead (`${id}_l`). See
+  `Slot` in `examples/sketch-link-arm.tsx`, which uses handles throughout (the pulley example
+  uses string ids).
 
 ## Solver
 
@@ -113,7 +149,9 @@ All carry JSX source locations.
 - **Profile**: `open profile: line "x" ends at point "a" and nothing continues from there`;
   `branching profile: 3 curves meet at point "p"`; a self-crossing profile warns
   (`the profile crosses itself near (5, 5)`), usually an unsigned dimension that flipped.
-- Unknown ids get "did you mean" suggestions.
+- Unknown ids get "did you mean" suggestions. Constraint elements outside a `<sketch>` get a
+  "belongs in a constraint `<sketch>`" error.
+- A declared `<point>` that nothing uses warns.
 
 ## Compile-result metadata (for the viewer)
 
@@ -169,5 +207,5 @@ turns left), `tangentArcTo(x, y)`, `close()`; `.d` (or `String(path)`) is the pa
 
 ## Examples
 
-- `examples/sketch-link-arm.tsx` — two bosses joined by tangent lines, bores, a slot component.
+- `examples/sketch-link-arm.tsx` — two bosses joined by tangent lines, bores and a slot component, written with typed handles.
 - `examples/sketch-pulley.tsx` — V-belt pulley half-section mirrored with `symmetric`, revolved.

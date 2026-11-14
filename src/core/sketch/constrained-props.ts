@@ -4,25 +4,36 @@
  * sketch. Lengths in mm, angles in degrees.
  */
 import type { Key } from "../element";
+import type { ArcHandle, CircleHandle, LineHandle, PointHandle, SketchRef, SplineHandle } from "./refs";
 
 type Vec2 = [number, number];
 
 /**
- * A reference to a point: a point id (`"o"`), an entity's point (`"base.start"`,
- * `"base.end"`, `"top.center"`), or — where a point is being created — `[x, y]` (a new
+ * A point: an id (`"o"`), an entity's point (`"base.start"`, `"base.end"`, `"top.center"`),
+ * a handle (`s.o`, `s.base.end`), or — where a point is being created — `[x, y]` (a new
  * anonymous point with that rough position).
  */
-export type PointRef = string | Vec2;
-/** One id or several. */
-export type Refs = string | readonly string[];
+export type PointLike = string | PointHandle | Vec2;
+/** A point named by id or handle (no coordinates). */
+export type PointId = string | PointHandle;
+/** An id or a handle of one of the kinds `H`. */
+export type Ref<H> = string | H;
+/** One reference or several. */
+export type Refs<H> = Ref<H> | readonly Ref<H>[];
+type Round = ArcHandle | CircleHandle;
+type AnyCurve = LineHandle | ArcHandle | CircleHandle | SplineHandle;
+/** Anything in a sketch: a point or a curve, by id or handle. */
+export type ThingRef = string | SketchRef;
 
 interface Common {
   /** Reconciliation key (diagnostics only). */
   key?: Key;
 }
-interface Entity extends Common {
+interface Entity<H> extends Common {
   /** Name to reference this entity from constraints (`tangent="base"`). */
   id?: string;
+  /** A handle naming this entity (`ref={s.base}`), the typed alternative to `id`. */
+  ref?: H;
   /** Construction geometry: constrains, but is not part of the profile. */
   construction?: boolean;
 }
@@ -30,6 +41,8 @@ interface Entity extends Common {
 /** A sketch point. `x`/`y` are a rough guess unless `fixed`. */
 export interface PointProps extends Common {
   id?: string;
+  /** A handle naming this point (`ref={s.o}`). */
+  ref?: PointHandle;
   /** Rough (or, with `fixed`, exact) X, mm. */
   x?: number;
   /** Rough (or, with `fixed`, exact) Y, mm. */
@@ -38,16 +51,16 @@ export interface PointProps extends Common {
   at?: Vec2;
   /** Pin the point at `x`, `y` (default 0, 0). */
   fixed?: boolean;
-  /** Keep the point on this curve (line, arc or circle id). */
-  on?: string;
+  /** Keep the point on this curve (line, arc or circle). */
+  on?: Ref<LineHandle | Round>;
 }
 
 /** Line-ish constraint props shared by `<line>`. */
-export interface LineProps extends Entity {
+export interface LineProps extends Entity<LineHandle> {
   /** Start point: an id (created if new) or `[x, y]`. */
-  from: PointRef;
+  from: PointLike;
   /** End point: an id (created if new) or `[x, y]`. */
-  to: PointRef;
+  to: PointLike;
   /** Keep the line horizontal. */
   horizontal?: boolean;
   /** Keep the line vertical. */
@@ -57,13 +70,13 @@ export interface LineProps extends Entity {
   /** Direction from `from` to `to`, degrees CCW from +X (lines are undirected: mod 180). */
   angle?: number;
   /** Parallel to these lines. */
-  parallel?: Refs;
+  parallel?: Refs<LineHandle>;
   /** Perpendicular to these lines. */
-  perpendicular?: Refs;
+  perpendicular?: Refs<LineHandle>;
   /** Same length as these lines. */
-  equal?: Refs;
+  equal?: Refs<LineHandle>;
   /** Tangent to these arcs/circles (`true`: the arc meeting this line's `from`). */
-  tangent?: Refs | boolean;
+  tangent?: Refs<Round> | boolean;
 }
 
 /**
@@ -71,13 +84,13 @@ export interface LineProps extends Entity {
  * Give `center` (an id) or leave it out and set `radius` / `tangent`: the centre is then
  * an implicit point (`"<id>.center"`).
  */
-export interface ArcProps extends Entity {
+export interface ArcProps extends Entity<ArcHandle> {
   /** Start point. */
-  from: PointRef;
+  from: PointLike;
   /** End point. */
-  to: PointRef;
+  to: PointLike;
   /** Centre point (created if new). */
-  center?: PointRef;
+  center?: PointLike;
   /** Radius, mm. */
   radius?: number;
   /** Alias of `radius`. */
@@ -93,44 +106,44 @@ export interface ArcProps extends Entity {
   /** Sweep angle, degrees (constrained). */
   angle?: number;
   /** Tangent to these lines/arcs/circles; `true`: to the curve meeting this arc's `from`. */
-  tangent?: Refs | boolean;
+  tangent?: Refs<LineHandle | Round> | boolean;
   /** Same radius as these arcs/circles. */
-  equal?: Refs;
+  equal?: Refs<Round>;
   /** Same centre as this arc/circle. */
-  concentric?: string;
+  concentric?: Ref<Round>;
 }
 
 /**
  * Inside a constraint sketch, `<circle>` is a solved circle: `center` an id or `[x, y]` (or
  * `x`/`y` as the rough centre), radius optional (then it's free).
  */
-export interface SketchCircleProps extends Entity {
+export interface SketchCircleProps extends Entity<CircleHandle> {
   /** Centre point id (created if new) or `[x, y]` guess. */
-  center?: PointRef;
+  center?: PointLike;
   /** Pin the centre where drawn. */
   fixed?: boolean;
   /** Tangent to these lines/arcs/circles. */
-  tangent?: Refs;
+  tangent?: Refs<LineHandle | Round>;
   /** Same radius as these arcs/circles. */
-  equal?: Refs;
+  equal?: Refs<Round>;
   /** Same centre as this arc/circle. */
-  concentric?: string;
+  concentric?: Ref<Round>;
 }
 
 /** A clamped B-spline through control points (ends on the first and last). */
-export interface SplineProps extends Entity {
+export interface SplineProps extends Entity<SplineHandle> {
   /** Control points: ids (created if new) or `[x, y]`, at least 2. */
-  points: readonly PointRef[];
+  points: readonly PointLike[];
   /** Degree (default 3, lowered for few points). */
   degree?: number;
 }
 
 /** Two things a constraint relates. `from`/`to` are aliases of `a`/`b`. */
-interface Pair extends Common {
-  a?: string;
-  b?: string;
-  from?: string;
-  to?: string;
+interface Pair<H = SketchRef> extends Common {
+  a?: Ref<H>;
+  b?: Ref<H>;
+  from?: Ref<H>;
+  to?: Ref<H>;
 }
 
 /**
@@ -151,7 +164,7 @@ export interface DimensionProps extends Pair {
   /** Angle from line a to line b, degrees CCW (mod 180). */
   angle?: number;
   /** The entity for `radius` / `diameter` / `length`. */
-  of?: string;
+  of?: Ref<AnyCurve>;
   radius?: number;
   diameter?: number;
   length?: number;
@@ -166,55 +179,55 @@ export interface DistanceProps extends Pair {
   dy?: number;
 }
 /** Angle from line `a` to line `b`, degrees CCW (lines undirected: mod 180). */
-export interface AngleProps extends Pair {
+export interface AngleProps extends Pair<LineHandle> {
   value?: number;
   angle?: number;
 }
 /** Two points made one, or a point put on a curve. */
 export interface CoincidentProps extends Pair {}
 /** Equal length (lines) or radius (arcs/circles); `of` for several. */
-export interface EqualProps extends Pair {
-  of?: readonly string[];
+export interface EqualProps extends Pair<LineHandle | Round> {
+  of?: readonly Ref<LineHandle | Round>[];
 }
 /** Two lines parallel (`of` for several). */
-export interface ParallelProps extends Pair {
-  of?: readonly string[];
+export interface ParallelProps extends Pair<LineHandle> {
+  of?: readonly Ref<LineHandle>[];
 }
 /** Two lines perpendicular. */
-export interface PerpendicularProps extends Pair {}
+export interface PerpendicularProps extends Pair<LineHandle> {}
 /** Tangent: line–arc/circle or arc/circle–arc/circle. */
-export interface TangentProps extends Pair {}
+export interface TangentProps extends Pair<LineHandle | Round> {}
 /** Lines on one infinite line. */
-export interface CollinearProps extends Pair {}
+export interface CollinearProps extends Pair<LineHandle> {}
 /** Same centre. */
-export interface ConcentricProps extends Pair {}
+export interface ConcentricProps extends Pair<Round> {}
 /** A line (`a`) or two points (`a`, `b`) horizontal. */
-export interface HorizontalProps extends Pair {}
+export interface HorizontalProps extends Pair<LineHandle | PointHandle> {}
 /** A line (`a`) or two points (`a`, `b`) vertical. */
-export interface VerticalProps extends Pair {}
+export interface VerticalProps extends Pair<LineHandle | PointHandle> {}
 /**
  * `a` and `b` mirror images: across line `about`; about point `about` (point symmetry); or,
  * with `axis`, across the vertical (`"x"`: x mirrored) or horizontal (`"y"`) line through
  * point `about` (default the origin).
  */
-export interface SymmetricProps extends Pair {
-  about?: string;
+export interface SymmetricProps extends Pair<PointHandle | Round> {
+  about?: Ref<PointHandle | LineHandle>;
   axis?: "x" | "y";
 }
 /** `point` at the middle of line `of`. */
 export interface MidpointProps extends Common {
-  point: string;
-  of: string;
+  point: PointId;
+  of: Ref<LineHandle>;
 }
 /** `point` on curve `curve` (line: the infinite line; arc: its circle). */
 export interface OnCurveProps extends Common {
-  point: string;
-  curve: string;
+  point: PointId;
+  curve: Ref<LineHandle | Round>;
 }
 /** Pin a point (at `x`/`y`, or where it is drawn). */
 export interface FixProps extends Common {
-  point?: string;
-  a?: string;
+  point?: PointId;
+  a?: PointId;
   x?: number;
   y?: number;
 }
