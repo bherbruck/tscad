@@ -19,8 +19,12 @@ export const params = defineParams({
 
 type Pt = [number, number]
 
-/** The outline of an involute gear as one closed polygon, CCW. */
-export function involuteGear(teeth: number, module: number, pressureDeg: number, flankSteps = 5): Pt[] {
+/**
+ * The outline of an involute gear as SVG path data: each flank is the true involute fitted with
+ * a cubic Bézier (Hermite: exact ends and tangents), joined by exact arcs along the tip and root
+ * circles. Smooth flanks become single B-rep faces.
+ */
+export function involuteGear(teeth: number, module: number, pressureDeg: number, pieces = 1): string {
   const alpha = (pressureDeg * Math.PI) / 180
   const r = (module * teeth) / 2 // pitch radius
   const rb = r * Math.cos(alpha) // base radius
@@ -30,25 +34,45 @@ export function involuteGear(teeth: number, module: number, pressureDeg: number,
   // Half the angular tooth thickness at the base circle.
   const half = Math.PI / (2 * teeth) + inv(alpha)
   const tAt = (radius: number) => Math.sqrt(Math.max(0, (radius / rb) ** 2 - 1))
-  const t0 = tAt(Math.max(rb, rf))
   const t1 = tAt(ra)
+  // Start a hair above the base circle: the involute's tangent vanishes exactly on it.
+  const t0 = Math.max(tAt(Math.max(rb, rf)), t1 * 0.03)
 
-  const pts: Pt[] = []
   const polar = (radius: number, angle: number): Pt => [radius * Math.cos(angle), radius * Math.sin(angle)]
+  // A flank as a function of the involute parameter t: side -1 leads, +1 trails.
+  const flank = (c: number, side: number) => (t: number): Pt => polar(rb * Math.sqrt(1 + t * t), c + side * (half - (t - Math.atan(t))))
+  const f = (v: number) => +v.toFixed(5)
+  const P = (p: Pt) => `${f(p[0])} ${f(p[1])}`
+  /** Cubic Bézier pieces of `g` from parameter a to b (Hermite with numeric tangents). */
+  const curve = (g: (t: number) => Pt, a: number, b: number) => {
+    let d = ""
+    const h = 1e-6
+    const D = (t: number): Pt => {
+      const p = g(t + h), q = g(t - h)
+      return [(p[0] - q[0]) / (2 * h), (p[1] - q[1]) / (2 * h)]
+    }
+    for (let i = 0; i < pieces; i++) {
+      const ta = a + ((b - a) * i) / pieces, tb = a + ((b - a) * (i + 1)) / pieces
+      const pa = g(ta), pb = g(tb), da = D(Math.max(ta, 1e-5)), db = D(Math.max(tb, 1e-5)), k = (tb - ta) / 3
+      d += ` C ${P([pa[0] + da[0] * k, pa[1] + da[1] * k])} ${P([pb[0] - db[0] * k, pb[1] - db[1] * k])} ${P(pb)}`
+    }
+    return d
+  }
+
+  let d = ""
   for (let i = 0; i < teeth; i++) {
     const c = (2 * Math.PI * i) / teeth
-    const flank: [number, number][] = [] // [radius, angle offset from the tooth centre]
-    for (let s = 0; s <= flankSteps; s++) {
-      const t = t0 + ((t1 - t0) * s) / flankSteps
-      flank.push([rb * Math.sqrt(1 + t * t), half - (t - Math.atan(t))])
-    }
-    // Leading flank (root → tip), then trailing flank (tip → root).
-    if (rf < rb) pts.push(polar(rf, c - half))
-    for (const [rad, a] of flank) pts.push(polar(rad, c - a))
-    for (const [rad, a] of [...flank].reverse()) pts.push(polar(rad, c + a))
-    if (rf < rb) pts.push(polar(rf, c + half))
+    const lead = flank(c, -1), trail = flank(c, 1)
+    const start = rf < rb ? polar(rf, c - half) : lead(t0)
+    d += i === 0 ? `M ${P(start)}` : ` A ${f(rf)} ${f(rf)} 0 0 1 ${P(start)}` // root arc from the last tooth
+    if (rf < rb) d += ` L ${P(lead(t0))}` // radial line up to the base circle
+    d += curve(lead, t0, t1)
+    d += ` A ${f(ra)} ${f(ra)} 0 0 1 ${P(trail(t1))}` // tip land
+    d += curve(trail, t1, t0)
+    if (rf < rb) d += ` L ${P(polar(rf, c + half))}`
   }
-  return pts
+  const first = rf < rb ? polar(rf, -half) : flank(0, -1)(t0)
+  return `${d} A ${f(rf)} ${f(rf)} 0 0 1 ${P(first)} Z`
 }
 
 export default function SpurGear(p: ParamValues<typeof params>) {
@@ -68,7 +92,7 @@ export default function SpurGear(p: ParamValues<typeof params>) {
           <union>
             <chamfer distance={p.toothChamfer ? p.module * 0.2 : 0} edges=">Z or <Z">
               <extrude height={p.thickness}>
-                <polygon points={involuteGear(p.teeth, p.module, p.pressureAngle)} />
+                <path d={involuteGear(p.teeth, p.module, p.pressureAngle)} />
               </extrude>
             </chamfer>
             {p.hub && <cylinder r={hubR} h={p.thickness * 1.6} />}

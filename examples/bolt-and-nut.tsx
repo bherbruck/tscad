@@ -1,6 +1,7 @@
 /**
  * ISO-style hex bolt and nut, sized from the metric thread table. The hex heads get the classic
- * 30° chamfer by intersecting the prism with a double cone; threads are cosmetic grooves.
+ * 30° chamfer by intersecting the prism with a double cone; the shank is a single revolved
+ * profile with cosmetic V-grooves for the thread.
  */
 import { defineParams, type ParamValues } from "tscad"
 
@@ -46,25 +47,27 @@ function ChamferedHex({ acrossFlats, height, z = 0 }: { acrossFlats: number; hei
 export default function BoltAndNut(p: ParamValues<typeof params>) {
   const d = Number(p.size.slice(1))
   const [pitch, af, headH, nutH] = METRIC[p.size]
-  const grooveCount = Math.floor((p.length * 0.7) / pitch)
+  const L = p.length
+  const r = d / 2
+  const depth = 0.54 * pitch // ISO external thread depth
+  // The whole shank is ONE revolved profile (radius, height): a plain length under the head,
+  // then a row of 60° V-grooves (cosmetic rings, not a helix), then a chamfered tip.
+  const threadLen = p.grooves ? Math.floor((L * 0.7) / pitch) * pitch : 0
+  const z0 = headH - 0.5 // sink into the head so the union fuses
+  const zt = headH + L - threadLen - pitch // thread starts here
+  const profile: [number, number][] = [[0, z0], [r, z0], [r, zt]]
+  for (let z = zt; z < headH + L - pitch * 1.5; z += pitch) profile.push([r - depth, z + pitch / 2], [r, z + pitch])
+  profile.push([r, headH + L - pitch], [r - pitch, headH + L], [0, headH + L])
 
   return (
     <assembly name="fastener">
       <part name="bolt" color="#9aa3ad">
-        <difference>
-          <union>
-            <ChamferedHex acrossFlats={af} height={headH} />
-            {/* shank with a chamfered tip */}
-            <cylinder r={d / 2} h={p.length - pitch} z={headH} />
-            <cone r1={d / 2} r2={d / 2 - pitch} h={pitch} z={headH + p.length - pitch} />
-          </union>
-          {/* cosmetic thread: a stack of shallow V-grooves along the lower 70% */}
-          {p.grooves && (
-            <linearPattern count={grooveCount} step={[0, 0, pitch]}>
-              <torus R={d / 2 + pitch * 0.15} r={pitch * 0.35} z={headH + p.length * 0.3 + pitch / 2} />
-            </linearPattern>
-          )}
-        </difference>
+        <union>
+          <ChamferedHex acrossFlats={af} height={headH} />
+          <revolve>
+            <polygon points={profile} />
+          </revolve>
+        </union>
       </part>
 
       <part name="nut" color="#c9ced4" z={headH + p.gap}>

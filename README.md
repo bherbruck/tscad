@@ -5,6 +5,8 @@ export STEP, STL, 3MF, GLB and OBJ. Like [tscircuit](https://tscircuit.com), but
 parts — powered by the [solidcore](https://github.com/tangency-labs/solidcore) B-rep kernel,
 compiled to WebAssembly so it runs in bun and in the browser.
 
+<p align="center"><a href="examples/enclosure.tsx"><img src="docs/images/enclosure.png" alt="A parametric electronics enclosure rendered by tscad" width="720"></a></p>
+
 ```tsx
 import { defineParams, edges, type ParamValues } from "tscad"
 
@@ -73,18 +75,30 @@ To add tscad to an existing bun project: `bun add tscad`, then set
 
 ## Examples
 
-| Example | Shows off |
-|---|---|
-| [`bracket.tsx`](examples/bracket.tsx) | L-bracket: unions, a gusset sketch, rounded corners and an inside-bend fillet picked with combined selectors, `gridPattern` holes, slots |
-| [`spur-gear.tsx`](examples/spur-gear.tsx) | involute gear profile computed from the math, hub, `polarPattern` lightening holes, bore chamfer by `edges.radius()` |
-| [`enclosure.tsx`](examples/enclosure.tsx) | `<assembly>` of body + lid, a `<Boss>` component, vent louvres, revolved countersinks, filleted edges, every cut batched into one tool |
-| [`vase.tsx`](examples/vase.tsx) | smooth Bézier silhouette from an SVG `path`, `revolve`, `shell` |
-| [`bolt-and-nut.tsx`](examples/bolt-and-nut.tsx) | ISO metric table as a `choice` param, chamfered hex via intersection, cosmetic thread via `linearPattern` |
-| [`coaster.tsx`](examples/coaster.tsx) | honeycomb laid out with plain loops and filtered to the rim, cut as one sketch |
-| [`phone-stand.tsx`](examples/phone-stand.tsx) | angle-driven side profile as a `polygon` on the XZ plane, extruded and filleted |
-| [`component-library.tsx`](examples/component-library.tsx) | reusable typed components (`<Standoff/>`, `<CountersunkHole/>` as revolved profiles, `<RoundedPlate/>`) and a board table → a mounting plate |
+<table>
+<tr>
+<td width="50%" valign="top"><a href="examples/enclosure.tsx"><img src="docs/images/enclosure.png" alt="Enclosure"></a><br><b><a href="examples/enclosure.tsx">Enclosure</a></b> — `<assembly>` of body + lid, a `<Boss>` component, vent louvres, revolved countersinks, filleted edges</td>
+<td width="50%" valign="top"><a href="examples/spur-gear.tsx"><img src="docs/images/spur-gear.png" alt="Spur gear"></a><br><b><a href="examples/spur-gear.tsx">Spur gear</a></b> — true involute flanks as Bézier `path` data, hub, `polarPattern` lightening holes, bore chamfer by `edges.radius()`</td>
+</tr>
+<tr>
+<td width="50%" valign="top"><a href="examples/bracket.tsx"><img src="docs/images/bracket.png" alt="Bracket"></a><br><b><a href="examples/bracket.tsx">Bracket</a></b> — rounded corners and an inside-bend fillet picked with combined selectors, gusset sketch, `gridPattern` holes, slots</td>
+<td width="50%" valign="top"><a href="examples/vase.tsx"><img src="docs/images/vase.png" alt="Vase"></a><br><b><a href="examples/vase.tsx">Vase</a></b> — smooth silhouette from an SVG `path`, `revolve`, `shell`, a `choice` param for the glaze</td>
+</tr>
+<tr>
+<td width="50%" valign="top"><a href="examples/bolt-and-nut.tsx"><img src="docs/images/bolt-and-nut.png" alt="Bolt and nut"></a><br><b><a href="examples/bolt-and-nut.tsx">Bolt and nut</a></b> — ISO metric table as a `choice` param, chamfered hex via `intersection`, the whole grooved shank as one `revolve`</td>
+<td width="50%" valign="top"><a href="examples/coaster.tsx"><img src="docs/images/coaster.png" alt="Coaster"></a><br><b><a href="examples/coaster.tsx">Coaster</a></b> — honeycomb laid out with plain loops, filtered to the rim and cut as one sketch</td>
+</tr>
+<tr>
+<td width="50%" valign="top"><a href="examples/phone-stand.tsx"><img src="docs/images/phone-stand.png" alt="Phone stand"></a><br><b><a href="examples/phone-stand.tsx">Phone stand</a></b> — angle-driven side profile as a `polygon` on the XZ plane, extruded and filleted</td>
+<td width="50%" valign="top"><a href="examples/component-library.tsx"><img src="docs/images/component-library.png" alt="Component library"></a><br><b><a href="examples/component-library.tsx">Component library</a></b> — reusable typed components (`<Standoff/>`, `<CountersunkHole/>`, `<RoundedPlate/>`) and a board table</td>
+</tr>
+<tr>
+<td width="50%" valign="top"><a href="examples/parts-showcase.tsx"><img src="docs/images/parts-showcase.png" alt="Parts library"></a><br><b><a href="examples/parts-showcase.tsx">Parts library</a></b> — the `tscad/parts` components: a NEMA 17 mount and a Raspberry Pi base with an engraved label</td>
+</tr>
+</table>
 
-Run one from a checkout with `bun src/cli/index.ts dev examples/spur-gear.tsx`.
+Run one from a checkout with `bun src/cli/index.ts dev examples/spur-gear.tsx`. The images are rendered
+headlessly by `tscad/render` (`bun scripts/render-examples.ts`).
 
 ## Elements
 
@@ -170,6 +184,23 @@ await Bun.write("plate.step", await exportModel(kernel, parts, "step"))
 await Bun.write("plate.3mf", await exportModel(kernel, parts, "3mf", { tolerance: 0.01 }))
 ```
 
+### Rendering images
+
+`tscad/render` is a software renderer in pure TypeScript (no GPU, no DOM; fflate for the PNG): studio
+lighting, soft ground shadow, crisp B-rep edge lines, supersampled. It makes product shots like
+the gallery above, in bun or in the browser:
+
+```ts
+import { renderPNG } from "tscad/render"
+
+const meshes = await Promise.all(parts.map(async (p) => ({ ...p, mesh: await kernel.meshAt(p.name, 0.02) })))
+await Bun.write("plate.png", renderPNG(meshes, { width: 1200, height: 800, view: "iso", background: "dark" }))
+```
+
+Options: `view` (`"iso" | "front" | "top" | "right" | …` or `{ azimuth, elevation }`),
+`background` (`"dark" | "light" | "transparent"` or a CSS colour), `edges`, `smoothEdges`,
+`shadow`, `ssaa`, `projection` (`"perspective" | "orthographic"`).
+
 ## How it works
 
 ```
@@ -190,7 +221,7 @@ await Bun.write("plate.3mf", await exportModel(kernel, parts, "3mf", { tolerance
    the B-rep.
 
 Packages (one npm package, subpath exports): `tscad`, `tscad/jsx-runtime`, `tscad/kernel`,
-`tscad/export`, `tscad/ir`.
+`tscad/export`, `tscad/render`, `tscad/ir`.
 
 See [docs/guide.md](docs/guide.md) for a full tutorial and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 for the internals.
