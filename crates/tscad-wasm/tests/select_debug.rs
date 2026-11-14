@@ -103,3 +103,20 @@ fn many_holes_batched() {
     let e = 70.0 * 50.0 * 5.0 - 24.0 * std::f64::consts::PI * 4.0 * 5.0;
     assert!((v - e).abs() < 1e-3, "{v} {e}");
 }
+
+#[test]
+fn draft_offset_split() {
+    let pi = std::f64::consts::PI;
+    // split a sphere in half
+    let v = vol(r#"{"type":"split","origin":[0,0,0],"normal":[0,0,1],"children":[{"type":"sphere","radius":3}]}"#).unwrap();
+    assert!((v - 2.0 / 3.0 * pi * 27.0).abs() < 1e-3, "{v}");
+    let v = vol(r#"{"type":"split","origin":[0,0,2],"normal":[0,0,1],"keep":"below","children":[{"type":"box","size":[10,10,10]}]}"#).unwrap();
+    assert!((v - 200.0).abs() < 1e-6, "{v}");
+    // offset the top face of a box up by 2
+    let v = vol(r#"{"type":"offsetFaces","distance":2,"faces":{"type":"max","axis":"z"},"children":[{"type":"box","size":[10,10,10]}]}"#).unwrap();
+    assert!((v - 1200.0).abs() < 1e-6, "{v}");
+    // draft the four side walls of a box 5 degrees
+    let r = vol(r#"{"type":"draft","angle":0.0872664626,"faces":{"type":"perpendicular","axis":"z"},"children":[{"type":"box","size":[20,20,10],"center":true}]}"#);
+    println!("draft: {r:?}");
+    assert!(r.is_ok());
+}

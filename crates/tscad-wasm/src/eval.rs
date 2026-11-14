@@ -7,7 +7,7 @@ use solidcore_ops as ops;
 use solidcore_ops::{Blend, BooleanOp, Body, Corners};
 use solidcore_record::brep::{self as rec, Brep as Record};
 
-use crate::ir::{Axis, Curve, Node, Selector, SweepFrame};
+use crate::ir::{Axis, Curve, Node, Selector, SplitKeep, SweepFrame};
 
 /// An evaluation failure: what failed, at which node path.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, tsify::Tsify)]
@@ -213,6 +213,70 @@ fn eval_uncached(node: &Node, path: &str, cache: &mut Cache) -> R<Solid> {
         Node::Fillet { radius, edges, children } => blend(children, path, cache, "fillet", Blend::Round, *radius, edges),
         Node::Chamfer { distance, edges, children } => {
             blend(children, path, cache, "chamfer", Blend::Chamfer, *distance, edges)
+        }
+        Node::Draft { angle, faces, origin, normal, pull, children } => {
+            let Some(b) = union(children, path, cache)? else { return Ok(None) };
+            let (record, order) = kernel(path, "draft", b.to_record())?;
+            let picked = select_faces(&record, faces);
+            if picked.is_empty() {
+                return Err(fail(path, "draft", "the face selector matched no faces"));
+            }
+            kernel(
+                path,
+                "draft",
+                ops::offset::draft(
+                    &b,
+                    &order,
+                    &picked,
+                    origin.unwrap_or([0.0; 3]),
+                    normal.unwrap_or([0.0, 0.0, 1.0]),
+                    pull.unwrap_or([0.0, 0.0, 1.0]),
+                    *angle,
+                ),
+            )?;
+            Ok(Some(b))
+        }
+        Node::OffsetFaces { distance, faces, children } => {
+            let Some(b) = union(children, path, cache)? else { return Ok(None) };
+            let (record, order) = kernel(path, "offsetFaces", b.to_record())?;
+            let picked = select_faces(&record, faces);
+            if picked.is_empty() {
+                return Err(fail(path, "offsetFaces", "the face selector matched no faces"));
+            }
+            kernel(path, "offsetFaces", ops::offset::offset_faces(&b, &order, &picked, *distance))?;
+            Ok(Some(b))
+        }
+        Node::Split { origin, normal, keep, children } => {
+            let Some(b) = union(children, path, cache)? else { return Ok(None) };
+            let (lo, hi) = kernel(path, "split", b.bounds())?;
+            let n = norm(*normal);
+            // a plane patch covering the body: two axes square to the normal, the body's
+            // diagonal on each side
+            let helper = if n[0].abs() < 0.9 { [1.0, 0.0, 0.0] } else { [0.0, 1.0, 0.0] };
+            let u = norm(cross(n, helper));
+            let v = cross(n, u);
+            let reach = 2.0 * dot(sub(hi, lo), sub(hi, lo)).sqrt() + 1.0;
+            let centre = [(lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0, (lo[2] + hi[2]) / 2.0];
+            let d = dot(sub(centre, *origin), n);
+            let o = [centre[0] - d * n[0], centre[1] - d * n[1], centre[2] - d * n[2]];
+            let tool = ops::split::Tool {
+                surface: rec::Surface::Plane { origin: o, u_axis: u, v_axis: v },
+                domain: [[-reach, reach], [-reach, reach]],
+            };
+            let side = |body: &Body| -> R<f64> {
+                let (a, z) = kernel(path, "split", body.bounds())?;
+                let c = [(a[0] + z[0]) / 2.0, (a[1] + z[1]) / 2.0, (a[2] + z[2]) / 2.0];
+                Ok(dot(sub(c, *origin), n))
+            };
+            let want_above = matches!(keep, SplitKeep::Above);
+            match kernel(path, "split", ops::split::split_body(&b, &tool))? {
+                Some((p, q)) => {
+                    let p_above = side(&p)? > side(&q)?;
+                    Ok(Some(if p_above == want_above { p } else { q }))
+                }
+                // the plane misses the body: all of it, or none of it
+                None => Ok(if (side(&b)? > 0.0) == want_above { Some(b) } else { None }),
+            }
         }
         Node::Shell { thickness, faces, children } => {
             let Some(b) = union(children, path, cache)? else { return Ok(None) };

@@ -120,6 +120,38 @@ pub enum Node {
         edges: Selector,
         children: Vec<Node>,
     },
+    /// The selected faces of the children (unioned) drafted by `angle` radians for pulling along
+    /// `pull` (a mould draft), about the neutral plane through `origin` with normal `normal`
+    /// (default: z = 0, normal +Z, pull +Z). Positive angles lean the faces in going along the pull.
+    Draft {
+        angle: f64,
+        #[serde(default = "Selector::none")]
+        faces: Selector,
+        #[serde(default)]
+        origin: Option<[f64; 3]>,
+        #[serde(default)]
+        normal: Option<[f64; 3]>,
+        #[serde(default)]
+        pull: Option<[f64; 3]>,
+        children: Vec<Node>,
+    },
+    /// The selected faces of the children (unioned) moved along their normals by `distance`
+    /// (negative: inward), their neighbours extended or trimmed to meet them.
+    OffsetFaces {
+        distance: f64,
+        #[serde(default = "Selector::none")]
+        faces: Selector,
+        children: Vec<Node>,
+    },
+    /// The children (unioned) cut by the plane through `origin` with normal `normal`, the part on
+    /// the side the normal points to kept (`keep: "below"` keeps the other side).
+    Split {
+        origin: [f64; 3],
+        normal: [f64; 3],
+        #[serde(default)]
+        keep: SplitKeep,
+        children: Vec<Node>,
+    },
     /// The children (unioned) hollowed to `thickness`, the selected faces left open.
     Shell {
         thickness: f64,
@@ -127,6 +159,17 @@ pub enum Node {
         faces: Selector,
         children: Vec<Node>,
     },
+}
+
+/// Which side of a split plane is kept.
+#[derive(Debug, Default, Serialize, Deserialize, Clone, Copy, Tsify)]
+#[serde(rename_all = "camelCase")]
+pub enum SplitKeep {
+    /// The side the normal points to.
+    #[default]
+    Above,
+    /// The other side.
+    Below,
 }
 
 /// How a swept profile moves along its path.
