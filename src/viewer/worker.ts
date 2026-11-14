@@ -45,10 +45,10 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
           const next = await import(/* @vite-ignore */ url);
           mod = next;
           modUrl = url;
-          sourceMap = undefined;
+          sourceMap = msg.map ? Promise.resolve(new SourceMap(msg.map as any)) : undefined;
         } catch (err) {
           modUrl = url;
-          sourceMap = undefined;
+          sourceMap = msg.map ? Promise.resolve(new SourceMap(msg.map as any)) : undefined;
           post({ type: "error", error: await stageError("import", err) });
           break;
         }

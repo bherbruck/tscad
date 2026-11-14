@@ -13,6 +13,7 @@ ${c.bold("Usage")}
   ${c.accent("tscad dev")} ${c.gray("[file=index.tsx]")}         live viewer with hot reload
   ${c.accent("tscad build")} ${c.gray("[file] -o out.stl")}      export STEP / STL / 3MF / GLB / OBJ
   ${c.accent("tscad info")} ${c.gray("[file]")}                  params and part stats
+  ${c.accent("tscad render")} ${c.gray("[file] -o out.png")}     a PNG image of the model
 
 ${c.bold("dev")}
   --port <n>            port ${c.gray("(default 3333; next free one if taken)")}
@@ -27,6 +28,14 @@ ${c.bold("build")}
   --part <name>         only this part ${c.gray("(repeatable)")}
   --ascii               ASCII STL
   --json                machine-readable output
+
+${c.bold("render")}
+  -o, --out <file.png>  output ${c.gray("(default <name>.png)")}
+  --view <v>            iso | front | back | top | bottom | right | left | <azimuth>,<elevation>
+  --width/--height <px> image size ${c.gray("(default 1200×800)")}
+  --background <bg>     dark | light | transparent | <css colour>
+  --ortho               orthographic projection;  --no-edges  hide edge lines
+  -p, --param <k=v>     as for build
 
 ${c.bold("Examples")}
   ${c.gray("$")} tscad dev bracket.tsx --open
@@ -92,6 +101,12 @@ export async function main(argv: string[]): Promise<number> {
       if (!needFile()) return 1;
       const { info } = await import("./build");
       return info({ file, params, json: !!f.json });
+    }
+    case "render": {
+      if (!needFile()) return 1;
+      const { render } = await import("./render");
+      const num = (v: unknown) => (str(v) === undefined ? undefined : Number(str(v)));
+      return render({ file, out: str(f.out), params, view: str(f.view), width: num(f.width), height: num(f.height), background: str(f.background), ortho: !!f.ortho, edges: f.edges !== false });
     }
     case "dev": {
       if (!needFile()) return 1;

@@ -21,6 +21,9 @@ function kind(spec: ParamSpec): "number" | "int" | "boolean" | "choice" | "color
 
 const humanize = (k: string) => k.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ").replace(/^./, (c) => c.toUpperCase());
 
+/** Hash keys that are never params (the playground's shared source). */
+export const RESERVED = new Set(["code", "example"]);
+
 /** Values that differ from defaults, as a hash string (`a=1&b=x`). */
 export function valuesToHash(schema: ParamSchemaData, values: ParamValuesData): string {
   const q = new URLSearchParams();
@@ -37,6 +40,7 @@ export function hashToValues(hash: string, schema?: ParamSchemaData): ParamValue
   const q = new URLSearchParams(hash.replace(/^#/, ""));
   const out: ParamValuesData = {};
   for (const [k, raw] of q) {
+    if (RESERVED.has(k)) continue;
     const spec = schema?.[k];
     if (schema && !spec) continue;
     out[k] = spec ? coerce(spec, raw) : guess(raw);

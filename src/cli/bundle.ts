@@ -15,6 +15,7 @@ export const RUNTIME_ENTRIES: Record<string, string> = {
   tscad: "index.ts",
   "tscad/jsx-runtime": "jsx-runtime.ts",
   "tscad/jsx-dev-runtime": "jsx-dev-runtime.ts",
+  "tscad/parts": "parts/index.ts",
 };
 
 export interface Asset {
@@ -42,15 +43,17 @@ export function browserRuntimePlugin(prefix = APP_PREFIX): BunPlugin {
 }
 
 /** Bundle the viewer app, the eval worker and the tscad runtime into memory (shared chunks). */
-export async function buildApp(opts: { minify?: boolean } = {}): Promise<Map<string, Asset>> {
-  const entrypoints = [...Object.values(RUNTIME_ENTRIES).map((e) => resolve(SRC, e)), resolve(SRC, "viewer/main.ts"), resolve(SRC, "viewer/worker.ts")];
+export async function buildApp(opts: { minify?: boolean; /** App entries (relative to src/); default the dev viewer. */ entries?: string[] } = {}): Promise<Map<string, Asset>> {
+  const app = opts.entries ?? ["viewer/main.ts"];
+  const entrypoints = [...Object.values(RUNTIME_ENTRIES), ...app, "viewer/worker.ts"].map((e) => resolve(SRC, e));
   const result = await Bun.build({
     entrypoints,
     root: SRC,
     target: "browser",
     format: "esm",
     splitting: true,
-    minify: opts.minify ?? false,
+    // Keep identifiers: the runtime's source capture reads function names from stack frames.
+    minify: opts.minify ? { whitespace: true, syntax: true, identifiers: false } : false,
     sourcemap: "linked",
     naming: { entry: "[dir]/[name].[ext]", chunk: "chunks/[name]-[hash].[ext]", asset: "assets/[name]-[hash].[ext]" },
     define: { "process.env.NODE_ENV": JSON.stringify("development") },

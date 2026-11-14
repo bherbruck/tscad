@@ -102,6 +102,16 @@ describe("tscad build", () => {
     expect(readFileSync(join(bare, "m.stl")).readUInt32LE(80)).toBe(12);
   }, 60_000);
 
+  test("tscad render writes a PNG", () => {
+    const r = run("render", "cube.tsx", "-o", "shot.png", "--width", "320", "--height", "200", "--view", "top");
+    expect(r.exitCode).toBe(0);
+    const png = readFileSync(join(dir, "shot.png"));
+    expect([...png.subarray(1, 4)].map((c) => String.fromCharCode(c)).join("")).toBe("PNG");
+    expect(png.readUInt32BE(16)).toBe(320);
+    expect(png.readUInt32BE(20)).toBe(200);
+    expect(run("render", "cube.tsx", "--view", "sideways").exitCode).toBe(2);
+  }, 60_000);
+
   test("tscad info lists params and parts", () => {
     const r = run("info", "cube.tsx", "--json");
     expect(r.exitCode).toBe(0);

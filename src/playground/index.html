@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>tscad playground — CAD as TSX</title>
+    <meta name="description" content="Write parametric solid models in TSX and see them live: a B-rep CAD kernel running in your browser. Export STEP, STL, 3MF." />
+    <meta name="color-scheme" content="dark light" />
+    <meta property="og:title" content="tscad playground" />
+    <meta property="og:description" content="CAD as TSX — parametric B-rep models in your browser." />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3 28 10 16 17 4 10Z' fill='%23b7c6ff'/%3E%3Cpath d='M4 10 16 17V30L4 23Z' fill='%237391ff'/%3E%3Cpath d='M28 10 16 17V30L28 23Z' fill='%234a5fd8'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="./__tscad/styles.css" />
+    <script>
+      try {
+        document.documentElement.dataset.theme = localStorage.getItem("tscad.theme") || "dark";
+      } catch {}
+    </script>
+  </head>
+  <body class="playground">
+    <div id="app"></div>
+    <script type="module" src="./__tscad/playground/main.js"></script>
+  </body>
+</html>

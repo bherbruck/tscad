@@ -100,7 +100,7 @@ export function parseStack(stack: string | undefined): Loc[] {
   if (!stack) return [];
   const out: Loc[] = [];
   for (const raw of stack.split("\n")) {
-    const m = raw.match(/\(?((?:[a-z]+:\/\/|\/)[^\s()]*?):(\d+):(\d+)\)?\s*$/i) ?? raw.match(/@(.*?):(\d+):(\d+)\s*$/);
+    const m = raw.match(/\(?((?:blob:)?(?:[a-z]+:\/\/|\/)[^\s()]*?):(\d+):(\d+)\)?\s*$/i) ?? raw.match(/@(.*?):(\d+):(\d+)\s*$/);
     if (m) out.push({ file: m[1]!, line: Number(m[2]), column: Number(m[3]) });
   }
   return out;

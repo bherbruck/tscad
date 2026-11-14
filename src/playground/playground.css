@@ -1,0 +1,236 @@
+/* Playground layout: editor pane | viewer workspace. Builds on the viewer's styles.css tokens. */
+
+:root,
+:root[data-theme="dark"] {
+  --tk-a: #9ccfd8;
+  --tk-f: #82aaff;
+}
+
+:root[data-theme="light"] {
+  --tk-a: #0e7490;
+  --tk-f: #1d4ed8;
+}
+
+.pg-pane {
+  position: relative;
+  width: min(44vw, 640px);
+  min-width: 260px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  background: color-mix(in srgb, var(--panel-solid) 94%, var(--bg));
+  border-right: 1px solid var(--line);
+  z-index: 12;
+}
+
+.pg-editor-head {
+  height: 38px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.pg-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 7px;
+  background: var(--hover);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.pg-run-state {
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.pg-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.pg-hint kbd {
+  height: 18px;
+  min-width: 18px;
+  font-size: 10px;
+}
+
+.pg-editor {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.pg-editor .cm-editor {
+  height: 100%;
+}
+
+.pg-editor .cm-completionInfo code {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text);
+}
+
+.pg-resizer {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  z-index: 3;
+}
+
+.pg-resizer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.pg-resizer:hover::after,
+.pg-resizing .pg-resizer::after {
+  background: var(--accent);
+}
+
+.pg-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+.pg-resizing canvas {
+  pointer-events: none;
+}
+
+.pg-code-hidden .pg-pane {
+  display: none;
+}
+
+.pg-code-hidden .pg-code-toggle {
+  color: var(--text-3);
+}
+
+.pg-code-toggle {
+  color: var(--accent);
+}
+
+.pg-extras {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 6px;
+}
+
+.pg-select {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 8px 0 10px;
+  border-radius: 9px;
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.pg-select select {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  height: 30px;
+  padding: 0 4px;
+  width: auto;
+  max-width: 230px;
+  font-weight: 550;
+  color: var(--text);
+  cursor: pointer;
+  outline: none;
+}
+
+.pg-select select option {
+  background: var(--panel-solid);
+  color: var(--text);
+}
+
+/* The viewer's floating panels sit closer together in the narrower workspace. */
+@container (max-width: 1080px) {
+  .side {
+    width: 260px;
+  }
+  .bottom {
+    width: calc(100% - 32px) !important;
+    min-width: 0 !important;
+  }
+  .gizmo {
+    bottom: 84px !important;
+  }
+  .side.right {
+    bottom: 184px !important;
+  }
+}
+
+@container (max-width: 760px) {
+  .tool.text span {
+    display: none;
+  }
+  .tool-group .tool.text:not(:first-child) {
+    display: none;
+  }
+  .side.right .card:last-child {
+    display: none;
+  }
+}
+
+@media (max-width: 820px) {
+  .pg-pane {
+    position: absolute;
+    inset: 52px 0 0 0;
+    width: auto !important;
+    border-right: 0;
+  }
+  .pg-resizer,
+  .pg-hint,
+  .btn span {
+    display: none;
+  }
+  .pg-select select {
+    max-width: 104px;
+  }
+  .topbar {
+    gap: 6px;
+    padding: 0 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .topbar .sep,
+  .topbar .icon-btn[title^="Save"],
+  .topbar .icon-btn[title^="Keyboard"],
+  .topbar .only-narrow,
+  .pg-select > .icon:first-child {
+    display: none !important;
+  }
+  .pg-extras {
+    gap: 6px;
+    margin-left: 0;
+  }
+  .playground:not(.pg-code-hidden) .bottom,
+  .playground:not(.pg-code-hidden) .gizmo {
+    display: none;
+  }
+}

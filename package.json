@@ -48,7 +48,9 @@
     "build:wasm:dev": "bun scripts/build-wasm.ts --dev",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
-    "dev": "bun src/cli/index.ts dev examples/bracket.tsx"
+    "dev": "bun src/cli/index.ts dev examples/bracket.tsx",
+    "build:playground": "bun scripts/build-playground.ts",
+    "playground": "bun scripts/build-playground.ts --dev --serve 4600"
   },
   "engines": {
     "bun": ">=1.2"

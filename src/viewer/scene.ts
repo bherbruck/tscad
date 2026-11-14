@@ -182,7 +182,7 @@ export class Viewport {
     this.canvas.style.width = `${w}px`;
     this.canvas.style.height = `${h}px`;
     this.persp.aspect = w / h;
-    this.persp.updateProjectionMatrix();
+    this.#applyInsets();
     this.#updateOrthoFrustum();
     for (const m of this.#lineMats) m.resolution.set(w, h);
     this.#needsRender = true;
@@ -614,9 +614,39 @@ export class Viewport {
     this.#animateTo({ pos: s.center.clone().add(dir.multiplyScalar(dist)), target: s.center.clone(), zoom: this.#fitZoom(s.radius, dist), up: this.camera.up.clone() }, animate);
   }
 
+  #insets = { left: 0, right: 0 };
+
+  /**
+   * Screen space covered by floating panels (px). The view is shifted so the model centres in
+   * the free region between them, and fits size it to that region.
+   */
+  setInsets(left: number, right: number) {
+    if (left === this.#insets.left && right === this.#insets.right) return;
+    this.#insets = { left, right };
+    this.#applyInsets();
+    this.#updateOrthoFrustum();
+    this.#needsRender = true;
+  }
+
+  #applyInsets() {
+    const { x: w, y: h } = this.#size;
+    const free = w - this.#insets.left - this.#insets.right;
+    // Ignore insets that leave too little room (narrow screens put panels in drawers).
+    this.#useInsets = free > 240;
+    const shift = this.#useInsets ? (this.#insets.left - this.#insets.right) / 2 : 0;
+    if (shift) this.persp.setViewOffset(w, h, -shift, 0, w, h);
+    else this.persp.clearViewOffset();
+    this.persp.updateProjectionMatrix();
+    this.#shift = shift;
+  }
+
+  #shift = 0;
+  #useInsets = false;
+
   #fitDistance(r: number) {
     const fov = THREE.MathUtils.degToRad(this.persp.fov);
-    const aspect = Math.min(1, this.persp.aspect);
+    const freeW = this.#size.x - (this.#useInsets ? this.#insets.left + this.#insets.right : 0);
+    const aspect = Math.min(1, freeW / this.#size.y);
     return ((Math.max(r, 1) / Math.sin(fov / 2)) * 1.45) / Math.sqrt(aspect);
   }
 
@@ -635,6 +665,8 @@ export class Viewport {
     this.ortho.right = w / 2;
     this.ortho.top = h / 2;
     this.ortho.bottom = -h / 2;
+    if (this.#shift) this.ortho.setViewOffset(this.#size.x, this.#size.y, -this.#shift, 0, this.#size.x, this.#size.y);
+    else this.ortho.clearViewOffset();
     this.ortho.updateProjectionMatrix();
   }
 
