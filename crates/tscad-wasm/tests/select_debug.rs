@@ -1,0 +1,47 @@
+//! Fillet volumes against closed forms: the edges selected are the edges rounded.
+use tscad_wasm::{Document, Engine, EvalOptions};
+
+fn vol(node: &str) -> Result<f64, String> {
+    let d: Document = serde_json::from_str(&format!(r#"{{"parts":[{{"name":"a","node":{node}}}]}}"#)).unwrap();
+    let mut e = Engine::new(None);
+    let r = e.evaluate(&d, &EvalOptions::default());
+    let p = &r.parts[0];
+    p.volume.ok_or_else(|| format!("{:?}", p.error))
+}
+
+#[test]
+fn vertical_fillet_volume() {
+    let v = vol(r#"{"type":"fillet","radius":2,"edges":{"type":"parallel","axis":"z"},"children":[{"type":"box","size":[20,20,10]}]}"#).unwrap();
+    let expect = 4000.0 - 4.0 * (4.0 - std::f64::consts::PI) * 10.0;
+    assert!((v - expect).abs() < 1e-3, "{v} vs {expect}");
+}
+
+#[test]
+fn rounded_rect_top_fillet() {
+    // a rounded rectangle 30 x 20, corner radius 4, extruded 5; fillet its top loop (tangent chain)
+    let (w, h, r) = (15.0_f64, 10.0_f64, 4.0_f64);
+    let pi = std::f64::consts::PI;
+    let arc = |cx: f64, cy: f64, a0: f64| format!(r#"{{"type":"arc","center":[{cx},{cy},0],"axis":[0,0,1],"reference":[1,0,0],"radius":{r},"start":{a0},"end":{}}}"#, a0 + pi / 2.0);
+    let line = |a: [f64; 2], b: [f64; 2]| format!(r#"{{"type":"line","start":[{},{},0],"end":[{},{},0]}}"#, a[0], a[1], b[0], b[1]);
+    let prof = [
+        line([-w + r, -h], [w - r, -h]), arc(w - r, -h + r, -pi / 2.0),
+        line([w, -h + r], [w, h - r]), arc(w - r, h - r, 0.0),
+        line([w - r, h], [-w + r, h]), arc(-w + r, h - r, pi / 2.0),
+        line([-w, h - r], [-w, -h + r]), arc(-w + r, -h + r, pi),
+    ].join(",");
+    let ext = format!(r#"{{"type":"extrude","direction":[0,0,1],"distance":5,"profile":[{prof}]}}"#);
+    let base = vol(&ext).unwrap();
+    println!("base {base}");
+    for (name, node) in [
+        ("fillet top", format!(r#"{{"type":"fillet","radius":1,"edges":{{"type":"max","axis":"z"}},"children":[{ext}]}}"#)),
+        ("chamfer top", format!(r#"{{"type":"chamfer","distance":1,"edges":{{"type":"max","axis":"z"}},"children":[{ext}]}}"#)),
+        ("shell", format!(r#"{{"type":"shell","thickness":-1,"faces":{{"type":"max","axis":"z"}},"children":[{ext}]}}"#)),
+        ("shell out", format!(r#"{{"type":"shell","thickness":1,"faces":{{"type":"max","axis":"z"}},"children":[{ext}]}}"#)),
+        ("shell closed", format!(r#"{{"type":"shell","thickness":-1,"faces":{{"type":"none"}},"children":[{ext}]}}"#)),
+        ("shell bottom", format!(r#"{{"type":"shell","thickness":-1,"faces":{{"type":"min","axis":"z"}},"children":[{ext}]}}"#)),
+        ("shell cyl", r#"{"type":"shell","thickness":-1,"faces":{"type":"max","axis":"z"},"children":[{"type":"cylinder","radius":10,"height":5}]}"#.to_string()),
+        ("fillet all", format!(r#"{{"type":"fillet","radius":1,"children":[{ext}]}}"#)),
+    ] {
+        println!("{name}: {:?}", vol(&node));
+    }
+}

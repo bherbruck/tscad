@@ -221,7 +221,7 @@ fn union(children: &[Node], path: &str, cache: &mut Cache) -> R<Solid> {
 
 fn blend(children: &[Node], path: &str, cache: &mut Cache, op: &str, kind: Blend, size: f64, edges: &Selector) -> R<Solid> {
     let Some(b) = union(children, path, cache)? else { return Ok(None) };
-    let (record, _) = kernel(path, op, b.to_record())?;
+    let (record, order) = kernel(path, op, b.to_record())?;
     let mut picked = select_edges(&record, edges);
     if picked.is_empty() {
         return Err(fail(path, op, "the edge selector matched no edges"));
@@ -231,7 +231,7 @@ fn blend(children: &[Node], path: &str, cache: &mut Cache, op: &str, kind: Blend
     // the user's own choice and are not dropped.
     let explicit = matches!(edges, Selector::Index { .. });
     loop {
-        match ops::blend(&b, kind, &picked, &[size], &[], Corners::Filled) {
+        match ops::blend_ordered(&b, &order, kind, &picked, &[size], &[], Corners::Filled, ops::BlendOptions::default()) {
             Ok(_) => break,
             Err(ops::Error::EdgeNotBlendable { edge, .. }) if !explicit && picked.len() > 1 => {
                 let before = picked.len();
@@ -405,6 +405,34 @@ fn is_seam(e: &rec::Edge) -> bool {
     e.uses.len() == 2 && e.uses[0].face == e.uses[1].face
 }
 
+/// The unit normal of face `f`'s surface at the point nearest `p`.
+fn normal_at(record: &Record, f: u32, p: [f64; 3]) -> Option<[f64; 3]> {
+    let s = ops::face_surface::FaceSurface::of(record, f as usize).ok()?;
+    let [[u0, u1], [v0, v1]] = s.domain();
+    let c = s.closest_point(p, [(u0 + u1) / 2.0, (v0 + v1) / 2.0]).ok()?;
+    s.normal(c.uv).ok().map(norm)
+}
+
+/// A smooth edge: its two faces meet tangentially along it (a joint between a line wall and an
+/// arc wall of an extruded rounded rectangle). Nothing to round there.
+fn is_smooth(record: &Record, e: &rec::Edge) -> bool {
+    let [a, b] = match e.uses.as_slice() {
+        [a, b] => [a.face, b.face],
+        _ => return false,
+    };
+    let p = match &e.curve {
+        rec::Curve::Line { start, end } => [(start[0] + end[0]) / 2.0, (start[1] + end[1]) / 2.0, (start[2] + end[2]) / 2.0],
+        _ => match record.vertices.get(e.vertices[0] as usize) {
+            Some(v) => v.point,
+            None => return false,
+        },
+    };
+    match (normal_at(record, a, p), normal_at(record, b, p)) {
+        (Some(n1), Some(n2)) => dot(n1, n2).abs() > 1.0 - 1e-6,
+        _ => false,
+    }
+}
+
 pub fn select_edges(record: &Record, s: &Selector) -> Vec<usize> {
     let (lo, hi) = bounds(record);
     let explicit = matches!(s, Selector::Index { .. });
@@ -412,7 +440,7 @@ pub fn select_edges(record: &Record, s: &Selector) -> Vec<usize> {
         .edges
         .iter()
         .enumerate()
-        .filter(|(_, e)| explicit || !is_seam(e))
+        .filter(|(_, e)| explicit || !(is_seam(e) || is_smooth(record, e)))
         .filter(|(i, e)| matches(&edge_item(record, e), s, lo, hi, *i, false))
         .map(|(i, _)| i)
         .collect()

@@ -23,3 +23,17 @@ These have NOT been filed upstream.
 ## 3. Union of overlapping spheres is slow
 - Six spheres r=4 spaced 7 apart along X, unioned: ~4.5 s in wasm (O3), vs ~0.2 s for a filleted
   plate with a hole. Not wrong, just slow (sphere/sphere SSI).
+
+## 4. Inward shell across tangent walls fails
+- Shell (thickness -1, top face open, closed, or bottom open) of an extruded rounded rectangle →
+  "the result is not a closed solid". The same body shelled outward (+1) works, and an inward
+  shell of a cylinder works.
+- Repro: `crates/tscad-wasm/tests/select_debug.rs` (`rounded_rect_top_fillet`, "shell" cases).
+- Workaround: none yet; use `outward` or build the cavity with a boolean.
+
+## Notes (tscad bugs found and fixed, not kernel bugs)
+- `solidcore_ops::blend` takes the kernel's *native* edge order, not record order (its
+  `SetBack` docs say so; the function's own docs read as record indices). tscad now uses
+  `blend_ordered` with the record's `Order`. Before that, `fillet` rounded the wrong edges.
+- `EdgeNotBlendable { edge }` reports the native position, which callers of the ordered API
+  can't map back; tscad pre-filters seam and tangent (smooth) edges from broad selectors instead.
