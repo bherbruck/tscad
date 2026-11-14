@@ -157,5 +157,5 @@ Horizontal holes print cleanly as teardrops (a circle plus a 45° roof); a flat 
 1. \`tscad_docs\` (this) and \`tscad_docs\` with \`element\` for exact props; \`tscad_read_example\` for full models.
 2. Write the TSX; \`tscad_evaluate\` it (source string or file). Fix errors (they point at TSX lines).
 3. \`tscad_render\` to look at it (iso/top/front...). 4. \`tscad_check\` for printability (overhangs,
-thin walls, bed fit) and part interference. 5. \`tscad_export\` to STEP/STL/3MF/GLB/OBJ/DXF/SVG.
+thin walls, bed fit) and part interference. 5. \`tscad_export\` to STEP/STL/3MF/GLB/OBJ/DXF/SVG, or \`tscad_plate\` to orient the parts and lay them out on print beds (3MF per plate).
 `;

@@ -106,6 +106,32 @@ These have NOT been filed upstream.
 - r 4.85, h 21, pitch 11.72 × 8.3 (rows overlap): "the result is not a closed solid" after ~18 s;
   5×3, 6×2 and 3×3 work. Found by the example sweep.
 
+## 17. Gear root gaps still fail to extrude after the #15 retry
+- Two cubic root fillets, the short root arc between them and two lines through the origin (one
+  root gap of an 8-tooth module-0.5 gear) → "the result is not a closed solid" in both windings.
+  The profile is clean: endpoint gaps ~1e-14, no self-crossings.
+- Whole gears: `examples/spur-gear.tsx` still fails at most tooth counts above ~35 (and some
+  small fine-module ones), and `examples/cookbook/gear-pair.tsx` whenever a gear has that many.
+  Joining the Béziers into one B-spline, more pieces, or cubics/lines instead of the arcs don't
+  help; dropping the root fillets does.
+- Repro: `fuzz/sweep-regressions.json` → `sweep-extrude-gear-root`.
+
+## 18. Extruding a profile with 0.008 mm arcs fails
+- A circle minus 34 overlapping flute circles (exact 2D difference) leaves 0.008 mm arcs of the
+  big circle between flutes; extruding it → "the result is not a closed solid".
+- Hit by `examples/agent/d-shaft-knob.tsx` with many flutes on a small knob; the knob now caps
+  the flute count so a land is left. Repro: `sweep-extrude-tiny-arcs`.
+- Also seen by the sweep, not minimised: `chamfer` along a 41-tooth module-1.5 gear outline
+  reports a "largest Distance that fits" of ~0.095 mm, well under the outline's tightest bend
+  (0.22 mm) and shortest edge (0.5 mm); the vase `shell` with extreme radius swings gives
+  "mass::enclosure"; `examples/enclosure.tsx` with large corner radii and thin walls hits the
+  PointClassify gap of #14.
+
+## 19. Extruding the DejaVu Sans glyph "t" at 1–3 mm fails
+- "the result is not a closed solid" at text sizes 1, 1.25 and 1.75–3 (1.5 and ≥ 3.25 work); the
+  other letters of "tscad" extrude at every size. 16 edges: lines and two quadratic B-splines.
+- Hit by `examples/cookbook/name-tag.tsx` on small tags. Repro: `sweep-extrude-glyph-t`.
+
 ## Notes (tscad bugs found and fixed, not kernel bugs)
 - `solidcore_ops::blend` takes the kernel's *native* edge order, not record order (its
   `SetBack` docs say so; the function's own docs read as record indices). tscad now uses

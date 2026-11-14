@@ -46,7 +46,8 @@ export default function Enclosure(p: ParamValues<typeof params>) {
           <union>
             {/* a rounded tub: the outer outline minus the inner one, raised by the floor */}
             <difference>
-              <fillet radius={Math.min(2, p.wall)} edges={edges.bottom()}>
+              {/* the bottom round can't be bigger than the corner radius it runs into */}
+              <fillet radius={Math.min(2, p.wall, p.radius > 0 ? p.radius * 0.9 : 2)} edges={edges.bottom()}>
                 <extrude height={H} x={W / 2} y={D / 2}>
                   <roundedRect w={W} h={D} r={p.radius} />
                 </extrude>

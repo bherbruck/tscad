@@ -21,19 +21,35 @@ export const params = defineParams({
 
 export default function Bracket(p: ParamValues<typeof params>) {
   const t = p.thickness
-  const margin = Math.max(p.holeDiameter, 6)
-  const pitchX = p.holesX > 1 ? (p.width - 2 * margin) / (p.holesX - 1) : 0
-  const pitchY = p.holesY > 1 ? (p.depth - t - 2 * margin) / (p.holesY - 1) : 0
+  const d = p.holeDiameter
+  // the inside-bend fillet, as big as the plate is thick but leaving flat on both legs
+  const bend = Math.min(t, (p.depth - t) / 3, (p.height - t) / 3)
+  // outer corners: no bigger than half the width or the flat part of each leg
+  const corner = Math.max(0, Math.min(p.cornerRadius, p.width / 2 - 1, p.depth - t - bend - 1, p.height - t - bend - 1))
+  const margin = Math.max(d, 6)
+  // holes start past the bend fillet; drop rows/columns that would overlap (pitch ≥ 1.5 Ø)
+  const y0 = t + Math.max(margin, bend + d / 2 + 1)
+  const spanX = p.width - 2 * margin
+  const spanY = p.depth - margin - y0
+  const holesX = Math.max(1, Math.min(p.holesX, Math.floor(spanX / (1.5 * d)) + 1))
+  const holesY = Math.max(1, Math.min(p.holesY, Math.floor(spanY / (1.5 * d)) + 1))
+  const pitchX = holesX > 1 ? spanX / (holesX - 1) : 0
+  const pitchY = holesY > 1 ? spanY / (holesY - 1) : 0
   const gussetSize = Math.min(p.depth, p.height) * 0.6
+  // slots in the upright: centred at 60% height, clear of the bend fillet below
+  const slotBottom = t + bend + 1
+  const slotTop = p.height - Math.max(corner, 1) - 1
+  const slotLength = Math.min(p.height * 0.3, slotTop - slotBottom - d)
+  const slotZ = Math.min(Math.max(p.height * 0.6, slotBottom + (slotLength + d) / 2), slotTop - (slotLength + d) / 2)
 
   return (
     <part name="bracket" color="#4f7cac">
       <difference>
         <union>
           {/* round the outer corners: the base's front corners and the upright's top corners */}
-          <fillet radius={p.cornerRadius} edges={edges.parallel("z").max("y").or(edges.parallel("y").max("z"))}>
+          <fillet radius={corner} edges={edges.parallel("z").max("y").or(edges.parallel("y").max("z"))}>
             {/* a fillet in the inside bend, as wide as the plate */}
-            <fillet radius={t} edges={edges.parallel("x").within([-1, t - 0.01, t - 0.01], [p.width + 1, t + 0.01, t + 0.01])}>
+            <fillet radius={bend} edges={edges.parallel("x").within([-1, t - 0.01, t - 0.01], [p.width + 1, t + 0.01, t + 0.01])}>
               <union>
                 {/* base plate (x: width, y: depth) */}
                 <box size={[p.width, p.depth, t]} center={false} />
@@ -51,16 +67,17 @@ export default function Bracket(p: ParamValues<typeof params>) {
         </union>
 
         {/* mounting holes through the base */}
-        <gridPattern nx={p.holesX} ny={p.holesY} dx={pitchX} dy={pitchY} center={false}>
-          <cylinder r={p.holeDiameter / 2} h={t * 3} x={margin} y={t + margin} z={-t} />
+        <gridPattern nx={holesX} ny={holesY} dx={pitchX} dy={pitchY} center={false}>
+          <cylinder r={d / 2} h={t * 3} x={margin} y={y0} z={-t} />
         </gridPattern>
 
         {/* two vertical adjustment slots through the upright */}
-        {[0.25, 0.75].map((fx) => (
-          <extrude height={t * 3} x={p.width * fx} y={-t} z={p.height * 0.6} rotate={[-90, 0, 0]}>
-            <slot length={p.height * 0.3} width={p.holeDiameter} rotate={90} />
-          </extrude>
-        ))}
+        {slotLength > 0 &&
+          [0.25, 0.75].map((fx) => (
+            <extrude height={t * 3} x={p.width * fx} y={-t} z={slotZ} rotate={[-90, 0, 0]}>
+              <slot length={slotLength} width={d} rotate={90} />
+            </extrude>
+          ))}
       </difference>
     </part>
   )

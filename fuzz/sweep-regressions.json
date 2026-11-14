@@ -1,0 +1,2415 @@
+{
+ "about": "Minimal IR repros of solidcore bugs found by the example param sweep (scripts/sweep-examples.ts, docs/SWEEP.md), in the fuzz/regressions.json style. Evaluate each `ir` document; `expect` says what correct behaviour is, `message` what happens today.",
+ "checked": "2026-11-14T13:52:09.082Z",
+ "regressions": [
+  {
+   "id": "sweep-extrude-gear-root",
+   "oracle": "eval-error",
+   "op": "extrude",
+   "message": "the result is not a closed solid",
+   "expect": "evaluates ok (a simple closed profile: two cubic root fillets, the root arc between them and two lines through the origin)",
+   "source": "examples/spur-gear.tsx (involuteGear 8 teeth, module 0.5, 14.5°); most gears above ~35 teeth fail the same way",
+   "ir": {
+    "parts": [
+     {
+      "name": "g",
+      "node": {
+       "type": "extrude",
+       "profile": [
+        {
+         "type": "nurbs",
+         "degree": 3,
+         "points": [
+          [
+           1.89754,
+           0.38838,
+           0,
+           1
+          ],
+          [
+           1.66027,
+           0.34585,
+           0,
+           1
+          ],
+          [
+           1.33161,
+           0.35727,
+           0,
+           1
+          ],
+          [
+           1.29836,
+           0.45265,
+           0,
+           1
+          ]
+         ],
+         "knots": [
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          1,
+          1
+         ]
+        },
+        {
+         "type": "arc",
+         "center": [
+          0.000013753436853614076,
+          -0.000033138669190746484,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 1.375,
+         "start": 0.3354817494474223,
+         "end": 0.4499640822085281
+        },
+        {
+         "type": "nurbs",
+         "degree": 3,
+         "points": [
+          [
+           1.23815,
+           0.598,
+           0,
+           1
+          ],
+          [
+           1.19422,
+           0.68896,
+           0,
+           1
+          ],
+          [
+           1.41854,
+           0.92944,
+           0,
+           1
+          ],
+          [
+           1.61639,
+           1.06713,
+           0,
+           1
+          ]
+         ],
+         "knots": [
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          1,
+          1
+         ]
+        },
+        {
+         "type": "line",
+         "start": [
+          1.61639,
+          1.06713,
+          0
+         ],
+         "end": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "type": "line",
+         "start": [
+          0,
+          0,
+          0
+         ],
+         "end": [
+          1.89754,
+          0.38838,
+          0
+         ]
+        }
+       ],
+       "direction": [
+        0,
+        0,
+        1
+       ],
+       "distance": 2
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "sweep-union-cylinder-grid",
+   "oracle": "eval-error",
+   "op": "union",
+   "message": "the result is not a closed solid (after ~18 s)",
+   "expect": "evaluates ok: 18 cylinders whose rows overlap; 5×3, 6×2 and 3×3 grids of the same work",
+   "source": "examples/bracket.tsx {width 78, depth 43, holesX 6, holesY 3, holeDiameter 9.7} before the hole-pitch fix",
+   "ir": {
+    "parts": [
+     {
+      "name": "p",
+      "node": {
+       "type": "union",
+       "children": [
+        {
+         "type": "cylinder",
+         "radius": 4.85,
+         "height": 21
+        },
+        {
+         "type": "transform",
+         "matrix": [
+          1,
+          0,
+          0,
+          11.72,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+         ],
+         "children": [
+          {
+           "type": "cylinder",
+           "radius": 4.85,
+           "height": 21
+          }
+         ]
+        },
+        {
+         "type": "transform",
+         "matrix": [
+          1,
+          0,
+          0,
+          23.44,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+         ],
+         "children": [
+          {
+           "type": "cylinder",
+           "radius": 4.85,
+           "height": 21
+          }
+         ]
+        },
+        {
+         "type": "transform",
+         "matrix": [
+          1,
+          0,
+          0,
+          35.160000000000004,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+         ],
+         "children": [
+          {
+           "type": "cylinder",
+           "radius": 4.85,
+           "height": 21
+          }
+         ]
+        },
+        {
+         "type": "transform",
+         "matrix": [
+          1,
+          0,
+          0,
+          46.88,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+         ],
+         "children": [
+          {
+           "type": "cylinder",
+           "radius": 4.85,
+           "height": 21
+          }
+         ]
+        },
+        {
+         "type": "transform",
+         "matrix": [
+          1,
+          0,
+          0,
+          58.6,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+         ],
+         "children": [
+          {
+           "type": "cylinder",
+           "radius": 4.85,
+           "height": 21
+          }
+         ]
+        },
+        {
+         "type": "transform",
+         "matrix": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          8.3,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+         ],
+         "children": [
+          {
+           "type": "cylinder",
+           "radius": 4.85,
+           "height": 21
+          }
+         ]
+        },
+        {
+         "type": "transform",
+         "matrix": [
+          1,
+          0,
+          0,
+          11.72,
+          0,
+          1,
+          0,
+          8.3,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+         ],
+         "children": [
+          {
+           "type": "cylinder",
+           "radius": 4.85,
+           "height": 21
+          }
+         ]
+        },
+        {
+         "type": "transform",
+         "matrix": [
+          1,
+          0,
+          0,
+          23.44,
+          0,
+          1,
+          0,
+          8.3,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+         ],
+         "children": [
+          {
+           "type": "cylinder",
+           "radius": 4.85,
+           "height": 21
+          }
+         ]
+        },
+        {
+         "type": "transform",
+         "matrix": [
+          1,
+          0,
+          0,
+          35.160000000000004,
+          0,
+          1,
+          0,
+          8.3,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+         ],
+         "children": [
+          {
+           "type": "cylinder",
+           "radius": 4.85,
+           "height": 21
+          }
+         ]
+        },
+        {
+         "type": "transform",
+         "matrix": [
+          1,
+          0,
+          0,
+          46.88,
+          0,
+          1,
+          0,
+          8.3,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+         ],
+         "children": [
+          {
+           "type": "cylinder",
+           "radius": 4.85,
+           "height": 21
+          }
+         ]
+        },
+        {
+         "type": "transform",
+         "matrix": [
+          1,
+          0,
+          0,
+          58.6,
+          0,
+          1,
+          0,
+          8.3,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+         ],
+         "children": [
+          {
+           "type": "cylinder",
+           "radius": 4.85,
+           "height": 21
+          }
+         ]
+        },
+        {
+         "type": "transform",
+         "matrix": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          16.6,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+         ],
+         "children": [
+          {
+           "type": "cylinder",
+           "radius": 4.85,
+           "height": 21
+          }
+         ]
+        },
+        {
+         "type": "transform",
+         "matrix": [
+          1,
+          0,
+          0,
+          11.72,
+          0,
+          1,
+          0,
+          16.6,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+         ],
+         "children": [
+          {
+           "type": "cylinder",
+           "radius": 4.85,
+           "height": 21
+          }
+         ]
+        },
+        {
+         "type": "transform",
+         "matrix": [
+          1,
+          0,
+          0,
+          23.44,
+          0,
+          1,
+          0,
+          16.6,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+         ],
+         "children": [
+          {
+           "type": "cylinder",
+           "radius": 4.85,
+           "height": 21
+          }
+         ]
+        },
+        {
+         "type": "transform",
+         "matrix": [
+          1,
+          0,
+          0,
+          35.160000000000004,
+          0,
+          1,
+          0,
+          16.6,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+         ],
+         "children": [
+          {
+           "type": "cylinder",
+           "radius": 4.85,
+           "height": 21
+          }
+         ]
+        },
+        {
+         "type": "transform",
+         "matrix": [
+          1,
+          0,
+          0,
+          46.88,
+          0,
+          1,
+          0,
+          16.6,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+         ],
+         "children": [
+          {
+           "type": "cylinder",
+           "radius": 4.85,
+           "height": 21
+          }
+         ]
+        },
+        {
+         "type": "transform",
+         "matrix": [
+          1,
+          0,
+          0,
+          58.6,
+          0,
+          1,
+          0,
+          16.6,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+         ],
+         "children": [
+          {
+           "type": "cylinder",
+           "radius": 4.85,
+           "height": 21
+          }
+         ]
+        }
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "sweep-extrude-tiny-arcs",
+   "oracle": "eval-error",
+   "op": "extrude",
+   "message": "the result is not a closed solid",
+   "expect": "evaluates ok: a 2D difference of a circle and 34 overlapping flute circles leaves 0.008 mm arcs of the big circle between flutes",
+   "source": "examples/agent/d-shaft-knob.tsx {diameter 22, grips 34} before the flute-count cap",
+   "ir": {
+    "parts": [
+     {
+      "name": "k",
+      "node": {
+       "type": "extrude",
+       "profile": [
+        {
+         "type": "arc",
+         "center": [
+          0,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 11,
+         "start": 0.0920322033865073,
+         "end": 0.0927673644717153
+        },
+        {
+         "type": "arc",
+         "center": [
+          11.40248795633326,
+          2.131494406672216,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          -1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 1.2,
+         "start": 1.9550005875397671,
+         "end": 3.9585855839233712
+        },
+        {
+         "type": "arc",
+         "center": [
+          0,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 11,
+         "start": 0.2768317712447308,
+         "end": 0.2775669323299388
+        },
+        {
+         "type": "arc",
+         "center": [
+          10.816677861090527,
+          4.190403327770974,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          -1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 1.2,
+         "start": 1.7702010196815445,
+         "end": 3.7737860160651504
+        },
+        {
+         "type": "arc",
+         "center": [
+          0,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 11,
+         "start": 0.4616313391029543,
+         "end": 0.4623665001881614
+        },
+        {
+         "type": "arc",
+         "center": [
+          9.862518774463524,
+          6.106613089377326,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          -1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 1.2,
+         "start": 1.585401451823321,
+         "end": 3.588986448206926
+        },
+        {
+         "type": "arc",
+         "center": [
+          0,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 11,
+         "start": 0.6464309069611769,
+         "end": 0.6471660680463849
+        },
+        {
+         "type": "arc",
+         "center": [
+          8.572503439759645,
+          7.814869466300063,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          -1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 1.2,
+         "start": 1.4006018839650984,
+         "end": 3.4041868803487034
+        },
+        {
+         "type": "arc",
+         "center": [
+          0,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 11,
+         "start": 0.8312304748194004,
+         "end": 0.8319656359046084
+        },
+        {
+         "type": "arc",
+         "center": [
+          6.990561781999374,
+          9.256999836450778,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          -1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 1.2,
+         "start": 1.2158023161068758,
+         "end": 3.219387312490479
+        },
+        {
+         "type": "arc",
+         "center": [
+          0,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 11,
+         "start": 1.016030042677623,
+         "end": 1.016765203762831
+        },
+        {
+         "type": "arc",
+         "center": [
+          5.170564927007844,
+          10.383894179718723,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          -1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 1.2,
+         "start": 1.0310027482486515,
+         "end": 3.0345877446322556
+        },
+        {
+         "type": "arc",
+         "center": [
+          0,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 11,
+         "start": 1.2008296105358465,
+         "end": 1.2015647716210545
+        },
+        {
+         "type": "arc",
+         "center": [
+          3.174490684836163,
+          11.1571774608047,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          -1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 1.2,
+         "start": 0.8462031803904289,
+         "end": 2.8497881767740347
+        },
+        {
+         "type": "arc",
+         "center": [
+          0,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 11,
+         "start": 1.385629178394069,
+         "end": 1.386364339479277
+        },
+        {
+         "type": "arc",
+         "center": [
+          1.0703129697743035,
+          11.5505164450224,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          -1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 1.2,
+         "start": 0.6614036125322071,
+         "end": 2.6649886089158104
+        },
+        {
+         "type": "arc",
+         "center": [
+          0,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 11,
+         "start": 1.5704287462522926,
+         "end": 1.5711639073375006
+        },
+        {
+         "type": "arc",
+         "center": [
+          -1.070312969774302,
+          11.550516445022401,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          -1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 1.2,
+         "start": 0.47660404467398276,
+         "end": 2.4801890410575864
+        },
+        {
+         "type": "arc",
+         "center": [
+          0,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 11,
+         "start": 1.755228314110516,
+         "end": 1.755963475195724
+        },
+        {
+         "type": "arc",
+         "center": [
+          -3.1744906848361616,
+          11.1571774608047,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          -1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 1.2,
+         "start": 0.2918044768157584,
+         "end": 2.2953894731993647
+        },
+        {
+         "type": "arc",
+         "center": [
+          0,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 11,
+         "start": 1.9400278819687387,
+         "end": 1.9407630430539466
+        },
+        {
+         "type": "arc",
+         "center": [
+          -5.170564927007838,
+          10.383894179718725,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          -1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 1.2,
+         "start": 0.10700490895753756,
+         "end": 2.1105899053411417
+        },
+        {
+         "type": "arc",
+         "center": [
+          0,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 11,
+         "start": 2.1248274498269613,
+         "end": 2.1255626109121692
+        },
+        {
+         "type": "arc",
+         "center": [
+          -6.990561781999372,
+          9.25699983645078,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          -1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 1.2,
+         "start": 6.205390648278899,
+         "end": 8.208975644662505
+        },
+        {
+         "type": "arc",
+         "center": [
+          0,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 11,
+         "start": 2.309627017685184,
+         "end": 2.3103621787703936
+        },
+        {
+         "type": "arc",
+         "center": [
+          -8.572503439759648,
+          7.814869466300062,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          -1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 1.2,
+         "start": 6.020591080420678,
+         "end": 8.024176076804281
+        },
+        {
+         "type": "arc",
+         "center": [
+          0,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 11,
+         "start": 2.4944265855434082,
+         "end": 2.4951617466286162
+        },
+        {
+         "type": "arc",
+         "center": [
+          -9.862518774463522,
+          6.10661308937733,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          -1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 1.2,
+         "start": 5.835791512562454,
+         "end": 7.839376508946058
+        },
+        {
+         "type": "arc",
+         "center": [
+          0,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 11,
+         "start": 2.679226153401631,
+         "end": 2.679961314486839
+        },
+        {
+         "type": "arc",
+         "center": [
+          -10.816677861090525,
+          4.190403327770978,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          -1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 1.2,
+         "start": 5.650991944704231,
+         "end": 7.654576941087835
+        },
+        {
+         "type": "arc",
+         "center": [
+          0,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 11,
+         "start": 2.8640257212598534,
+         "end": 2.864760882345063
+        },
+        {
+         "type": "arc",
+         "center": [
+          -11.40248795633326,
+          2.1314944066722163,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          -1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 1.2,
+         "start": 5.466192376846008,
+         "end": 7.469777373229612
+        },
+        {
+         "type": "arc",
+         "center": [
+          0,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 11,
+         "start": 3.048825289118078,
+         "end": 3.049560450203286
+        },
+        {
+         "type": "arc",
+         "center": [
+          -11.6,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          -1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 1.2,
+         "start": 5.281392808987784,
+         "end": 7.284977805371389
+        },
+        {
+         "type": "arc",
+         "center": [
+          0,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 11,
+         "start": 3.2336248569763004,
+         "end": 3.2343600180615084
+        },
+        {
+         "type": "arc",
+         "center": [
+          -11.40248795633326,
+          -2.1314944066722132,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          -1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 1.2,
+         "start": 5.096593241129562,
+         "end": 7.100178237513166
+        },
+        {
+         "type": "arc",
+         "center": [
+          0,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 11,
+         "start": 3.4184244248345235,
+         "end": 3.4191595859197315
+        },
+        {
+         "type": "arc",
+         "center": [
+          -10.816677861090529,
+          -4.190403327770971,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          -1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 1.2,
+         "start": 4.911793673271338,
+         "end": 6.9153786696549435
+        },
+        {
+         "type": "arc",
+         "center": [
+          0,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 11,
+         "start": 3.6032239926927465,
+         "end": 3.603959153777955
+        },
+        {
+         "type": "arc",
+         "center": [
+          -9.862518774463524,
+          -6.106613089377327,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          -1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 1.2,
+         "start": 4.726994105413114,
+         "end": 6.730579101796719
+        },
+        {
+         "type": "arc",
+         "center": [
+          0,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 11,
+         "start": 3.78802356055097,
+         "end": 3.788758721636178
+        },
+        {
+         "type": "arc",
+         "center": [
+          -8.572503439759645,
+          -7.814869466300063,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          -1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 1.2,
+         "start": 4.5421945375548916,
+         "end": 6.545779533938496
+        },
+        {
+         "type": "arc",
+         "center": [
+          0,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 11,
+         "start": 3.972823128409193,
+         "end": 3.9735582894944
+        },
+        {
+         "type": "arc",
+         "center": [
+          -6.990561781999383,
+          -9.256999836450772,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          -1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 1.2,
+         "start": 4.357394969696671,
+         "end": 6.360979966080273
+        },
+        {
+         "type": "arc",
+         "center": [
+          0,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 11,
+         "start": 4.157622696267415,
+         "end": 4.158357857352623
+        },
+        {
+         "type": "arc",
+         "center": [
+          -5.170564927007851,
+          -10.38389417971872,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          -1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 1.2,
+         "start": 4.172595401838446,
+         "end": 6.1761803982220504
+        },
+        {
+         "type": "arc",
+         "center": [
+          0,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 11,
+         "start": 4.342422264125639,
+         "end": 4.343157425210848
+        },
+        {
+         "type": "arc",
+         "center": [
+          -3.174490684836164,
+          -11.1571774608047,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          -1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 1.2,
+         "start": 3.987795833980222,
+         "end": 5.991380830363828
+        },
+        {
+         "type": "arc",
+         "center": [
+          0,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 11,
+         "start": 4.527221831983862,
+         "end": 4.52795699306907
+        },
+        {
+         "type": "arc",
+         "center": [
+          -1.0703129697743021,
+          -11.550516445022401,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          -1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 1.2,
+         "start": 3.8029962661219994,
+         "end": 5.8065812625056035
+        },
+        {
+         "type": "arc",
+         "center": [
+          0,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 11,
+         "start": 4.712021399842086,
+         "end": 4.712756560927295
+        },
+        {
+         "type": "arc",
+         "center": [
+          1.0703129697743081,
+          -11.5505164450224,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          -1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 1.2,
+         "start": 3.6181966982637768,
+         "end": 5.621781694647379
+        },
+        {
+         "type": "arc",
+         "center": [
+          0,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 11,
+         "start": 4.896820967700309,
+         "end": 4.897556128785517
+        },
+        {
+         "type": "arc",
+         "center": [
+          3.1744906848361603,
+          -11.1571774608047,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          -1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 1.2,
+         "start": 3.4333971304055506,
+         "end": 5.436982126789159
+        },
+        {
+         "type": "arc",
+         "center": [
+          0,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 11,
+         "start": 5.081620535558532,
+         "end": 5.08235569664374
+        },
+        {
+         "type": "arc",
+         "center": [
+          5.170564927007837,
+          -10.383894179718725,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          -1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 1.2,
+         "start": 3.2485975625473316,
+         "end": 5.252182558930935
+        },
+        {
+         "type": "arc",
+         "center": [
+          0,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 11,
+         "start": 5.266420103416754,
+         "end": 5.267155264501962
+        },
+        {
+         "type": "arc",
+         "center": [
+          6.9905617819993715,
+          -9.256999836450781,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          -1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 1.2,
+         "start": 3.0637979946891067,
+         "end": 5.06738299107271
+        },
+        {
+         "type": "arc",
+         "center": [
+          0,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 11,
+         "start": 5.451219671274978,
+         "end": 5.451954832360185
+        },
+        {
+         "type": "arc",
+         "center": [
+          8.57250343975964,
+          -7.8148694663000695,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          -1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 1.2,
+         "start": 2.878998426830883,
+         "end": 4.88258342321449
+        },
+        {
+         "type": "arc",
+         "center": [
+          0,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 11,
+         "start": 5.6360192391332005,
+         "end": 5.6367544002184085
+        },
+        {
+         "type": "arc",
+         "center": [
+          9.86251877446352,
+          -6.106613089377332,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          -1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 1.2,
+         "start": 2.6941988589726606,
+         "end": 4.697783855356267
+        },
+        {
+         "type": "arc",
+         "center": [
+          0,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 11,
+         "start": 5.820818806991424,
+         "end": 5.821553968076632
+        },
+        {
+         "type": "arc",
+         "center": [
+          10.816677861090527,
+          -4.190403327770975,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          -1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 1.2,
+         "start": 2.5093992911144367,
+         "end": 4.512984287498041
+        },
+        {
+         "type": "arc",
+         "center": [
+          0,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 11,
+         "start": 6.0056183748496474,
+         "end": 6.006353535934855
+        },
+        {
+         "type": "arc",
+         "center": [
+          11.40248795633326,
+          -2.131494406672213,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          -1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 1.2,
+         "start": 2.3245997232562132,
+         "end": 4.328184719639818
+        },
+        {
+         "type": "arc",
+         "center": [
+          0,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 11,
+         "start": 6.190417942707871,
+         "end": 6.191153103793079
+        },
+        {
+         "type": "arc",
+         "center": [
+          11.6,
+          0,
+          0
+         ],
+         "axis": [
+          0,
+          0,
+          -1
+         ],
+         "reference": [
+          1,
+          0,
+          0
+         ],
+         "radius": 1.2,
+         "start": 2.1398001553979906,
+         "end": 4.143385151781596
+        }
+       ],
+       "direction": [
+        0,
+        0,
+        1
+       ],
+       "distance": 17
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "sweep-extrude-glyph-t",
+   "oracle": "eval-error",
+   "op": "extrude",
+   "message": "the result is not a closed solid",
+   "expect": "evaluates ok: the DejaVu Sans \"t\" at size 2 (16 edges: lines and two quadratic B-splines)",
+   "source": "examples/cookbook/name-tag.tsx with a small tag (text size ≈ 3); \"t\" fails at sizes 1–3 except 1.5, the other letters of \"tscad\" never",
+   "ir": {
+    "parts": [
+     {
+      "name": "t",
+      "node": {
+       "type": "extrude",
+       "profile": [
+        {
+         "type": "line",
+         "start": [
+          0.185546875,
+          1.404296875,
+          0
+         ],
+         "end": [
+          0.185546875,
+          1.09375,
+          0
+         ]
+        },
+        {
+         "type": "line",
+         "start": [
+          0.185546875,
+          1.09375,
+          0
+         ],
+         "end": [
+          0.0537109375,
+          1.09375,
+          0
+         ]
+        },
+        {
+         "type": "line",
+         "start": [
+          0.0537109375,
+          1.09375,
+          0
+         ],
+         "end": [
+          0.0537109375,
+          0.9541015625,
+          0
+         ]
+        },
+        {
+         "type": "line",
+         "start": [
+          0.0537109375,
+          0.9541015625,
+          0
+         ],
+         "end": [
+          0.185546875,
+          0.9541015625,
+          0
+         ]
+        },
+        {
+         "type": "line",
+         "start": [
+          0.185546875,
+          0.9541015625,
+          0
+         ],
+         "end": [
+          0.185546875,
+          0.3603515625,
+          0
+         ]
+        },
+        {
+         "type": "nurbs",
+         "degree": 2,
+         "points": [
+          [
+           0.185546875,
+           0.3603515625,
+           0,
+           1
+          ],
+          [
+           0.185546875,
+           0.1552734375,
+           0,
+           1
+          ],
+          [
+           0.2646484375,
+           0.07763671875,
+           0,
+           1
+          ],
+          [
+           0.34375,
+           0,
+           0,
+           1
+          ],
+          [
+           0.5517578125,
+           0,
+           0,
+           1
+          ]
+         ],
+         "knots": [
+          0,
+          0,
+          0,
+          0.5,
+          0.5,
+          1,
+          1,
+          1
+         ]
+        },
+        {
+         "type": "line",
+         "start": [
+          0.5517578125,
+          0,
+          0
+         ],
+         "end": [
+          0.736328125,
+          0,
+          0
+         ]
+        },
+        {
+         "type": "line",
+         "start": [
+          0.736328125,
+          0,
+          0
+         ],
+         "end": [
+          0.736328125,
+          0.150390625,
+          0
+         ]
+        },
+        {
+         "type": "line",
+         "start": [
+          0.736328125,
+          0.150390625,
+          0
+         ],
+         "end": [
+          0.5517578125,
+          0.150390625,
+          0
+         ]
+        },
+        {
+         "type": "nurbs",
+         "degree": 2,
+         "points": [
+          [
+           0.5517578125,
+           0.150390625,
+           0,
+           1
+          ],
+          [
+           0.439453125,
+           0.150390625,
+           0,
+           1
+          ],
+          [
+           0.40283203125,
+           0.1884765625,
+           0,
+           1
+          ],
+          [
+           0.3662109375,
+           0.2265625,
+           0,
+           1
+          ],
+          [
+           0.3662109375,
+           0.3603515625,
+           0,
+           1
+          ]
+         ],
+         "knots": [
+          0,
+          0,
+          0,
+          0.5,
+          0.5,
+          1,
+          1,
+          1
+         ]
+        },
+        {
+         "type": "line",
+         "start": [
+          0.3662109375,
+          0.3603515625,
+          0
+         ],
+         "end": [
+          0.3662109375,
+          0.9541015625,
+          0
+         ]
+        },
+        {
+         "type": "line",
+         "start": [
+          0.3662109375,
+          0.9541015625,
+          0
+         ],
+         "end": [
+          0.736328125,
+          0.9541015625,
+          0
+         ]
+        },
+        {
+         "type": "line",
+         "start": [
+          0.736328125,
+          0.9541015625,
+          0
+         ],
+         "end": [
+          0.736328125,
+          1.09375,
+          0
+         ]
+        },
+        {
+         "type": "line",
+         "start": [
+          0.736328125,
+          1.09375,
+          0
+         ],
+         "end": [
+          0.3662109375,
+          1.09375,
+          0
+         ]
+        },
+        {
+         "type": "line",
+         "start": [
+          0.3662109375,
+          1.09375,
+          0
+         ],
+         "end": [
+          0.3662109375,
+          1.404296875,
+          0
+         ]
+        },
+        {
+         "type": "line",
+         "start": [
+          0.3662109375,
+          1.404296875,
+          0
+         ],
+         "end": [
+          0.185546875,
+          1.404296875,
+          0
+         ]
+        }
+       ],
+       "direction": [
+        0,
+        0,
+        1
+       ],
+       "distance": 1
+      }
+     }
+    ]
+   }
+  }
+ ],
+ "count": 4
+}

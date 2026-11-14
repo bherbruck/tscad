@@ -34,6 +34,8 @@ function HookPath({ z, reach, bend, rise, tilt }: { z: number; reach: number; be
 export default function CoatHook(p: ParamValues<typeof params>) {
   const width = Math.max(24, p.rod * 3)
   const hookZ = p.plate * 0.3
+  // the bend's centre-line radius must clear the rod's radius, or the swept tube folds onto itself
+  const bend = Math.max(p.bend, p.rod / 2 + 1)
   return (
     <part name="coat-hook" material="petg">
       <difference>
@@ -44,7 +46,7 @@ export default function CoatHook(p: ParamValues<typeof params>) {
           </extrude>
           <sweep>
             <sweepPath plane="YZ">
-              <HookPath z={hookZ} reach={p.reach} bend={p.bend} rise={p.rise} tilt={p.tilt} />
+              <HookPath z={hookZ} reach={p.reach} bend={bend} rise={p.rise} tilt={p.tilt} />
             </sweepPath>
             <circle d={p.rod} />
           </sweep>

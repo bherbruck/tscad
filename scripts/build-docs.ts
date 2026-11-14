@@ -44,7 +44,9 @@ const docPages: DocPage[] = [
   { path: "docs/guide.html", title: "Guide", src: join(DOCS, "guide.md") },
   { path: "docs/sketch.html", title: "Constraint sketches", src: join(DOCS, "sketch.md") },
   { path: "docs/assembly.html", title: "Assemblies & mates", src: join(DOCS, "assembly.md") },
+  { path: "docs/sheet-metal.html", title: "Sheet metal", src: join(DOCS, "sheet-metal.md") },
   { path: "docs/cookbook.html", title: "Cookbook", src: join(DOCS, "cookbook.md") },
+  { path: "docs/sweep.html", title: "Param sweep", src: join(DOCS, "SWEEP.md") },
   { path: "docs/convert.html", title: "Converting OpenSCAD", src: join(DOCS, "convert.md") },
   { path: "docs/selectors.html", title: "Selectors", src: join(CONTENT, "selectors.md") },
   { path: "docs/checks.html", title: "Checks & testing", src: join(DOCS, "checks.md") },
@@ -86,6 +88,7 @@ const GROUPS: [string, string, string[]][] = [
   ["Sketch → solid", "Turn 2D shapes into solids.", ["extrude", "revolve", "loft", "sweep", "sweepPath"]],
   ["Patterns", "Repeat children.", ["linearPattern", "gridPattern", "polarPattern"]],
   ["Features", "Round, bevel, hollow, draft, push/pull and split. Edges and faces are picked with selectors.", ["fillet", "chamfer", "shell", "draft", "pushPull", "offsetFaces", "split"]],
+  ["Sheet metal", "Bent sheet parts from a base outline: flanges, edge flanges, hems and jogs, with the flat pattern as cut/bend drawings. See the sheet-metal guide.", ["sheetMetal", "flange", "edgeFlange", "hem", "jog"]],
   ["Features on faces", "Sketch on a face of a solid, then pocket into it, raise a boss from it or cut through. The face is picked with a selector; x, y and rotate place the sketch in the face.", ["pocket", "boss", "cutThrough", "onFace"]],
 ];
 
@@ -100,7 +103,7 @@ const allGroups: [string, string, string[]][] = [
 ];
 
 const sidebar: NavGroup[] = [
-  { title: "Start", items: docPages.filter((p) => ["docs/getting-started.html", "docs/guide.html", "docs/cookbook.html", "docs/sketch.html", "docs/assembly.html"].includes(p.path)).map((p) => ({ title: p.title, href: p.path })) },
+  { title: "Start", items: docPages.filter((p) => ["docs/getting-started.html", "docs/guide.html", "docs/cookbook.html", "docs/sketch.html", "docs/assembly.html", "docs/sheet-metal.html"].includes(p.path)).map((p) => ({ title: p.title, href: p.path })) },
   {
     title: "Reference",
     items: [
@@ -110,7 +113,7 @@ const sidebar: NavGroup[] = [
       { title: "API", href: "reference/api.html" },
     ],
   },
-  { title: "More", items: [...docPages.filter((p) => ["docs/checks.html", "docs/convert.html", "docs/mcp.html", "docs/mcp-dogfood.html", "docs/kernel.html", "docs/architecture.html"].includes(p.path)).map((p) => ({ title: p.title, href: p.path })), { title: "Gallery", href: "gallery/index.html" }] },
+  { title: "More", items: [...docPages.filter((p) => ["docs/checks.html", "docs/convert.html", "docs/mcp.html", "docs/mcp-dogfood.html", "docs/kernel.html", "docs/sweep.html", "docs/architecture.html"].includes(p.path)).map((p) => ({ title: p.title, href: p.path })), { title: "Gallery", href: "gallery/index.html" }] },
 ];
 
 // ---------------------------------------------------------------------------------------------
@@ -130,6 +133,8 @@ const DOC_LINKS: Record<string, string> = {
   "cookbook.md": "docs/cookbook.html",
   "convert.md": "docs/convert.html",
   "api.md": "reference/api.html",
+  "sheet-metal.md": "docs/sheet-metal.html",
+  "SWEEP.md": "docs/sweep.html",
 };
 
 /** Rewrite a markdown URL found in `srcFile`, for a page at `pagePath`. */

@@ -106,6 +106,9 @@ The first release: CAD as TSX.
   - `tscad dev <folder>` (or a folder without `index.tsx`) serves a gallery of every model in the
     tree: thumbnails, doc-comment titles and descriptions, parts, volume and error badges, with
     filter and sort. Thumbnails are cached in `.tscad/cache/` (which `tscad init` gitignores).
+  - `tscad plate` orients each part for the least overhang and packs parts (and copies) onto
+    as many beds as needed, writing a 3MF (with per-object orientation notes) or STL per plate.
+    The viewer has the same as Plate mode (`P`), and MCP has `tscad_plate`.
   - `tscad render <folder> -o <dir>` renders every model to `<dir>/<path>.png` through the same
     cache, and `tscad render file --json` prints each part's status and volume.
 - **Viewer:**

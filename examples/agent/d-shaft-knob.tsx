@@ -22,12 +22,14 @@ export default function Knob(p: ParamValues<typeof params>) {
   const R = p.diameter / 2
   const r = p.shaft / 2 + p.fit
   const flatAt = p.flat - p.shaft / 2 + p.fit // from the shaft axis to the flat
+  // flutes (Ø 2.4) at least 2.8 mm apart around the rim, so a land is left between neighbours
+  const grips = Math.min(p.grips, Math.floor((2 * Math.PI * R) / 2.8))
   // the fluted rim and the D bore are 2D booleans: one extrude each instead of 24 + 2 solid cuts
   const rim = (
     <difference2d>
       <circle r={R} />
-      {Array.from({ length: p.grips }, (_, i) => {
-        const a = (i * 2 * Math.PI) / p.grips
+      {Array.from({ length: grips }, (_, i) => {
+        const a = (i * 2 * Math.PI) / grips
         return <circle key={i} r={1.2} x={(R + 0.6) * Math.cos(a)} y={(R + 0.6) * Math.sin(a)} />
       })}
     </difference2d>

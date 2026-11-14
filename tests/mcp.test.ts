@@ -67,7 +67,7 @@ describe("mcp server", () => {
       expect(r.get(1).result.serverInfo.name).toBe("tscad");
       // tools/list
       const names = r.get(2).result.tools.map((t: any) => t.name);
-      expect(names).toEqual(expect.arrayContaining(["tscad_evaluate", "tscad_render", "tscad_export", "tscad_pick_selectors", "tscad_list_examples", "tscad_read_example", "tscad_docs", "tscad_check"]));
+      expect(names).toEqual(expect.arrayContaining(["tscad_evaluate", "tscad_render", "tscad_export", "tscad_pick_selectors", "tscad_list_examples", "tscad_read_example", "tscad_docs", "tscad_check", "tscad_plate"]));
       for (const t of r.get(2).result.tools) expect(t.inputSchema.type).toBe("object");
       // evaluate
       const ev = r.get(3).result;
@@ -160,6 +160,15 @@ describe("mcp server", () => {
       const svg = (await h(call(6, "tscad_export", { source: box, format: "svg", path: join(dir, "b.svg") }))) as any;
       expect(svg.result.content[0].text).toContain("section of b at z = 5");
       expect(existsSync(join(dir, "b.svg"))).toBe(true);
+      // a tall thin box is laid on its side; two copies of the 200 mm plank need two 150 mm beds
+      const parts = `export default () => <><part name="post"><box size={[10, 10, 60]} /></part><part name="plank"><box size={[200, 30, 5]} /></part></>`;
+      const pl = (await h(call(7, "tscad_plate", { source: parts, bed: [220, 150], copies: { plank: 2 }, path: join(dir, "p.3mf") }))) as any;
+      const sc = pl.result.structuredContent;
+      expect(sc.items.map((i: any) => i.part).sort()).toEqual(["plank", "plank", "post"]);
+      expect(sc.items.find((i: any) => i.part === "post").height).toBeCloseTo(10, 3);
+      expect(sc.files.length).toBe(sc.plates);
+      expect(pl.result.content[0].text).toContain("| post |");
+      for (const f of sc.files) expect(readFileSync(f).subarray(0, 2).toString()).toBe("PK");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

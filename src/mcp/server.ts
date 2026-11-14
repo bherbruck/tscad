@@ -11,7 +11,7 @@ export const PROTOCOL_VERSION = "2025-06-18";
 const SUPPORTED = [PROTOCOL_VERSION, "2025-03-26", "2024-11-05"];
 
 const INSTRUCTIONS = `tscad: parametric CAD as TSX (React-style JSX → exact B-rep solids, STEP/STL/3MF export).
-Start with tscad_docs (the authoring guide; then {"element": ...} for exact props), look at an example with tscad_read_example, write the model TSX, check it with tscad_evaluate (errors point at TSX lines), tscad_render (PNG) and tscad_check (printability, interference), then tscad_export. Units are mm and degrees, Z up; <box>/<cylinder> sit centred on z = 0.`;
+Start with tscad_docs (the authoring guide; then {"element": ...} for exact props), look at an example with tscad_read_example, write the model TSX, check it with tscad_evaluate (errors point at TSX lines), tscad_render (PNG) and tscad_check (printability, interference), then tscad_export (or tscad_plate for a print-ready layout). Units are mm and degrees, Z up; <box>/<cylinder> sit centred on z = 0.`;
 
 type Id = string | number;
 interface Request {

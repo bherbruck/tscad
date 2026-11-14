@@ -93,6 +93,7 @@ bunx tscad build index.tsx -o plate.3mf -p width=80     # override a parameter
 bunx tscad info index.tsx                               # params, volumes, masses
 bunx tscad render index.tsx -o plate.png --view iso     # a PNG, no browser needed
 bunx tscad render models/ -o images/                     # every model in a folder (cached)
+bunx tscad plate index.tsx -o plate.3mf --copies leg=4  # oriented and packed for printing
 ```
 
 Formats: `step` (exact B-rep, AP242), `stl`, `3mf` (with colours), `glb`, `obj`. `dxf` and `svg`

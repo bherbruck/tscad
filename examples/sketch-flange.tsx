@@ -23,6 +23,19 @@ export const params = defineParams({
 
 export default function Flange(p: ParamValues<typeof params>) {
   const R = p.diameter / 2
+  // derived so any slider combination stays a valid flange, with at least `gap` of material
+  // between features (the top-edge fillet needs room)
+  const gap = 4
+  const bore = Math.min(p.bore, p.diameter - 4 * gap)
+  const lugR = Math.min(p.lugRadius, 0.45 * R)
+  const reach = Math.max(p.lugReach, R + 0.3 * lugR) // the lug must stick out of the disc
+  const lugHole = Math.max(1, Math.min(p.lugHole, 2 * (lugR - gap)))
+  // bolt circle between the bore and the rim; fewer bolts if they would touch
+  const hole = Math.min(p.boltHole, R - bore / 2 - 2 * gap)
+  const bc = Math.min(Math.max(p.boltCircle / 2, bore / 2 + hole / 2 + gap), R - hole / 2 - gap)
+  const maxBolts = hole > 1 ? Math.floor(Math.PI / Math.asin(Math.min(1, (hole + gap) / (2 * bc)))) : 0
+  const bolts = Math.min(p.bolts, maxBolts)
+  const withBolts = hole > 1 && bolts >= 2
   return (
     <part name="flange" material="steel">
       <fillet radius={1} edges={edges.max("z")}>
@@ -34,8 +47,8 @@ export default function Flange(p: ParamValues<typeof params>) {
             {/* right lug: centre on the X axis, end arc, two tangent lines into the flange */}
             <point id="lug" />
             <horizontal a="o" b="lug" />
-            <dimension a="o" b="lug" dx={p.lugReach} />
-            <arc id="lugEnd" center="lug" from="l1" to="l2" radius={p.lugRadius} />
+            <dimension a="o" b="lug" dx={reach} />
+            <arc id="lugEnd" center="lug" from="l1" to="l2" radius={lugR} />
             <line id="lugTop" from="l2" to="m2" tangent="lugEnd" />
             <line id="lugBottom" from="m1" to="l1" tangent="lugEnd" />
 
@@ -45,13 +58,17 @@ export default function Flange(p: ParamValues<typeof params>) {
             <mirrorEntities about="axis" of={["lugEnd", "lugTop", "lugBottom"]} />
 
             {/* holes: bore, lug holes, bolt circle */}
-            <circle center="o" diameter={p.bore} />
-            <circle center="lug" diameter={p.lugHole} />
-            <circle center="lug'" diameter={p.lugHole} />
-            <circle id="bolt" center="b" diameter={p.boltHole} />
-            <dimension a="o" b="b" distance={p.boltCircle / 2} />
-            <line from="o" to="b" angle={90 + 180 / p.bolts} construction />
-            <circularPattern center="o" count={p.bolts} of={["bolt"]} />
+            <circle center="o" diameter={bore} />
+            <circle center="lug" diameter={lugHole} />
+            <circle center="lug'" diameter={lugHole} />
+            {withBolts && (
+              <>
+                <circle id="bolt" center="b" diameter={hole} />
+                <dimension a="o" b="b" distance={bc} />
+                <line from="o" to="b" angle={90 + 180 / bolts} construction />
+                <circularPattern center="o" count={bolts} of={["bolt"]} />
+              </>
+            )}
           </sketch>
         </extrude>
       </fillet>

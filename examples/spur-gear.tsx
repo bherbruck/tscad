@@ -24,6 +24,51 @@ type Pt = [number, number]
  * a cubic Bézier (Hermite: exact ends and tangents), blended into the root circle by a tangent
  * fillet, with exact arcs along the tip and root circles. Smooth flanks become single B-rep faces.
  */
+/** Where an involute flank starts (involute parameter `t0`). */
+function flankStart(teeth: number, module: number, pressureDeg: number): number {
+  const alpha = (pressureDeg * Math.PI) / 180
+  const r = (module * teeth) / 2
+  const rb = r * Math.cos(alpha)
+  const tAt = (radius: number) => Math.sqrt(Math.max(0, (radius / rb) ** 2 - 1))
+  // Start a hair above the base circle: the involute's tangent vanishes exactly on it.
+  return Math.max(tAt(Math.max(rb, r - 1.25 * module)), tAt(r + module) * 0.03)
+}
+
+/**
+ * The widest chamfer the kernel takes along SVG path data: under the tightest bend radius of
+ * its cubic pieces (sampled), and under half its shortest piece (the kernel's own limit).
+ */
+export function chamferLimit(d: string): number {
+  const tok = d.match(/[A-Za-z]|-?[\d.]+(?:e-?\d+)?/g) ?? []
+  let bend = Infinity
+  let shortest = Infinity
+  let p: Pt = [0, 0]
+  const to = (q: Pt) => {
+    shortest = Math.min(shortest, Math.hypot(q[0] - p[0], q[1] - p[1]))
+    p = q
+  }
+  for (let i = 0; i < tok.length; ) {
+    const cmd = tok[i++]!
+    const n = (k: number) => tok.slice(i, i + k).map(Number)
+    if (cmd === "M" || cmd === "L") (p = n(2) as Pt), (i += 2)
+    else if (cmd === "A") to(n(7).slice(5) as Pt), (i += 7)
+    else if (cmd === "C") {
+      const [bx, by, cx, cy, dx, dy] = n(6)
+      const a = p, b: Pt = [bx!, by!], c: Pt = [cx!, cy!], e: Pt = [dx!, dy!]
+      for (let k = 0; k <= 64; k++) {
+        const t = k / 64, u = 1 - t
+        const d1 = [0, 1].map((j) => 3 * u * u * (b[j]! - a[j]!) + 6 * u * t * (c[j]! - b[j]!) + 3 * t * t * (e[j]! - c[j]!))
+        const d2 = [0, 1].map((j) => 6 * u * (c[j]! - 2 * b[j]! + a[j]!) + 6 * t * (e[j]! - 2 * c[j]! + b[j]!))
+        const cross = Math.abs(d1[0]! * d2[1]! - d1[1]! * d2[0]!)
+        if (cross > 1e-12) bend = Math.min(bend, Math.hypot(d1[0]!, d1[1]!) ** 3 / cross)
+      }
+      to(e)
+      i += 6
+    }
+  }
+  return Math.min(bend * 0.8, shortest * 0.45)
+}
+
 export function involuteGear(teeth: number, module: number, pressureDeg: number, pieces = 1): string {
   const alpha = (pressureDeg * Math.PI) / 180
   const r = (module * teeth) / 2 // pitch radius
@@ -35,8 +80,7 @@ export function involuteGear(teeth: number, module: number, pressureDeg: number,
   const half = Math.PI / (2 * teeth) + inv(alpha)
   const tAt = (radius: number) => Math.sqrt(Math.max(0, (radius / rb) ** 2 - 1))
   const t1 = tAt(ra)
-  // Start a hair above the base circle: the involute's tangent vanishes exactly on it.
-  const t0 = Math.max(tAt(Math.max(rb, rf)), t1 * 0.03)
+  const t0 = flankStart(teeth, module, pressureDeg)
 
   const polar = (radius: number, angle: number): Pt => [radius * Math.cos(angle), radius * Math.sin(angle)]
   // A flank as a function of the involute parameter t: side -1 leads, +1 trails.
@@ -106,6 +150,7 @@ export default function SpurGear(p: ParamValues<typeof params>) {
   const holeOrbit = (hubR + webR) / 2
   const holeR = Math.min((webR - hubR) / 2 - 1.5, (Math.PI * holeOrbit) / 6 - 1.5)
   const showHoles = p.lightening && holeR > 1.5
+  const outline = involuteGear(p.teeth, p.module, p.pressureAngle)
 
   return (
     <part name="gear" color="#c8a24a">
@@ -113,9 +158,10 @@ export default function SpurGear(p: ParamValues<typeof params>) {
       <chamfer distance={0.5} edges={edges.radius(p.bore / 2)}>
         <difference>
           <union>
-            <chamfer distance={p.toothChamfer ? p.module * 0.2 : 0} edges=">Z or <Z">
+            {/* no wider than the outline's tightest bend or half its shortest edge */}
+            <chamfer distance={p.toothChamfer ? Math.min(p.module * 0.07, chamferLimit(outline)) : 0} edges=">Z or <Z">
               <extrude height={p.thickness}>
-                <path d={involuteGear(p.teeth, p.module, p.pressureAngle)} />
+                <path d={outline} />
               </extrude>
             </chamfer>
             {p.hub && <cylinder r={hubR} h={p.thickness * 1.6} />}

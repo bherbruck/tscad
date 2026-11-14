@@ -24,6 +24,15 @@ const PAIRS = [["b0", "b1"], ["h0", "h1"], ["w0", "w1"], ["k0", "k1"], ["r0", "r
 
 export default function Pulley(p: ParamValues<typeof params>) {
   const R = p.diameter / 2
+  // keep the section valid whatever the sliders say: bore < hub < rim < diameter, the groove
+  // inside the rim, the web inside the width
+  const hub = Math.min(p.hub, p.diameter - 8)
+  const bore = Math.min(p.bore, hub - 4)
+  const rim = Math.max(2, Math.min(p.rimThickness, R - hub / 2 - 2))
+  const tanHalf = Math.tan((p.grooveAngle * Math.PI) / 360)
+  const depth = Math.min(p.grooveDepth, rim - 1.5, (p.width - 1.5) / (2 * tanHalf))
+  const grooveBottom = Math.max(0.5, Math.min(p.grooveBottom, p.width - 1 - 2 * depth * tanHalf))
+  const web = Math.min(p.web, p.width - 1)
   return (
     <part name="pulley" material="aluminum">
       <revolve>
@@ -32,7 +41,7 @@ export default function Pulley(p: ParamValues<typeof params>) {
           <point id="mid" x={0} y={p.width / 2} fixed />
 
           {/* lower half, from the bore outwards: hub, web, rim, groove flank */}
-          <point id="b0" x={p.bore / 2} y={0} fixed />
+          <point id="b0" x={bore / 2} y={0} fixed />
           <line from="b0" to="h0" horizontal />
           <line from="h0" to="w0" vertical />
           <line from="w0" to="k0" horizontal />
@@ -41,15 +50,15 @@ export default function Pulley(p: ParamValues<typeof params>) {
           <line from="o0" to="g0" vertical />
           <line id="flank" from="g0" to="q0" angle={180 - p.grooveAngle / 2} />
           <line id="bottom" from="q0" to="q1" />
-          <dimension a="q0" b="q1" dy={p.grooveBottom} />
+          <dimension a="q0" b="q1" dy={grooveBottom} />
           <horizontal a="b0" b="o0" />
 
           {/* dimensions from the axis */}
-          <dimension a="axis" b="h0" dx={p.hub / 2} />
+          <dimension a="axis" b="h0" dx={hub / 2} />
           <dimension a="axis" b="o0" dx={R} />
-          <dimension a="k0" b="o0" dx={p.rimThickness} />
-          <dimension a="q0" b="o0" dx={p.grooveDepth} />
-          <dimension a="axis" b="w0" dy={(p.width - p.web) / 2} />
+          <dimension a="k0" b="o0" dx={rim} />
+          <dimension a="q0" b="o0" dx={depth} />
+          <dimension a="axis" b="w0" dy={(p.width - web) / 2} />
 
           {/* upper half: mirror images, joined back up */}
           {PAIRS.map(([a, b]) => <symmetric a={a} b={b} about="mid" axis="y" />)}

@@ -106,6 +106,10 @@ export default function CableClip(p: ParamValues<typeof params>) {
   const r = p.cable / 2
   const R = r + p.wall
   const tab = 12
+  // The opening's floor sits 0.4 r above the centre; a wider opening than where the bore meets
+  // that floor (less the 0.6 mm round) would leave a sliver of jaw too thin to round.
+  const maxHalf = Math.sqrt(Math.max(0, r * r - (r * 0.4 + 0.6) ** 2))
+  const opening = Math.min(p.cable * p.opening, 2 * maxHalf)
   return (
     <part name="clip" material="petg">
       <fillet radius={0.6} edges="|Y">
@@ -117,7 +121,7 @@ export default function CableClip(p: ParamValues<typeof params>) {
           {/* the cable */}
           <cylinder r={r} h={p.width + 2} rotateX={90} y={p.width / 2 + 1} z={R} />
           {/* the snap opening at the top */}
-          <box size={[p.cable * p.opening, p.width + 2, R]} z={R + r * 0.4} />
+          <box size={[opening, p.width + 2, R]} z={R + r * 0.4} />
           <CountersinkHole size="M3" depth={p.wall} x={R + tab / 2} z={p.wall} />
           <CountersinkHole size="M3" depth={p.wall} x={-R - tab / 2} z={p.wall} />
         </difference>
@@ -336,11 +340,14 @@ export const params = defineParams({
 })
 
 export default function NameTag(p: ParamValues<typeof params>) {
-  const hole = p.height * 0.18
-  const textSize = Math.min(p.height * 0.5, ((p.width - 4 * hole) / Math.max(1, p.name.length)) * 1.6)
+  // sized from the short side, so tall narrow tags stay valid
+  const short = Math.min(p.width, p.height)
+  const hole = short * 0.18
+  // the name fills the width right of the hole, but no taller than half the tag
+  const textSize = Math.max(1, Math.min(p.height * 0.5, ((p.width - 4 * hole) / Math.max(1, p.name.length)) * 1.6))
   const outline = (
     <>
-      <roundedRect w={p.width} h={p.height} r={p.height / 4} />
+      <roundedRect w={p.width} h={p.height} r={short / 4} />
       <circle r={hole / 2} x={-p.width / 2 + hole * 1.4} />
     </>
   )

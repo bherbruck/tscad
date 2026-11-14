@@ -244,6 +244,7 @@ an OpenSCAD model you paste or open. `tscad dev` gives you the same viewer local
 - pick-to-selector;
 - a **gallery** when you point it at a folder (`tscad dev examples/`): every model as a card with
   a thumbnail, its doc comment, parts and volume;
+- **plate mode** (`P`): parts oriented and packed on bed outlines, downloadable as 3MF;
 - **geometry diff** (`D`): after each edit, added material shows green and removed material
   red, with per-part Δvolume. **Pin** a version to compare later edits against it.
 
@@ -310,6 +311,7 @@ One npm package, `tscad`, with subpath exports. The full API is in [docs/api.md]
 | `tscad build [file] -o out.step` | `step` `stl` `3mf` `glb` `obj` `dxf` `svg`; `-p key=value`, `-t <mm>`, `--part`, `--json` |
 | `tscad info [file]` | params, volume, mass and bounds per part |
 | `tscad render [file\|folder] -o out.png` | `--view iso\|front\|top\|…`, `--width`, `--background`, `--ortho`, `--json`; a folder renders every model into `-o <dir>` (cached) |
+| `tscad plate [file] -o plate.3mf` | orient parts for printing and pack them onto beds (`--bed 256x256`, `--spacing`, `--copies part=n`, `--orient auto\|keep`, `--json`); several plates → `plate-1.3mf`, … |
 | `tscad convert in.scad -o out.tsx` | convert an OpenSCAD model |
 | `tscad mcp` | MCP server over stdio |
 

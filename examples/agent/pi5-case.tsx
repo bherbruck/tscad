@@ -56,9 +56,11 @@ export default function Pi5Case(p: ParamValues<typeof params>) {
           {/* GPIO header slot along the back edge */}
           <box size={[52, 7, p.wall * 3]} x={-bw / 2 + 32.5} y={bd / 2 - 3.5} z={top - split - p.wall * 2} />
           {/* vent slots over the SoC */}
-          <linearPattern count={p.vents} dx={5} center>
-            <box size={[2, 30, p.wall * 3]} y={-6} z={top - split - p.wall * 2} />
-          </linearPattern>
+          {p.vents > 0 && (
+            <linearPattern count={p.vents} dx={5} center>
+              <box size={[2, 30, p.wall * 3]} y={-6} z={top - split - p.wall * 2} />
+            </linearPattern>
+          )}
         </difference>
       </part>
     </assembly>

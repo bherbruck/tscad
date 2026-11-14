@@ -1911,7 +1911,13 @@ function solve(sketch: Host, hooks: SolveHooks): Solved {
   }
   if (an.dof > 0 && !sketch.props.allowFree) hooks.warn(sketch, `under-constrained: ${an.dof} degree${an.dof === 1 ? "" : "s"} of freedom remain (free: ${free.slice(0, 6).join(", ")}${free.length > 6 ? `, +${free.length - 6} more` : ""}); solved near the drawn positions`);
 
+  // round near-round values for clean output, then polish so every constraint still holds to
+  // full precision (rounding a centre by 1e-8 would open a gap the kernel can see)
   for (let i = 0; i < x.length; i++) x[i] = snapVal(x[i]!);
+  {
+    const polished = lm(sys, order, x, 20);
+    if (polished.converged && polished.residual > 0) for (let i = 0; i < x.length; i++) x[i] = polished.x[i]!;
+  }
   const info: SolvedSketch = {
     ...(sketch.loc ? { loc: sketch.loc } : {}),
     status,

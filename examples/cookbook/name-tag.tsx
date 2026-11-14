@@ -13,11 +13,14 @@ export const params = defineParams({
 })
 
 export default function NameTag(p: ParamValues<typeof params>) {
-  const hole = p.height * 0.18
-  const textSize = Math.min(p.height * 0.5, ((p.width - 4 * hole) / Math.max(1, p.name.length)) * 1.6)
+  // sized from the short side, so tall narrow tags stay valid
+  const short = Math.min(p.width, p.height)
+  const hole = short * 0.18
+  // the name fills the width right of the hole, but no taller than half the tag
+  const textSize = Math.max(1, Math.min(p.height * 0.5, ((p.width - 4 * hole) / Math.max(1, p.name.length)) * 1.6))
   const outline = (
     <>
-      <roundedRect w={p.width} h={p.height} r={p.height / 4} />
+      <roundedRect w={p.width} h={p.height} r={short / 4} />
       <circle r={hole / 2} x={-p.width / 2 + hole * 1.4} />
     </>
   )

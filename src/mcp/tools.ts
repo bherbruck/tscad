@@ -14,6 +14,8 @@ import { checkInterference, checkPrintability, checkWatertight } from "../check"
 import { massOf } from "../core/materials";
 import { section, toDXF, toSVG } from "../drawing";
 import { exportModel, type ExportFormat } from "../export";
+import { toSTL } from "../export/stl";
+import { orientationNote, plate3MF, plateParts, transformMesh } from "../plate";
 import type { MeshArrays } from "../kernel";
 import { renderPNG, type RenderPart } from "../render";
 import { elementsMarkdown, lookupReference, partsMarkdown, referenceNames } from "./reference";
@@ -354,6 +356,66 @@ async function exportTool(args: Record<string, any>): Promise<ToolResult> {
       content: [{ type: "text", text: `${note}wrote ${out} (${fmt.toUpperCase()}, ${bytes} bytes, ${what})` }],
       structuredContent: { path: out, format: fmt, bytes, parts: docParts.map((p) => p.name) },
     };
+  });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Plate (print layout)
+
+async function plateTool(args: Record<string, any>): Promise<ToolResult> {
+  return withModel(args, async (m) => {
+    const r = await run(m, args, {});
+    if (!r.run) return { content: [{ type: "text", text: r.error! }], isError: true };
+    const { rendered, result, kernel } = r.run;
+    if (result.parts.some((p) => !p.ok)) {
+      const { text } = summarize(m, r.run, r.logs);
+      return { content: [{ type: "text", text: `not plated: the model has errors\n${text}` }], isError: true };
+    }
+    const only: string[] | undefined = Array.isArray(args.parts) ? args.parts.map(String) : undefined;
+    const copies: Record<string, number> = args.copies && typeof args.copies === "object" ? args.copies : {};
+    const parts = (rendered.document.parts ?? []).filter((p) => p.name && (!only || only.includes(p.name)));
+    if (!parts.length) throw new ToolInputError("no parts to plate");
+    const meshes = new Map<string, MeshArrays>();
+    for (const p of parts) meshes.set(p.name!, await kernel.meshAt(p.name!, 0.01));
+    const bed: [number, number] = Array.isArray(args.bed) && args.bed.length >= 2 ? [Number(args.bed[0]), Number(args.bed[1])] : [256, 256];
+    let plated;
+    try {
+      plated = plateParts(
+        parts.map((p) => ({ name: p.name!, color: p.color, mesh: meshes.get(p.name!)!, copies: Math.max(1, Math.floor(Number(copies[p.name!] ?? 1))) })),
+        { bed, spacing: typeof args.spacing === "number" ? args.spacing : 5, orient: args.orient === "keep" ? "keep" : "auto", maxOverhangDeg: typeof args.maxOverhangDeg === "number" ? args.maxOverhangDeg : 45 },
+      );
+    } catch (e) {
+      return { content: [{ type: "text", text: `not plated: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+    }
+    const items = plated.items.map((it) => ({
+      part: it.name,
+      copy: it.copy,
+      plate: it.plate + 1,
+      bottom: it.orientation.label,
+      overhangPercent: r3(it.orientation.overhangFraction * 100),
+      height: r3(it.orientation.height),
+      rect: it.rect.map(r3),
+      rotated90: it.rotated90,
+    }));
+    const lines = [`${plated.items.length} item(s) on ${plated.plates} plate(s) of ${bed[0]} × ${bed[1]} mm`, "", "| part | plate | bottom | overhang | height |", "| --- | --- | --- | --- | --- |"];
+    for (const it of items) lines.push(`| ${it.part}${it.copy > 1 ? ` #${it.copy}` : ""} | ${it.plate} | ${it.bottom} | ${it.overhangPercent}% | ${it.height} mm |`);
+    const files: string[] = [];
+    if (args.path) {
+      const base = args.baseDir ? resolve(String(args.baseDir)) : process.cwd();
+      const out = resolve(base, String(args.path));
+      const stl = out.toLowerCase().endsWith(".stl");
+      for (let n = 0; n < plated.plates; n++) {
+        const on = plated.items.filter((it) => it.plate === n);
+        const ps = on.map((it) => ({ name: (copies[it.name] ?? 1) > 1 ? `${it.name} #${it.copy}` : it.name, color: it.color, mesh: transformMesh(meshes.get(it.name)!, it.transform) }));
+        const data = stl ? toSTL(ps, { binary: true }) : plate3MF(ps, on.map(orientationNote), bed);
+        const path = plated.plates === 1 ? out : out.replace(/(\.\w+)$/, `-${n + 1}$1`);
+        mkdirSync(dirname(path), { recursive: true });
+        writeFileSync(path, data);
+        files.push(path);
+      }
+      lines.push("", `wrote ${files.join(", ")}`);
+    }
+    return { content: [{ type: "text", text: lines.join("\n") }], structuredContent: { bed, plates: plated.plates, items, files } };
   });
 }
 
@@ -716,6 +778,27 @@ export const TOOLS: ToolDef[] = [
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     run: (a) => serial(() => exportTool(a)),
+  },
+  {
+    name: "tscad_plate",
+    title: "Lay a model out for printing",
+    description:
+      "Orient every part for printing (least overhang among its axis directions and largest flat faces, unless orient=\"keep\") and pack the parts (and copies) onto as many beds as needed. Returns a table of part, plate, the face on the bed, overhang % and height; with `path` it writes one 3MF (with per-object orientation notes) or STL per plate (plate-1.3mf, plate-2.3mf… when there are several).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ...MODEL_PROPS,
+        bed: { type: "array", items: { type: "number" }, minItems: 2, maxItems: 2, description: "Bed size [x, y] mm (default [256, 256])." },
+        spacing: { type: "number", description: "Gap between parts and from the bed edge, mm (default 5)." },
+        copies: { type: "object", additionalProperties: { type: "number" }, description: "Copies per part, e.g. {\"leg\": 4} (default 1 each)." },
+        orient: { type: "string", enum: ["auto", "keep"], description: "auto: least overhang (default); keep: as modelled." },
+        maxOverhangDeg: { type: "number", description: "Steepest printable overhang, degrees from vertical (default 45)." },
+        parts: { type: "array", items: { type: "string" }, description: "Only these parts." },
+        path: { type: "string", description: "Write the plate(s): .3mf (default) or .stl, relative to `baseDir` or cwd." },
+      },
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    run: (a) => serial(() => plateTool(a)),
   },
   {
     name: "tscad_pick_selectors",
