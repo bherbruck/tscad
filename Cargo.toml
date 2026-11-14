@@ -19,3 +19,8 @@ opt-level = 2
 inherits = "release"
 lto = false
 codegen-units = 16
+
+# Size-optimised wasm (compare with release: `cargo build --profile wasm-small`).
+[profile.wasm-small]
+inherits = "release"
+opt-level = "s"

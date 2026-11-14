@@ -201,11 +201,27 @@ fn union(children: &[Node], path: &str, cache: &mut Cache) -> R<Solid> {
 fn blend(children: &[Node], path: &str, cache: &mut Cache, op: &str, kind: Blend, size: f64, edges: &Selector) -> R<Solid> {
     let Some(b) = union(children, path, cache)? else { return Ok(None) };
     let (record, _) = kernel(path, op, b.to_record())?;
-    let picked = select_edges(&record, edges);
+    let mut picked = select_edges(&record, edges);
     if picked.is_empty() {
         return Err(fail(path, op, "the edge selector matched no edges"));
     }
-    kernel(path, op, ops::blend(&b, kind, &picked, &[size], &[], Corners::Filled))?;
+    // A broad selector (all, max z...) takes in smooth joins the kernel has no blend for (a
+    // tangent edge, a seam): those are dropped and the rest blended. Edges named by index are
+    // the user's own choice and are not dropped.
+    let explicit = matches!(edges, Selector::Index { .. });
+    loop {
+        match ops::blend(&b, kind, &picked, &[size], &[], Corners::Filled) {
+            Ok(_) => break,
+            Err(ops::Error::EdgeNotBlendable { edge, .. }) if !explicit && picked.len() > 1 => {
+                let before = picked.len();
+                picked.retain(|e| *e != edge);
+                if picked.len() == before {
+                    return Err(fail(path, op, format!("edge {edge} has no blend")));
+                }
+            }
+            Err(e) => return Err(fail(path, op, format!("{e}"))),
+        }
+    }
     Ok(Some(b))
 }
 
@@ -363,12 +379,19 @@ pub(crate) fn matches(it: &Item, s: &Selector, lo: [f64; 3], hi: [f64; 3], index
     }
 }
 
+/// A seam: an edge where a periodic face meets itself (a cylinder's side line).
+fn is_seam(e: &rec::Edge) -> bool {
+    e.uses.len() == 2 && e.uses[0].face == e.uses[1].face
+}
+
 pub fn select_edges(record: &Record, s: &Selector) -> Vec<usize> {
     let (lo, hi) = bounds(record);
+    let explicit = matches!(s, Selector::Index { .. });
     record
         .edges
         .iter()
         .enumerate()
+        .filter(|(_, e)| explicit || !is_seam(e))
         .filter(|(i, e)| matches(&edge_item(record, e), s, lo, hi, *i, false))
         .map(|(i, _)| i)
         .collect()

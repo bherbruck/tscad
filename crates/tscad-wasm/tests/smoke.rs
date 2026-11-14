@@ -63,3 +63,10 @@ fn shell_and_transform() {
       {"name":"moved","node":{"type":"transform","matrix":[1,0,0,5, 0,1,0,0, 0,0,1,0, 0,0,0,1],"children":[{"type":"sphere","radius":3},{"type":"torus","majorRadius":6,"minorRadius":1}]}}]}"#);
     assert!(r.ok);
 }
+
+#[test]
+fn fillet_all_with_hole_skips_seams() {
+    let (_, r) = run(r#"{"parts":[{"name":"a","node":{"type":"fillet","radius":1,"children":[{"type":"difference","children":[
+        {"type":"box","size":[40,30,10],"center":true},{"type":"cylinder","radius":5,"height":20,"center":true}]}]}}]}"#);
+    assert!(r.ok, "{:?}", r.parts[0].error);
+}
