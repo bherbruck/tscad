@@ -18,6 +18,7 @@ import { toSTL } from "../export/stl";
 import { orientationNote, plate3MF, plateParts, transformMesh } from "../plate";
 import type { MeshArrays } from "../kernel";
 import { renderPNG, type RenderPart } from "../render";
+import { drawingMeta } from "../viewer/fmt";
 import { elementsMarkdown, lookupReference, partsMarkdown, referenceNames } from "./reference";
 import { GUIDE } from "./guide";
 import { selectorCode, selectorString } from "./selectors";
@@ -216,7 +217,7 @@ function summarize(m: ModelCtx, r: ModelRun, logs: string[]) {
   const structured = {
     ok: result.ok,
     parts,
-    drawings: rendered.drawings.map((d) => ({ name: d.name, loops: d.loops.length, ...(d.thickness ? { thickness: d.thickness } : {}) })),
+    drawings: rendered.drawings.map((d) => ({ name: d.name, loops: d.loops.length, paths: d.paths?.length ?? 0, notes: d.notes?.length ?? 0, ...(d.layer ? { layer: d.layer } : {}), ...(d.thickness ? { thickness: d.thickness } : {}) })),
     warnings: rendered.warnings.map((w) => m.rewrite(w)),
     params: Object.fromEntries(Object.entries(rendered.params).map(([k, s]) => [k, { ...s, value: (rendered.values as any)[k] }])),
     timings_ms: { import: Math.round(timings.import), render: Math.round(timings.render), kernel: Math.round(timings.kernel) },
@@ -235,7 +236,7 @@ function summarize(m: ModelCtx, r: ModelRun, logs: string[]) {
       if (e.frame) lines.push(e.frame.split("\n").map((l: string) => `    ${l}`).join("\n"));
     }
   }
-  for (const d of structured.drawings) lines.push(`- drawing ${d.name}: ${d.loops} loop(s)`);
+  for (const d of structured.drawings) lines.push(`- ${d.name}: ${drawingMeta({ loops: d.loops, paths: d.paths, notes: Array.from({ length: d.notes }) })}${d.layer ? ` (layer ${d.layer})` : ""}`);
   if (structured.warnings.length) lines.push(`warnings:\n${structured.warnings.map((w) => `  - ${w}`).join("\n")}`);
   const ps = Object.entries(structured.params);
   if (ps.length) lines.push(`params: ${ps.map(([k, s]: [string, any]) => `${k}=${JSON.stringify(s.value)}`).join(", ")}`);
