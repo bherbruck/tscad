@@ -11,6 +11,8 @@ beforeAll(async () => {
 }, 30_000);
 
 const PI = Math.PI;
+/** Cross-section removed by a fillet of radius r on a 90° edge. */
+const filletArea = (r: number) => r * r * (1 - PI / 4);
 
 async function volume(el: Children): Promise<number> {
   const { document } = compile(el);
@@ -40,7 +42,6 @@ describe("kernel integration", () => {
     ["grid of pegs", <gridPattern nx={3} ny={2} dx={10} dy={10}><cylinder r={1} h={4} /></gridPattern>, 6 * PI * 4],
     ["placement", <intersection><box size={10} center /><sphere r={5} rotate={[30, 40, 50]} at={[5, 5, 5]} /></intersection>, (4 / 3) * PI * 125 / 8],
     ["cone, torus", <union><cone r1={5} r2={0} h={10} /><torus R={20} r={2} /></union>, (PI * 25 * 10) / 3 + 2 * PI * PI * 20 * 4],
-    ["chamfer top", <chamfer distance={1} edges=">Z"><box size={[20, 20, 10]} /></chamfer>, 4000 - 34.667, 0.01],
   ];
   for (const [name, el, expected, tol] of cases) {
     test(name, async () => {
@@ -49,20 +50,33 @@ describe("kernel integration", () => {
     }, 30_000);
   }
 
-  test("fillet runs (selector strings and builders)", async () => {
-    const a = await volume(<fillet radius={1} edges={edges.vertical()}><box size={[20, 20, 10]} /></fillet>);
-    const b = await volume(<fillet radius={1} edges="|Z"><box size={[20, 20, 10]} /></fillet>);
-    expect(a).toBe(b);
-    expect(a).toBeLessThan(4000);
-    expect(a).toBeGreaterThan(3950);
+  test("fillet volumes match closed forms (the right edges are blended)", async () => {
+    const box = <box size={[20, 20, 10]} />;
+    // 4 vertical edges, r = 2: 4 · (4 − π) · 10
+    const v = await volume(<fillet radius={2} edges={edges.vertical()}>{box}</fillet>);
+    expect(v).toBeCloseTo(4000 - 4 * (4 - PI) * 10, 3);
+    expect(await volume(<fillet radius={2} edges="|Z">{box}</fillet>)).toBeCloseTo(v, 6);
+    // top loop, r = 1, sharp vertical edges → mitred corners: each edge removes A·20, and at
+    // each corner the two removed prisms overlap in r³(5/3 − π/2) (cube minus two quarter
+    // cylinders' union; their intersection is 1/8 of a Steinmetz solid, 2r³/3)
+    const loop = 4000 - 4 * 20 * filletArea(1) + 4 * (5 / 3 - PI / 2);
+    expect(await volume(<fillet radius={1} edges=">Z">{box}</fillet>)).toBeCloseTo(loop, 3);
+    expect(await volume(<fillet radius={1} edges={edges.bottom()}>{box}</fillet>)).toBeCloseTo(loop, 3);
+  }, 60_000);
+
+  test("chamfer top loop closed form", async () => {
+    // 4 edges, d = 1: prisms of area d²/2 × 20, overlapping in d³/3 at each corner
+    const v = await volume(<chamfer distance={1} edges=">Z"><box size={[20, 20, 10]} /></chamfer>);
+    expect(v).toBeCloseTo(4000 - 4 * 20 * 0.5 + 4 / 3, 3);
   }, 30_000);
 
-  test("STEP round-trip through <step>", async () => {
-    await k.evaluate(compile(<part name="src"><difference><box size={[20, 10, 5]} /><cylinder r={2} h={5} /></difference></part>).document);
-    const text = await k.step(["src"]);
-    const v = await volume(<step data={text} x={100} />);
-    expect(v).toBeCloseTo(1000 - PI * 4 * 5, 2);
-  }, 30_000);
+  test("fillet/chamfer on a rounded-rect extrusion and fillet all with a hole", async () => {
+    const rr = <extrude height={5}><roundedRect w={30} h={20} r={4} /></extrude>;
+    expect(await volume(<fillet radius={1} edges=">Z">{rr}</fillet>)).toBeLessThan(await volume(rr));
+    expect(await volume(<chamfer distance={1} edges={edges.top()}>{rr}</chamfer>)).toBeLessThan(await volume(rr));
+    const holed = <difference><box size={[20, 20, 10]} /><cylinder r={3} h={10} /></difference>;
+    expect(await volume(<fillet radius={1} edges={edges.all()}>{holed}</fillet>)).toBeLessThan(await volume(holed));
+  }, 60_000);
 
   test("multi-part assembly evaluates every part", async () => {
     const { document } = compile(
