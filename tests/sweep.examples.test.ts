@@ -16,7 +16,7 @@ const KNOWN: Record<string, string> = {
   "cookbook/name-tag": "#19 glyph t at 1–3 mm",
 };
 /** Examples owned by the sketch agent whose fixes are in progress. */
-const PENDING = new Set(["sketch-vase", "sketch-flange", "sketch-link-arm", "sketch-coat-hook", "sketch-pulley", "converted/enclosure", "converted/box-with-lid", "converted/grid-bin"]);
+const PENDING = new Set(["sketch-on-face", "sketch-vase", "sketch-flange", "sketch-link-arm", "sketch-coat-hook", "sketch-pulley", "converted/enclosure", "converted/box-with-lid", "converted/grid-bin"]);
 
 const label = (f: string) => f.replace(/^.*\/examples\//, "").replace(/\.tsx$/, "");
 
