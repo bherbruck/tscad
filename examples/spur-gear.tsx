@@ -21,8 +21,8 @@ type Pt = [number, number]
 
 /**
  * The outline of an involute gear as SVG path data: each flank is the true involute fitted with
- * a cubic Bézier (Hermite: exact ends and tangents), joined by exact arcs along the tip and root
- * circles. Smooth flanks become single B-rep faces.
+ * a cubic Bézier (Hermite: exact ends and tangents), blended into the root circle by a tangent
+ * fillet, with exact arcs along the tip and root circles. Smooth flanks become single B-rep faces.
  */
 export function involuteGear(teeth: number, module: number, pressureDeg: number, pieces = 1): string {
   const alpha = (pressureDeg * Math.PI) / 180
@@ -59,20 +59,43 @@ export function involuteGear(teeth: number, module: number, pressureDeg: number,
     return d
   }
 
+  // Half the angular width of the gap at the root circle, and how much of it the fillets take.
+  const gapHalf = Math.PI / teeth - half
+  const phi = Math.min((0.38 * module) / rf, gapHalf * 0.7)
+  const fillet = (c: number, side: number) => {
+    const root = polar(rf, c + side * (half + phi))
+    const g = flank(c, side)
+    const top = g(t0)
+    const h = 1e-6
+    const q = g(t0 + h)
+    const dir: Pt = [(q[0] - top[0]) / h, (q[1] - top[1]) / h] // flank tangent, pointing outward
+    const dl = Math.hypot(dir[0], dir[1]) || 1
+    const L1 = phi * rf * 0.55 // along the root circle: stays inside the gap
+    // down the flank, but never below the root circle
+    const L2 = Math.min(Math.hypot(top[0] - root[0], top[1] - root[1]) * 0.4, (Math.hypot(top[0], top[1]) - rf) * 0.9)
+    const ang = c + side * (half + phi)
+    // tangent of the root circle, pointing toward the tooth
+    const tan: Pt = [side * Math.sin(ang), -side * Math.cos(ang)]
+    const c1: Pt = [root[0] + tan[0] * L1, root[1] + tan[1] * L1]
+    const c2: Pt = [top[0] - (dir[0] / dl) * L2, top[1] - (dir[1] / dl) * L2]
+    return { root, up: ` C ${P(c1)} ${P(c2)} ${P(top)}`, down: ` C ${P(c2)} ${P(c1)} ${P(root)}` }
+  }
+
   let d = ""
   for (let i = 0; i < teeth; i++) {
     const c = (2 * Math.PI * i) / teeth
     const lead = flank(c, -1), trail = flank(c, 1)
-    const start = rf < rb ? polar(rf, c - half) : lead(t0)
-    d += i === 0 ? `M ${P(start)}` : ` A ${f(rf)} ${f(rf)} 0 0 1 ${P(start)}` // root arc from the last tooth
-    if (rf < rb) d += ` L ${P(lead(t0))}` // radial line up to the base circle
+    // Root fillets: a smooth cubic from the root circle (tangent to it) up into the flank
+    // (tangent to it), so the tooth widens toward its root like a hobbed gear.
+    const fl = fillet(c, -1), fr = fillet(c, 1)
+    d += i === 0 ? `M ${P(fl.root)}` : ` A ${f(rf)} ${f(rf)} 0 0 1 ${P(fl.root)}` // root land from the last tooth
+    d += fl.up
     d += curve(lead, t0, t1)
     d += ` A ${f(ra)} ${f(ra)} 0 0 1 ${P(trail(t1))}` // tip land
     d += curve(trail, t1, t0)
-    if (rf < rb) d += ` L ${P(polar(rf, c + half))}`
+    d += fr.down
   }
-  const first = rf < rb ? polar(rf, -half) : flank(0, -1)(t0)
-  return `${d} A ${f(rf)} ${f(rf)} 0 0 1 ${P(first)} Z`
+  return `${d} A ${f(rf)} ${f(rf)} 0 0 1 ${P(fillet(0, -1).root)} Z`
 }
 
 export default function SpurGear(p: ParamValues<typeof params>) {

@@ -464,7 +464,11 @@ export function renderImage(parts: RenderPart[], opts: RenderOptions = {}): Imag
           sharp++;
           continue;
         }
-        if (Math.abs(depth[a]! - depth[b]!) > radius * 0.05) {
+        // a step in depth across the edge (an engraving's rim, a ledge): not smooth, even when
+        // the faces on both sides are parallel. A continuous surface changes depth evenly.
+        const m0 = Math.floor(my) * SW + Math.floor(mx);
+        const pixelWorld = (ortho ? 1 : depth[m0]!) / scale;
+        if (Math.abs(depth[a]! - 2 * depth[m0]! + depth[b]!) > pixelWorld * off * 0.6 || Math.abs(depth[a]! - depth[b]!) > radius * 0.05) {
           sharp++;
           continue;
         }

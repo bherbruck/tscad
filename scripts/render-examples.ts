@@ -30,6 +30,7 @@ const VIEWS: Record<string, RenderOptions["view"]> = {
   vase: { azimuth: -58, elevation: 18 },
   "bolt-and-nut": { azimuth: -50, elevation: 20 },
   bracket: { azimuth: 55, elevation: 28 },
+  "parts-showcase": { azimuth: -60, elevation: 50 },
 };
 
 const files = readdirSync(join(root, "examples"))

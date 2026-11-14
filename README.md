@@ -78,7 +78,7 @@ To add tscad to an existing bun project: `bun add tscad`, then set
 <table>
 <tr>
 <td width="50%" valign="top"><a href="examples/enclosure.tsx"><img src="docs/images/enclosure.png" alt="Enclosure"></a><br><b><a href="examples/enclosure.tsx">Enclosure</a></b> — `<assembly>` of body + lid, a `<Boss>` component, vent louvres, revolved countersinks, filleted edges</td>
-<td width="50%" valign="top"><a href="examples/spur-gear.tsx"><img src="docs/images/spur-gear.png" alt="Spur gear"></a><br><b><a href="examples/spur-gear.tsx">Spur gear</a></b> — true involute flanks as Bézier `path` data, hub, `polarPattern` lightening holes, bore chamfer by `edges.radius()`</td>
+<td width="50%" valign="top"><a href="examples/spur-gear.tsx"><img src="docs/images/spur-gear.png" alt="Spur gear"></a><br><b><a href="examples/spur-gear.tsx">Spur gear</a></b> — true involute flanks as Bézier `path` data with root fillets, `polarPattern` lightening holes, bore chamfer by `edges.radius()`</td>
 </tr>
 <tr>
 <td width="50%" valign="top"><a href="examples/bracket.tsx"><img src="docs/images/bracket.png" alt="Bracket"></a><br><b><a href="examples/bracket.tsx">Bracket</a></b> — rounded corners and an inside-bend fillet picked with combined selectors, gusset sketch, `gridPattern` holes, slots</td>
@@ -93,7 +93,11 @@ To add tscad to an existing bun project: `bun add tscad`, then set
 <td width="50%" valign="top"><a href="examples/component-library.tsx"><img src="docs/images/component-library.png" alt="Component library"></a><br><b><a href="examples/component-library.tsx">Component library</a></b> — reusable typed components (`<Standoff/>`, `<CountersunkHole/>`, `<RoundedPlate/>`) and a board table</td>
 </tr>
 <tr>
-<td width="50%" valign="top"><a href="examples/parts-showcase.tsx"><img src="docs/images/parts-showcase.png" alt="Parts library"></a><br><b><a href="examples/parts-showcase.tsx">Parts library</a></b> — the `tscad/parts` components: a NEMA 17 mount and a Raspberry Pi base with an engraved label</td>
+<td width="50%" valign="top"><a href="examples/parts-showcase.tsx"><img src="docs/images/parts-showcase.png" alt="Parts library"></a><br><b><a href="examples/parts-showcase.tsx">Parts library</a></b> — the `tscad/parts` components: a NEMA 17 mount with counterbores and a Raspberry Pi base with an engraved label</td>
+<td width="50%" valign="top"><a href="examples/sketch-link-arm.tsx"><img src="docs/images/sketch-link-arm.png" alt="Link arm"></a><br><b><a href="examples/sketch-link-arm.tsx">Link arm</a></b> — a constraint sketch: tangent lines between two bosses solved for you, every dimension a param</td>
+</tr>
+<tr>
+<td width="50%" valign="top"><a href="examples/sketch-pulley.tsx"><img src="docs/images/sketch-pulley.png" alt="V-belt pulley"></a><br><b><a href="examples/sketch-pulley.tsx">V-belt pulley</a></b> — a constraint-sketched half section kept symmetric by constraints, revolved about Z</td>
 </tr>
 </table>
 
