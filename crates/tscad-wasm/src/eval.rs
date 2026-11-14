@@ -351,6 +351,36 @@ fn union(children: &[Node], path: &str, cache: &mut Cache) -> R<Solid> {
             bodies.push(b);
         }
     }
+    let made = union_bodies(bodies, path);
+    // solidcore can refuse union(union(a, b), c) yet build union(a, b, c) (KERNEL_ISSUES #21):
+    // on a refusal with nested unions, union all their leaves together
+    if made.is_err() && children.iter().any(|c| matches!(c, Node::Union { .. })) {
+        let mut leaves = Vec::new();
+        flatten_unions(children, path, cache, &mut leaves)?;
+        if let Ok(r) = union_bodies(leaves, path) {
+            return Ok(r);
+        }
+    }
+    made
+}
+
+/// The bodies of `children`, with the children of nested unions taken in their place.
+fn flatten_unions(children: &[Node], path: &str, cache: &mut Cache, out: &mut Vec<Body>) -> R<()> {
+    for (i, c) in children.iter().enumerate() {
+        let p = format!("{path}/{i}");
+        match c {
+            Node::Union { children: inner } => flatten_unions(inner, &p, cache, out)?,
+            _ => {
+                if let Some(b) = eval(c, &p, cache)? {
+                    out.push(b);
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn union_bodies(mut bodies: Vec<Body>, path: &str) -> R<Solid> {
     match bodies.len() {
         0 => Ok(None),
         1 => Ok(bodies.pop()),

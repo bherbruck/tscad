@@ -49,3 +49,19 @@ fn sweep_regressions() {
         println!("{} {:<30} vol={:?} {}", if res.ok { "PASS" } else { "FAIL" }, r["id"].as_str().unwrap_or("?"), res.parts.first().and_then(|p| p.volume), why);
     }
 }
+
+#[test]
+fn fixture_repros() {
+    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures");
+    for name in ["kernel-union-nested-not-closed.json", "kernel-noroom-obround-fillet.json", "kernel-shell-loft-not-closed.json"] {
+        let Ok(text) = std::fs::read_to_string(format!("{dir}/{name}")) else { continue };
+        let doc: Document = serde_json::from_str(&text).expect("doc");
+        let mut e = Engine::new(None);
+        let r = e.evaluate(&doc, &EvalOptions::default());
+        let why = r.parts.iter().find_map(|p| p.error.as_ref().map(|e| e.message.clone())).unwrap_or_default();
+        println!("{} {name} {why}", if r.ok { "PASS" } else { "FAIL" });
+        if name.starts_with("kernel-union-nested") {
+            assert!(r.ok, "nested union should be rescued by flattening: {why}");
+        }
+    }
+}
