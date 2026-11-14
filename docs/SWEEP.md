@@ -25,7 +25,7 @@ stays honest.
 
 ## Results (2026-11-14)
 
-1221 of 1359 combos passed before the fixes; 1394 of 1458 after (three new examples joined
+1221 of 1359 combos passed before the fixes; 1397 of 1458 after (three new examples joined
 the sweep). Only examples with a failure, a fix or a slow combo are listed; the other 19 pass
 every combo.
 
@@ -51,7 +51,7 @@ every combo.
 | sketch-coat-hook | 25/33 | 33/33 | 3.2 s |  |
 | sketch-flange | 20/33 | 33/33 | 14.1 s |  |
 | sketch-link-arm | 25/33 | 32/33 | 4.3 s | kernel #20 |
-| sketch-on-face | new | 30/33 | 6.6 s | model: the boss face selector matches nothing when the boss outgrows the block (with the sketch agent) |
+| sketch-on-face | new | 33/33 | 6.6 s | |
 | sketch-pulley | 28/33 | 33/33 | 0.6 s |  |
 | sketch-vase | 15/33 | 33/33 | 11.3 s |  |
 | spur-gear | 7/33 | 7/33 | 60.8 s | kernel #17 (gear root gaps), #18 (chamfer limit); slow at many teeth with the tooth chamfer |
@@ -131,11 +131,6 @@ every combo.
 
 - **kernel** (link-arm): fillet: no room, params `{"length":54,"bigRadius":28,"smallRadius":12.5,"bigBore":9,"smallBore":37,"slotWidth":14,"thickness":17,"edgeRound":2.5}`
 
-### sketch-on-face
-
-- **kernel** (bearing-block): onFace: the face selector matched 0 faces (index 0), params `{"width":58,"depth":45,"thickness":18,"boss":53,"bossHeight":5,"bearing":16,"bearingWidth":11.5,"bore":29.5,"holeSpacing":78}`
-- **kernel** (bearing-block): onFace: the face selector matched 0 faces (index 0), params `{"width":85,"depth":39,"thickness":8.5,"boss":58,"bossHeight":28.5,"bearing":30.5,"bearingWidth":3.5,"bore":28,"holeSpacing":43}`
-- **kernel** (bearing-block): onFace: the face selector matched 0 faces (index 0), params `{"width":62,"depth":38,"thickness":19.5,"boss":51,"bossHeight":17.5,"bearing":43.5,"bearingWidth":13,"bore":10,"holeSpacing":62}`
 
 ### spur-gear
 

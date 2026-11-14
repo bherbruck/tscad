@@ -18,7 +18,7 @@ const KNOWN: Record<string, string> = {
   "converted/grid-bin": "#21 union grouping",
 };
 /** Examples whose model fixes are in progress (sketch agent). */
-const PENDING = new Set(["sketch-on-face"]);
+const PENDING = new Set<string>();
 
 const label = (f: string) => f.replace(/^.*\/examples\//, "").replace(/\.tsx$/, "");
 
