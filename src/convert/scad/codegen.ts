@@ -640,7 +640,24 @@ export class Gen {
         }
         return [el(s.name, [], ops)];
       }
-      case "hull":
+      case "hull": {
+        if (ctx.mode !== "3d" || this.dimOfAll(s.children) === "2d") {
+          // 2D hull: exact <hull> of the raw shapes
+          const raw: Ctx = { env, mode: "raw", wrap: (x) => x, linear: false, ...(ctx.module ? { module: ctx.module } : {}) };
+          const shape = el("hull", [], this.children(s.children, raw));
+          return ctx.mode === "3d" ? this.stmt({ ...s, name: "__hull2d" } as any, ctx) : leaf(shape);
+        }
+        const prism = this.hullPrism(s.children, env);
+        if (prism) return [el("extrude", [`height={${prism.h}}`, ...(prism.center ? [prism.center] : [])], [el("hull", [], prism.kids)])];
+        this.warn(s.line, "3D hull() is only converted for prisms of the same height on the same base (cylinders/cubes, translated in XY): its children are unioned instead");
+        return [el("union", [], kids())];
+      }
+      case "__hull2d": {
+        // a 2D hull where a solid is expected
+        const raw: Ctx = { env, mode: "raw", wrap: (x) => x, linear: false, ...(ctx.module ? { module: ctx.module } : {}) };
+        this.warn(s.line, "2D hull() at the top of a 3D context: extruded 1 mm (OpenSCAD would keep it flat)");
+        return [el("extrude", ["height={1}"], [el("hull", [], this.children(s.children, raw))])];
+      }
       case "minkowski":
         this.warn(s.line, `${s.name}() isn't supported: its children are unioned instead`);
         return ctx.mode === "raw" ? kids() : [el("union", [], kids())];
@@ -800,6 +817,113 @@ export class Gen {
     return [el(m.js, props, ch)];
   }
 
+  /**
+   * 3D hull() of straight prisms on a common base — cylinders and cubes of one height, moved
+   * in XY (translate with z = 0, rotate about Z, for loops) — is the extrusion of the 2D hull
+   * of their footprints. Returns undefined for anything else.
+   */
+  private hullPrism(stmts: Stmt[], env: Env): { h: string; center: string; kids: string[] } | undefined {
+    let h: string | undefined, center: string | undefined;
+    let assumed = false;
+    const same = (hh: string, cc: string) => {
+      if (h === undefined) [h, center] = [hh, cc];
+      return h === hh && center === cc;
+    };
+    const walk = (st: Stmt, en: Env): string[] | undefined => {
+      if (st.t === "block") {
+        const parts = st.body.map((b) => walk(b, en));
+        return parts.every(Boolean) ? parts.flat() as string[] : undefined;
+      }
+      if (st.t !== "inst" || st.modifier) return undefined;
+      const A = (pos: number, ...names: string[]) => this.arg(st.args, pos, ...names);
+      const one = () => {
+        const parts = st.children.map((c) => walk(c, en));
+        return parts.every(Boolean) ? (parts.flat() as string[]) : undefined;
+      };
+      switch (st.name) {
+        case "cylinder": {
+          if (A(1, "r1") || A(2, "r2") || A(-1, "d1") || A(-1, "d2")) return undefined;
+          const hh = this.e(A(0, "h", "height"), en) ?? "1";
+          const c = A(3, "center");
+          if (!same(hh, this.centerProp(c, en, undefined))) return undefined;
+          const r = A(-1, "r"), d = A(-1, "d");
+          const rr = r ? this.e(r, en)! : d ? `${paren(this.e(d, en)!)} / 2` : "1";
+          const fn = this.facets(st.args);
+          return [fn ? el("regularPolygon", [`sides={${fn}}`, `r={${rr}}`], []) : el("circle", [`r={${rr}}`], [])];
+        }
+        case "cube": {
+          const size = A(0, "size");
+          if (!size || size.t !== "vec" || size.items.length !== 3 || !size.items.every(isExpr)) return undefined;
+          const [w, dd, hh] = size.items.map((x) => this.expr(x as Expr, en).code);
+          const c = A(1, "center");
+          if (!same(hh!, this.centerProp(c, en, undefined))) return undefined;
+          return [el("rect", [`size={[${w}, ${dd}]}`, c ? this.centerProp(c, en, "false") : "center={false}"], [])];
+        }
+        case "translate": {
+          const v = A(0, "v");
+          if (!v) return one();
+          let at: string;
+          if (v.t === "vec" && v.items.every(isExpr)) {
+            const items = v.items as Expr[];
+            if (items.length === 3 && !(items[2]!.t === "num" && items[2]!.v === 0)) return undefined;
+            at = `[${this.expr(items[0]!, en).code}, ${this.expr(items[1]!, en).code}]`;
+          } else {
+            assumed = true;
+            at = `${this.h("$xy")}(${this.expr(v, en).code})`;
+          }
+          const k = one();
+          return k && [el("sketch", [`at={${at}}`], k)];
+        }
+        case "rotate": {
+          const a = A(0, "a");
+          if (A(1, "v") || !a) return undefined;
+          let rot: string;
+          if (a.t === "vec") {
+            const items = a.items as Expr[];
+            if (items.length !== 3 || !items.slice(0, 2).every((x) => x.t === "num" && x.v === 0)) return undefined;
+            rot = this.expr(items[2]!, en).code;
+          } else {
+            const e = this.expr(a, en);
+            if (e.kind !== "num") return undefined;
+            rot = e.code;
+          }
+          const k = one();
+          return k && [el("sketch", [`rotate={${rot}}`], k)];
+        }
+        case "union":
+        case "color":
+          return one();
+        case "for": {
+          const loops = st.args.filter((a) => a.name);
+          if (!loops.length) return undefined;
+          if (loops.length > 1) {
+            // for (a = …, b = …) is for (a = …) for (b = …)
+            const innerFor: Stmt = { ...st, args: loops.slice(1), children: st.children };
+            return walk({ ...st, args: [loops[0]!], children: [innerFor] }, en);
+          }
+          const it = this.iterable(loops[0]!.value, en);
+          const inner = en.child();
+          const name = loops[0]!.name!;
+          inner.set(name, { js: jsName(name), kind: it.item });
+          const parts = st.children.map((c) => walk(c, inner));
+          if (!parts.every(Boolean)) return undefined;
+          const body = (parts.flat() as string[]);
+          return [`{${it.code}.map((${jsName(name)}: ${it.item === "num" ? "number" : "any"}) => ${frag(body.length === 1 ? body[0]! : `<>${body.join("")}</>`)})}`];
+        }
+      }
+      return undefined;
+    };
+    const kids: string[] = [];
+    for (const st of stmts) {
+      const k = walk(st, env);
+      if (!k) return undefined;
+      kids.push(...k);
+    }
+    if (h === undefined || !kids.length) return undefined;
+    if (assumed) this.warn(stmts[0]!.line, "hull() of prisms: translate() offsets that aren't literal are assumed to have z = 0");
+    return { h, center: center ?? "", kids };
+  }
+
   private centerProp(c: Expr | undefined, env: Env, dflt: string | undefined): string {
     if (!c) return dflt === undefined ? "" : `center={${dflt}}`;
     if (c.t === "bool") return c.v ? "center" : "center={false}";
@@ -927,7 +1051,7 @@ export class Gen {
       return { code: `${this.h("$range")}(${a}, ${b}${st ? `, ${st}` : ""})`, item: "num" };
     }
     const x = this.expr(e, env);
-    if (e.t === "vec") return { code: x.code, item: e.items.every((i) => isExpr(i) && i.t === "num") ? "num" : "any" };
+    if (e.t === "vec") return { code: x.code, item: e.items.every((i) => isExpr(i) && this.expr(i, env).kind === "num") ? "num" : "any" };
     return { code: `${this.h("$iter")}(${x.code})`, item: "any" };
   }
 

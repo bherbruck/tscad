@@ -246,3 +246,27 @@ turns left), `tangentArcTo(x, y)`, `close()`; `.d` (or `String(path)`) is the pa
 
 - `examples/sketch-link-arm.tsx` — two bosses joined by tangent lines, bores and a slot component, written with typed handles.
 - `examples/sketch-pulley.tsx` — V-belt pulley half-section mirrored with `symmetric`, revolved.
+
+## `<hull>`: exact convex hulls
+
+`<hull>` works anywhere 2D shapes do: in `<extrude>`, `<revolve>`, `<loft>` sections,
+`<drawing>`, `<offset>` and constraint sketches' plain children. It takes the convex hull of
+its children:
+
+- Polygons stay polygons.
+- Circles and arcs give exact tangent segments and true arcs: two circles make a slot, three a
+  rounded triangle, and unequal circles a cam profile.
+- NURBS and text are flattened.
+
+```tsx
+<extrude height={6}>
+  <hull><circle r={12} /><circle r={5} x={17} /></hull>   {/* a plate cam */}
+  <circle d={6} />                                          {/* bore */}
+</extrude>
+```
+
+Method (`src/core/sketch/hull.ts`): sweep the support function h(θ) once round. The children
+reduce to point sites and arc sites, where an arc only supports directions within its range and
+its end points are separate point sites. Each change of active site happens at an exact angle,
+found in closed form where the two supports are equal. An active arc site contributes an arc,
+and each change contributes the common tangent segment. A flat (zero-area) input is an error.

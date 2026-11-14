@@ -465,6 +465,14 @@ export interface OffsetProps extends Placement2D, SketchChildren {
  * Groups 2D shapes to place them together. With `<point>`, `<line>`, `<arc>` and constraints
  * inside, it is a **constraint sketch**: solved, then its closed loops become profiles.
  */
+/**
+ * The exact convex hull of the child shapes: polygons stay polygons, circles and arcs give
+ * tangent lines and arcs (two circles → a slot, three → a rounded triangle), NURBS and text
+ * are flattened.
+ * @example <hull><circle r={10} /><circle r={4} x={25} /></hull>
+ */
+export interface HullProps extends Placement2D, SketchChildren {}
+
 export interface SketchProps extends Placement2D, SketchChildren, ConstraintSketchOptions {}
 
 /** A loft section: one 2D shape at height `z`. */
@@ -741,6 +749,8 @@ export interface IntrinsicElements extends ConstraintSketchElements, AssemblyEle
   sketch: SketchProps;
   /** 2D: offsets its shapes outward (+) or inward (−). */
   offset: OffsetProps;
+  /** 2D: the convex hull of the children (exact arcs and tangents). */
+  hull: HullProps;
   /** 2D: one loft section at height `z`. */
   section: SectionProps;
 

@@ -17,6 +17,7 @@ import { render, type Host } from "./render";
 import { layoutText, loadFont } from "./text/font";
 import { toSelector, type SelectorLike } from "./select";
 import { offsetLoops, OffsetError } from "./sketch/offset";
+import { hullLoops, HullError } from "./sketch/hull";
 import { CONSTRAINT_TAGS, isConstrainedSketch, SketchRecorder, type SketchInfo } from "./sketch/constrained";
 import { AssemblyRecorder, ASSEMBLY_TAGS, type AssemblyInfo } from "./assembly";
 import { parsePath, PathSyntaxError } from "./sketch/path";
@@ -137,7 +138,7 @@ const SOLID_TAGS = new Set([
   "linearPattern", "gridPattern", "polarPattern", "fillet", "chamfer", "shell", "draft", "pushPull", "offsetFaces", "split",
 ]);
 const SHAPE_TAGS = new Set(["text", "rect", "roundedRect", "circle", "ellipse", "polygon", "regularPolygon", "slot", "path", "star"]);
-const SKETCH_TAGS = new Set([...SHAPE_TAGS, "sketch", "section", "offset"]);
+const SKETCH_TAGS = new Set([...SHAPE_TAGS, "sketch", "section", "offset", "hull"]);
 const CONTAINER_TAGS = new Set(["part", "assembly", "drawing"]);
 const ALL_TAGS = [...SOLID_TAGS, ...SKETCH_TAGS, ...CONTAINER_TAGS, ...CONSTRAINT_TAGS, ...ASSEMBLY_TAGS];
 /** Tags whose x/y/z mean something else (no universal placement). */
@@ -403,7 +404,7 @@ class Compiler {
   }
 
   solid(h: Host): Node | null {
-    if (SHAPE_TAGS.has(h.tag) || h.tag === "sketch" || h.tag === "section" || h.tag === "offset") {
+    if (SHAPE_TAGS.has(h.tag) || h.tag === "sketch" || h.tag === "section" || h.tag === "offset" || h.tag === "hull") {
       this.fail(h, `<${h.tag}> is a 2D sketch shape and can't stand alone as a solid`, `put it inside <extrude height={...}>, <revolve>, <loft> or <sweep>`);
     }
     if (h.tag === "anchor") return null;
@@ -792,6 +793,22 @@ class Compiler {
         }
         if (inner.length && !loops.length) this.warn(c, `offsetting by ${d} removed every loop`);
         out.push(...loops.map((loop) => ({ loop, host: c })));
+        continue;
+      }
+      if (c.tag === "hull") {
+        // the exact convex hull of the children (circles and arcs stay exact)
+        const inner = this.sketch(c.children, mul2(m, this.place2(c)), parent);
+        for (const l of inner) this.checkClosed(l);
+        if (!inner.length) {
+          this.warn(c, "is empty");
+          continue;
+        }
+        try {
+          out.push({ loop: hullLoops(inner.map((l) => l.loop)), host: c });
+        } catch (e) {
+          if (e instanceof HullError) this.fail(c, e.message, "a hull needs shapes that span an area", e);
+          throw e;
+        }
         continue;
       }
       if (c.tag === "section") {

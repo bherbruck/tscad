@@ -32,6 +32,11 @@ async function run(scad: string, overrides: Record<string, unknown> = {}) {
   const volume = e.parts.reduce((s, p) => s + (p.volume ?? 0), 0);
   return { tsx, warnings, volume, bbox: e.parts[0]?.bbox, r, mod };
 }
+/** Belt around two circles r1, r2 with centres d apart. */
+const belt = (r1: number, r2: number, d: number) => {
+  const phi = Math.asin((r1 - r2) / d), t = Math.sqrt(d * d - (r1 - r2) ** 2);
+  return (r1 + r2) * t + 0.5 * r1 * r1 * (PI + 2 * phi) + 0.5 * r2 * r2 * (PI - 2 * phi);
+};
 const near = (a: number, b: number, rel = 1e-6) => expect(Math.abs(a - b) / Math.max(1, Math.abs(b))).toBeLessThan(rel);
 
 describe("parser", () => {
@@ -102,7 +107,7 @@ uses_global();
     const { warnings } = convertScad(`use <lib.scad>\nhull() { sphere(1); }\npolyhedron([[0,0,0]], [[0]]);\nlinear_extrude(5, twist=90) square(2);\n`);
     const msg = warnings.map((w) => `${w.line}: ${w.message}`).join("\n");
     expect(msg).toContain("1: use <lib.scad>");
-    expect(msg).toContain("2: hull() isn't supported");
+    expect(msg).toContain("2: 3D hull() is only converted for prisms");
     expect(msg).toContain("3: polyhedron() isn't supported");
     expect(msg).toContain("4: linear_extrude twist isn't supported");
   });
@@ -159,6 +164,35 @@ describe("geometric equivalence (kernel volumes)", () => {
     expect(warnings.map((w) => w.message)).toEqual(expect.arrayContaining(["color() dropped: set color on the <part> instead", "nested module inner is moved to file level"]));
   }, 30_000);
 
+  test("2D hull() → <hull> (cam profile)", async () => {
+    const { volume, tsx } = await run("linear_extrude(5) hull() { circle(10); translate([25, 0]) circle(4); }");
+    expect(tsx).toContain("<hull>");
+    near(volume, 5 * belt(10, 4, 25));
+  }, 30_000);
+  test("3D hull() of equal cylinders → extruded 2D hull (rounded plate)", async () => {
+    const { volume, tsx, warnings } = await run("hull() for (x = [0, 30], y = [0, 20]) translate([x, y, 0]) cylinder(r = 5, h = 3);");
+    expect(tsx).toContain("<extrude height={3}>");
+    expect(warnings).toEqual([]);
+    near(volume, 3 * (40 * 30 - 25 * (4 - PI)));
+  }, 30_000);
+  test("3D hull() of a cube and a cylinder", async () => {
+    const { volume } = await run("hull() { cube([20, 10, 4]); translate([30, 5, 0]) cylinder(r = 5, h = 4); }");
+    near(volume, 4 * (300 + 12.5 * PI));
+  }, 30_000);
+  test("other 3D hulls still warn", async () => {
+    const { warnings } = convertScad("hull() { sphere(5); translate([10, 0, 0]) sphere(5); }");
+    expect(warnings.some((w) => w.message.startsWith("3D hull() is only converted for prisms"))).toBe(true);
+  });
+
+  test("models: key tag (hull of four corner cylinders) and plate cam (2D hull)", async () => {
+    const tag = await run(readFileSync(new URL("./fixtures/scad/rounded-tag.scad", import.meta.url), "utf8"));
+    expect(tag.warnings).toEqual([]);
+    near(tag.volume, 3 * (50 * 25 - 25 * (4 - PI) - 9 * PI));
+    const cam = await run(readFileSync(new URL("./fixtures/scad/cam.scad", import.meta.url), "utf8"));
+    expect(cam.warnings).toEqual([]);
+    near(cam.volume, 6 * (belt(12, 5, 12 + 10 - 5) - 9 * PI));
+  }, 30_000);
+
   test("models: parametric box with lid (both parts, then the base only)", async () => {
     const src = readFileSync(new URL("./fixtures/scad/box-with-lid.scad", import.meta.url), "utf8");
     const shell = (w: number, d: number, h: number, t: number) => w * d * h - (w - 2 * t) * (d - 2 * t) * (h - t);
@@ -199,7 +233,7 @@ describe("geometric equivalence (kernel volumes)", () => {
 
 describe("examples/converted", () => {
   const dir = new URL("../examples/converted/", import.meta.url);
-  for (const name of ["box-with-lid", "knob", "hex-key-holder"]) {
+  for (const name of ["box-with-lid", "knob", "hex-key-holder", "rounded-tag", "cam"]) {
     test(`${name}: up to date with the converter, evaluates in < 10 s`, async () => {
       const scad = readFileSync(new URL(`${name}.scad`, dir), "utf8");
       const pascal = name.replace(/(^|-)(\w)/g, (_, __, c: string) => c.toUpperCase());

@@ -112,6 +112,8 @@ OpenSCAD's placement conventions are kept, so shapes land exactly where they did
 | `rotate_extrude(angle)` | `<revolve>` |
 | `square(s, center)` / `circle` / `polygon(points, paths)` / `text` / `offset(r \| delta)` | `<rect center={false}>` / `<circle>` / `<polygon>` (one per path, so nested paths are holes) / `<text>` / `<offset round>` |
 | `scale(v) circle(r)` | `<ellipse rx ry>` |
+| 2D `hull()` | `<hull>`: exact (tangent lines and true arcs) |
+| 3D `hull()` of straight prisms on one base (cylinders and cubes of one height, moved by `translate([x, y, 0])`, `rotate([0, 0, a])` or `for` loops) | `<extrude height><hull>` of their footprints: exact, e.g. rounded plates from four corner cylinders |
 
 **2D booleans.** tscad has no 2D boolean kernel. Instead, each 2D leaf under an extrusion is
 extruded on its own, and the 2D `difference` / `intersection` / `union` become 3D booleans of
@@ -122,7 +124,7 @@ leaves, which is also exact since planar motions commute with the extrusion. Und
 gets a `$leaf` prop, so the caller decides how its shapes become solids (extruded or
 revolved). A 2D object where a solid is expected (top level) is extruded 1 mm, with a warning.
 
-**Not converted (warnings):** `hull`, `minkowski` (children unioned), `polyhedron`, `import`,
+**Not converted (warnings):** other 3D `hull`s and `minkowski` (children unioned), `polyhedron`, `import`,
 `surface`, `projection`, `multmatrix`, `resize`, `linear_extrude` `twist` / `scale`,
 `offset(chamfer)`, 2D booleans inside `offset()` (even-odd approximation), `color` (set it on
 the `<part>`), text fonts (metrics differ, so check the size), `search`, `rands` (works but
@@ -132,7 +134,8 @@ random).
 
 `tests/convert.test.ts` covers the parser and codegen. It also checks geometric equivalence:
 converted snippets and three classic parametric models (`tests/fixtures/scad/`: a box with
-lid, a knurled knob with a D-shaft bore, a hex-key holder) are evaluated by the kernel, and
+lid, a knurled knob with a D-shaft bore, a hex-key holder, a key tag hulled from four corner
+cylinders, a plate cam from a 2D hull) are evaluated by the kernel, and
 their volumes are compared with closed forms. The converted models are in `examples/converted/`
 next to their `.scad` sources. A test keeps them in sync with the converter and checks that each
 evaluates in under 10 s.

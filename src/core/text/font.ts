@@ -63,8 +63,33 @@ function glyphContours(font: Font, g: Glyph): Loop2[] {
   let m = outlines.get(font);
   if (!m) outlines.set(font, (m = new Map()));
   let c = m.get(g.index);
-  if (!c) m.set(g.index, (c = contours(g.path.commands)));
+  if (!c) m.set(g.index, (c = contours(g.path.commands).map(joinCurves)));
   return c;
+}
+
+/**
+ * Join runs of consecutive Béziers of one degree into a single B-spline (knots of multiplicity
+ * `degree` at the joins: exactly the same curve). Fewer, longer edges are faster to extrude and
+ * avoid kernel trouble with many tiny NURBS edges.
+ */
+export function joinCurves(loop: Loop2): Loop2 {
+  const out: Seg2[] = [];
+  for (const s of loop) {
+    const prev = out[out.length - 1];
+    if (s.kind === "nurbs" && prev?.kind === "nurbs" && prev.degree === s.degree && s.pts.every((p) => p[2] === 1) && prev.pts.every((p) => p[2] === 1)) {
+      const p = prev.degree;
+      const last = prev.knots[prev.knots.length - 1]!;
+      // prev knots end with p+1 copies of `last`; keep p of them as an interior knot
+      const knots = [...prev.knots.slice(0, prev.knots.length - 1), ...s.knots.slice(p + 1).map((k) => k - s.knots[0]! + last + 1)];
+      out[out.length - 1] = { kind: "nurbs", degree: p, pts: [...prev.pts, ...s.pts.slice(1)], knots };
+    } else out.push(s);
+  }
+  // normalise knots to [0, 1]
+  return out.map((s) => {
+    if (s.kind !== "nurbs") return s;
+    const a = s.knots[0]!, b = s.knots[s.knots.length - 1]!;
+    return b > a ? { ...s, knots: s.knots.map((k) => (k - a) / (b - a)) } : s;
+  });
 }
 
 /** Path commands → closed contours (degenerate pieces dropped). */
