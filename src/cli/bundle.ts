@@ -58,6 +58,7 @@ export async function buildApp(opts: { minify?: boolean; /** App entries (relati
     naming: { entry: "[dir]/[name].[ext]", chunk: "chunks/[name]-[hash].[ext]", asset: "assets/[name]-[hash].[ext]" },
     define: { "process.env.NODE_ENV": JSON.stringify("development") },
     // The kernel loads node:fs only for file: URLs, never in the browser.
+    // (and src/cli/parallel.ts, which the worker loads only when it runs in bun)
     external: ["node:fs/promises", "node:fs", "node:path", "node:url"],
     throw: false,
   });

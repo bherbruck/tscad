@@ -42,7 +42,9 @@ export class EvalSession {
 
   close() {
     this.#closed = true;
-    this.#worker.terminate();
+    // Let the worker stop its kernel processes, then end it.
+    this.#worker.postMessage({ type: "dispose" });
+    setTimeout(() => this.#worker.terminate(), 300);
   }
 }
 

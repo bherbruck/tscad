@@ -47,7 +47,8 @@ export async function build(opts: BuildOptions): Promise<number> {
   const onlyStep = formats.every((f) => f === "step" || is2D(f));
   let run: ModelRun;
   try {
-    run = await runModel(opts.file, opts.params, { noMesh: onlyStep });
+    // STEP needs every part in one kernel session, so it gains nothing from kernel processes.
+    run = await runModel(opts.file, opts.params, { noMesh: onlyStep, parallel: !formats.includes("step") });
   } catch (e) {
     console.error(describeError(e, opts.file));
     return 1;

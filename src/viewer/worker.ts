@@ -62,10 +62,22 @@ self.onmessage = async (e: MessageEvent<ToWorker | { type: "child-init"; module?
           kernel = loadKernel();
           const k = await kernel;
           const isNative = !(k instanceof WasmKernelHost);
-          // One kernel: native sessions on several bun threads contend (measured: two parts at once
-          // take as long as in series), so parallel threads only cost memory here. `pool` > 1 opts in.
-          const size = isNative ? Math.max(1, Math.min(4, msg.pool ?? 1)) : 1;
-          pool = new Pool(new LocalEvaluator(k), size, () => new ChildEvaluator(import.meta.url, undefined, ""));
+          // The native kernel serialises every op behind one process-global lock, so parts run in
+          // parallel in kernel *processes* (src/cli/parallel.ts), bun only.
+          let size = 1;
+          let spawn: () => import("./pool").Evaluator = () => {
+            throw new Error("no parallel kernels");
+          };
+          if (isNative) {
+            const par = await import("../cli/parallel");
+            size = Math.max(1, Math.min(4, msg.pool ?? par.defaultParallelism()));
+            spawn = () => {
+              const p = new par.ProcessEvaluator();
+              void p.warm().catch(() => {});
+              return p;
+            };
+          }
+          pool = new Pool(new LocalEvaluator(k), size, spawn);
           post({ type: "ready", version: k.version, loadMs: performance.now() - t, pool: size, native: isNative });
           break;
         }
@@ -101,6 +113,9 @@ self.onmessage = async (e: MessageEvent<ToWorker | { type: "child-init"; module?
       case "params":
         values = msg.values;
         schedule();
+        break;
+      case "dispose":
+        pool?.dispose();
         break;
       case "pick": {
         await requireKernel();

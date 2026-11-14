@@ -163,6 +163,8 @@ export type ToWorker =
     }
   | { type: "load"; url: string; values?: ParamValuesData; /** Raw source map (else `${url}.map` is fetched). */ map?: object }
   | { type: "params"; values: ParamValuesData }
+  /** Free the kernels (server-side: stop the kernel processes). */
+  | { type: "dispose" }
   | { type: "pick"; id: number; kind: "edge" | "face"; part: string; index: number }
   | { type: "export"; id: number; format: ExportFormat; parts: { name: string; color?: string }[]; tolerance?: number }
   | { type: "check"; id: number; kind: "printability"; parts: CheckMeshData[]; maxOverhangDeg: number; minWall: number; thickness: boolean }
