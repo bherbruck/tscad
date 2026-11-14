@@ -7,6 +7,7 @@ import type { Viewport } from "./scene";
 const ADDED = new THREE.Color("#3ecf8e");
 const REMOVED = new THREE.Color("#ff4d6d");
 
+/** Geometry diff: added material green, removed material red, against a pinned version. */
 export class DiffOverlay {
   #objects: THREE.Object3D[] = [];
   #xrayBefore: boolean | undefined;

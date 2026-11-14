@@ -21,6 +21,7 @@ export interface Frame {
   o: THREE.Vector3;
 }
 
+/** The axes and origin of a row-major 4×4 frame. */
 export function frameOf(m: number[]): Frame {
   return {
     x: new THREE.Vector3(m[0], m[4], m[8]).normalize(),
@@ -54,6 +55,7 @@ interface Gizmo {
   part: string;
 }
 
+/** A mate gizmo drag: the param it drives and its new value. */
 export interface DragUpdate {
   param: string;
   /** New param value (unclamped; the host clamps and snaps). */
@@ -64,13 +66,13 @@ export interface DragUpdate {
   field: "angle" | "offset";
 }
 
+/** Mate triads and drag gizmos for assembly mates. */
 export class AssemblyOverlay {
   readonly root = new THREE.Group();
   #triads?: LineSegments2;
   #triadMat?: LineMaterial;
   #gizmos: Gizmo[] = [];
   #data?: AssemblyData;
-  #size = 50;
   #showAnchors = true;
   #explode = 0;
   #hover?: Gizmo;
@@ -159,7 +161,6 @@ export class AssemblyOverlay {
     const d = this.#data;
     if (!d) return this.viewport.requestRender();
     const size = this.viewport.bounds.getSize(new THREE.Vector3()).length() || 50;
-    this.#size = size;
     const offs = this.#partOffsets();
     const off = (part: string) => offs.get(part) ?? new THREE.Vector3();
 

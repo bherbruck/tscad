@@ -50,25 +50,7 @@ export function table(head: string[], rows: string[][], align: ("l" | "r")[] = [
   return [line(head.map((h) => c.bold(h))), rule, ...rows.map(line)].join("\n");
 }
 
-export function fmtNum(v: number | undefined, digits = 2): string {
-  if (v === undefined || !isFinite(v)) return "—";
-  const a = Math.abs(v);
-  const d = a >= 1000 ? 0 : a >= 100 ? 1 : digits;
-  return v.toLocaleString("en-US", { maximumFractionDigits: d });
-}
-
-export function fmtMs(ms: number): string {
-  return ms < 10 ? `${ms.toFixed(1)}ms` : ms < 1000 ? `${ms.toFixed(0)}ms` : `${(ms / 1000).toFixed(2)}s`;
-}
-
-export function fmtBytes(n: number): string {
-  return n >= 1e6 ? `${(n / 1e6).toFixed(1)} MB` : n >= 1e3 ? `${(n / 1e3).toFixed(1)} kB` : `${n} B`;
-}
-
-export function fmtVolume(mm3: number | undefined): string {
-  if (mm3 === undefined) return "—";
-  return mm3 >= 1e5 ? `${fmtNum(mm3 / 1000)} cm³` : `${fmtNum(mm3)} mm³`;
-}
+export { fmtBytes, fmtMs, fmtNum, fmtVol as fmtVolume } from "../viewer/fmt";
 
 /** A code frame of `source` around 1-based `line`/`column`. */
 export function codeFrame(source: string, line: number, column = 1, context = 2): string {
@@ -85,6 +67,7 @@ export function codeFrame(source: string, line: number, column = 1, context = 2)
   return out.join("\n");
 }
 
+/** Print an error and exit with status 1. */
 export function fail(message: string): never {
   console.error(`${sym.err} ${message}`);
   process.exit(1);

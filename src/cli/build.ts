@@ -1,17 +1,19 @@
 /** `tscad build` and `tscad info`. */
 import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname, extname, relative, resolve, basename } from "node:path";
+import { dirname, extname, resolve, basename } from "node:path";
 import { exportModel, type ExportFormat as MeshFormat } from "../export";
 import { section, polylineLoops, toDXF, toSVG } from "../drawing";
 import type { PartResult } from "../ir";
 import { describeError, describePartError, rel, runModel, type ModelRun } from "./model";
 import { c, fmtBytes, fmtMs, fmtNum, fmtVolume, sym, table } from "./ui";
 
+/** What `tscad build -o` can write. */
 export type ExportFormat = MeshFormat | "dxf" | "svg";
 export const FORMATS: ExportFormat[] = ["step", "stl", "3mf", "glb", "obj", "dxf", "svg"];
 const EXT_ALIASES: Record<string, ExportFormat> = { stp: "step", step: "step", stl: "stl", "3mf": "3mf", glb: "glb", obj: "obj", dxf: "dxf", svg: "svg" };
 const is2D = (f: ExportFormat): f is "dxf" | "svg" => f === "dxf" || f === "svg";
 
+/** The output format: `--format`, else the file extension; throws for unknown ones. */
 export function formatOf(path: string, explicit?: string): ExportFormat {
   const f = (explicit ?? extname(path).slice(1)).toLowerCase();
   const fmt = EXT_ALIASES[f];
@@ -19,6 +21,7 @@ export function formatOf(path: string, explicit?: string): ExportFormat {
   return fmt;
 }
 
+/** Options of `tscad build`. */
 export interface BuildOptions {
   file: string;
   outputs: string[];

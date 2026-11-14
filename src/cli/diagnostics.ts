@@ -7,7 +7,9 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { SRC } from "./bundle";
 import type { BunBundle } from "./model";
+import type { FromWorker, Loc } from "../viewer/protocol";
 
+/** One problem for an editor: a bundle, render or kernel error at a source location. */
 export interface DiagnosticItem {
   file: string;
   line: number;
@@ -21,9 +23,9 @@ export interface DiagnosticItem {
 }
 
 /** Pure: worker-protocol messages (a result or an error) → diagnostics. */
-export function diagnosticsFrom(msg: any, entry: string): DiagnosticItem[] {
+export function diagnosticsFrom(msg: FromWorker, entry: string): DiagnosticItem[] {
   const out: DiagnosticItem[] = [];
-  const at = (loc: any) => (loc && typeof loc.file === "string" && loc.line ? { file: loc.file.replace(/^file:\/\//, ""), line: loc.line, column: loc.column || 1 } : { file: entry, line: 1, column: 1 });
+  const at = (loc: Loc | undefined) => (loc && typeof loc.file === "string" && loc.line ? { file: loc.file.replace(/^file:\/\//, ""), line: loc.line, column: loc.column || 1 } : { file: entry, line: 1, column: 1 });
   if (msg?.type === "error") {
     const e = msg.error;
     out.push({ ...at(e.loc), severity: "error", message: e.message, source: e.stage === "kernel" ? "kernel" : "render" });

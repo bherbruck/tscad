@@ -5,6 +5,7 @@ import { renderPNG, type RenderPart, type View } from "../render";
 import { describeError, describePartError, rel, runModel } from "./model";
 import { c, fmtBytes, fmtMs, sym } from "./ui";
 
+/** Options of `tscad render`. */
 export interface RenderCliOptions {
   file: string;
   out?: string;
@@ -21,6 +22,7 @@ export interface RenderCliOptions {
 
 const VIEWS = ["iso", "front", "back", "top", "bottom", "right", "left"];
 
+/** A `--view` value: a named view or `<azimuth>,<elevation>`; throws for anything else. */
 export function parseView(v: string | undefined): View {
   if (!v) return "iso";
   if (VIEWS.includes(v)) return v as View;

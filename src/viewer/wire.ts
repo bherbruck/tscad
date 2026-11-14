@@ -28,6 +28,7 @@ function kindOf(v: ArrayBufferView): Kind | undefined {
 
 const align8 = (n: number) => (n + 7) & ~7;
 
+/** Encode a message: header JSON with typed arrays swapped for placeholders, then their bytes. */
 export function encode(msg: unknown): Uint8Array {
   const arrays: ArrayBufferView[] = [];
   const m = JSON.stringify(msg, (_k, v) => {
@@ -53,6 +54,7 @@ export function encode(msg: unknown): Uint8Array {
   return out;
 }
 
+/** Decode a message from {@link encode}. */
 export function decode<T = unknown>(data: ArrayBuffer | ArrayBufferView): T {
   let bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
   // Typed views need aligned offsets: copy once if a runtime handed us an unaligned slice.

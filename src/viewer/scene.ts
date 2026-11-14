@@ -9,22 +9,27 @@ import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import type { MeshArrays } from "../kernel";
+import { fmtNum } from "./fmt";
+import { GroundGrid } from "./grid";
+import { MeasureTool } from "./measure";
+import { Highlighter } from "./highlight";
+
+export { fmtNum };
 
 THREE.Object3D.DEFAULT_UP.set(0, 0, 1);
 
+/** A standard camera view. */
 export type ViewName = "iso" | "top" | "front" | "right" | "bottom" | "back" | "left";
+/** The axis a section plane is normal to. */
 export type SectionAxis = "x" | "y" | "z";
 
+/** What the pointer is over: a face or an edge of a part. */
 export interface Hit {
   kind: "face" | "edge";
   part: string;
   /** B-rep record index (for pickFace/pickEdge). */
   index: number;
   point: THREE.Vector3;
-}
-
-export interface Theme {
-  dark: boolean;
 }
 
 const VIEW_DIRS: Record<ViewName, [number, number, number]> = {
@@ -39,7 +44,8 @@ const VIEW_DIRS: Record<ViewName, [number, number, number]> = {
 
 export const PALETTE = ["#7c9cff", "#f5a524", "#3ecf8e", "#f471b5", "#a78bfa", "#38bdf8", "#fb7185", "#facc15"];
 
-interface PartView {
+/** A part in the viewport: its meshes, edges and the kernel data they came from. */
+export interface PartView {
   name: string;
   color: THREE.Color;
   group: THREE.Group;
@@ -62,6 +68,7 @@ const tmpB = new THREE.Vector3();
 
 const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
+/** The three.js viewport. */
 export class Viewport {
   readonly renderer: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
@@ -84,19 +91,13 @@ export class Viewport {
   onViewChange: () => void = () => {};
 
   #clipPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
-  #grid: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
-  #gridStep = 10;
-  #gridLabels: THREE.Sprite<THREE.Object3DEventMap>[] = [];
+  #ground = new GroundGrid();
   #key: THREE.DirectionalLight;
-  #shadowPlane: THREE.Mesh;
   #needsRender = true;
   #anim?: { from: CamState; to: CamState; start: number; dur: number };
-  #hoverFace?: THREE.Mesh;
-  #hoverEdge?: LineSegments2;
-  #selFace?: THREE.Mesh;
-  #selEdge?: LineSegments2;
   #lineMats: LineMaterial[] = [];
-  #measure: { points: THREE.Vector3[]; group: THREE.Group; label?: HTMLElement } = { points: [], group: new THREE.Group() };
+  #measure = new MeasureTool(this);
+  #highlight = new Highlighter(this);
   #raycaster = new THREE.Raycaster();
   #size = new THREE.Vector2(1, 1);
   #bounds = new THREE.Box3(new THREE.Vector3(-20, -20, 0), new THREE.Vector3(20, 20, 20));
@@ -152,15 +153,9 @@ export class Viewport {
     });
     this.controls.addEventListener("start", () => (this.#anim = undefined));
 
-    this.#grid = this.#makeGrid();
-    this.scene.add(this.#grid);
-    const shadowMat = new THREE.ShadowMaterial({ opacity: 0.22, depthWrite: false });
-    this.#shadowPlane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), shadowMat);
-    this.#shadowPlane.receiveShadow = true;
-    this.#shadowPlane.renderOrder = -1;
-    this.scene.add(this.#shadowPlane);
+    this.scene.add(this.#ground.mesh, this.#ground.shadow);
 
-    this.scene.add(this.model, this.overlay, this.#measure.group, this.#labelGroup);
+    this.scene.add(this.model, this.overlay, this.#measure.group, this.#ground.labels);
 
     const ro = new ResizeObserver(() => this.resize());
     ro.observe(host);
@@ -195,11 +190,11 @@ export class Viewport {
     this.controls.update();
     if (!this.#needsRender) return;
     this.#needsRender = false;
-    this.#updateGrid();
-    this.#updateLabels();
+    this.#ground.update(this.#bounds);
+    this.#ground.updateLabels(this.camera, this.persp, this.ortho, this.#size.y);
     for (const f of this.beforeRender) f();
     this.renderer.render(this.scene, this.camera);
-    this.#updateMeasureLabel();
+    this.#measure.updateLabel();
     for (const f of this.afterRender) f();
   };
 
@@ -207,148 +202,8 @@ export class Viewport {
     this.#dark = dark;
     this.#edgeColor.set(dark ? "#07080c" : "#1d2330");
     for (const m of this.#lineMats) if (!m.userData.highlight) m.color.copy(this.#edgeColor);
-    const u = this.#grid.material.uniforms;
-    u.uMinor!.value.set(dark ? "#2a3142" : "#cfd5e2");
-    u.uMajor!.value.set(dark ? "#3d465c" : "#a9b2c6");
-    (this.#shadowPlane.material as THREE.ShadowMaterial).opacity = dark ? 0.35 : 0.16;
-    for (const t of this.#labelTex.values()) t.tex.dispose();
-    this.#labelTex.clear();
+    this.#ground.setTheme(dark);
     this.#needsRender = true;
-  }
-
-  // ───────────────────────── grid ─────────────────────────
-
-  #makeGrid() {
-    const mat = new THREE.ShaderMaterial({
-      transparent: true,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-      uniforms: {
-        uStep: { value: 10 },
-        uMinor: { value: new THREE.Color("#2a3142") },
-        uMajor: { value: new THREE.Color("#3d465c") },
-        uCenter: { value: new THREE.Vector2() },
-        uFade: { value: 400 },
-      },
-      vertexShader: /* glsl */ `
-        varying vec3 vWorld;
-        void main() {
-          vec4 w = modelMatrix * vec4(position, 1.0);
-          vWorld = w.xyz;
-          gl_Position = projectionMatrix * viewMatrix * w;
-        }`,
-      fragmentShader: /* glsl */ `
-        uniform float uStep; uniform vec3 uMinor; uniform vec3 uMajor; uniform vec2 uCenter; uniform float uFade;
-        varying vec3 vWorld;
-        float line(vec2 p, float s, float w) {
-          vec2 c = p / s;
-          vec2 g = abs(fract(c - 0.5) - 0.5) / fwidth(c);
-          return 1.0 - min(min(g.x, g.y) / w, 1.0);
-        }
-        void main() {
-          vec2 p = vWorld.xy;
-          float minor = line(p, uStep / 10.0, 1.0);
-          float major = line(p, uStep, 1.2);
-          vec2 fw = fwidth(p);
-          float ax = 1.0 - min(abs(p.y) / (fw.y * 1.6), 1.0);
-          float ay = 1.0 - min(abs(p.x) / (fw.x * 1.6), 1.0);
-          // Minor lines fade out when they get too dense.
-          float density = clamp(1.0 - max(fw.x, fw.y) * 10.0 / uStep * 2.5, 0.0, 1.0);
-          vec4 col = vec4(uMinor, minor * 0.55 * density);
-          col = mix(col, vec4(uMajor, 0.9), major);
-          col = mix(col, vec4(0.94, 0.33, 0.36, 0.95), ax);
-          col = mix(col, vec4(0.36, 0.78, 0.42, 0.95), ay);
-          float d = length(p - uCenter);
-          col.a *= 1.0 - smoothstep(uFade * 0.35, uFade, d);
-          if (col.a < 0.004) discard;
-          gl_FragColor = col;
-        }`,
-    });
-    const grid = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
-    grid.renderOrder = -2;
-    grid.frustumCulled = false;
-    return grid;
-  }
-
-  #updateGrid() {
-    const size = this.#bounds.getSize(tmpV);
-    const span = Math.max(size.x, size.y, size.z, 10);
-    // Major step: 1/2/5 × 10^n so that ~4-10 majors cover the model.
-    const raw = span / 4;
-    const pow = Math.pow(10, Math.floor(Math.log10(raw)));
-    const step = [1, 2, 5, 10].map((m) => m * pow).find((s) => s >= raw) ?? 10 * pow;
-    this.#gridStep = step;
-    const u = this.#grid.material.uniforms;
-    u.uStep!.value = step;
-    const extent = Math.max(span * 6, step * 20);
-    this.#grid.scale.set(extent * 2, extent * 2, 1);
-    const c = this.#bounds.getCenter(tmpV);
-    u.uCenter!.value.set(c.x, c.y);
-    u.uFade!.value = extent;
-    this.#grid.position.set(c.x, c.y, 0);
-    this.#shadowPlane.position.set(c.x, c.y, this.#bounds.min.z - 0.01);
-    this.#shadowPlane.scale.set(span * 4, span * 4, 1);
-  }
-
-  /** Axis labels in mm along X and Y: depth-tested sprites, constant pixel size. */
-  #updateLabels() {
-    const step = this.#gridStep;
-    const want: { text: string; pos: THREE.Vector3; axis: "x" | "y" }[] = [];
-    const b = this.#bounds;
-    const lo = Math.floor(Math.min(b.min.x, 0) / step) - 1, hi = Math.ceil(Math.max(b.max.x, 0) / step) + 1;
-    for (let i = lo; i <= hi; i++) if (i !== 0) want.push({ text: fmtLen(i * step), pos: new THREE.Vector3(i * step, 0, 0), axis: "x" });
-    const loY = Math.floor(Math.min(b.min.y, 0) / step) - 1, hiY = Math.ceil(Math.max(b.max.y, 0) / step) + 1;
-    for (let i = loY; i <= hiY; i++) if (i !== 0) want.push({ text: fmtLen(i * step), pos: new THREE.Vector3(0, i * step, 0), axis: "y" });
-    while (this.#gridLabels.length < want.length) {
-      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthWrite: false, sizeAttenuation: false }));
-      sp.center.set(-0.08, 1.15);
-      sp.renderOrder = 5;
-      this.#labelGroup.add(sp);
-      this.#gridLabels.push(sp);
-    }
-    // World size of one pixel at distance 1 (perspective) or anywhere (ortho).
-    const px = this.camera === this.ortho ? (this.ortho.top - this.ortho.bottom) / this.ortho.zoom / this.#size.y : (2 * Math.tan(THREE.MathUtils.degToRad(this.persp.fov) / 2)) / this.#size.y;
-    this.#gridLabels.forEach((sp, i) => {
-      const it = want[i];
-      sp.visible = !!it;
-      if (!it) return;
-      const t = this.#labelTexture(it.text, it.axis);
-      if (sp.material.map !== t.tex) {
-        sp.material.map = t.tex;
-        sp.material.needsUpdate = true;
-      }
-      sp.position.copy(it.pos);
-      const hpx = 15;
-      sp.scale.set(hpx * t.aspect * px, hpx * px, 1);
-    });
-  }
-
-  #labelTex = new Map<string, { tex: THREE.CanvasTexture; aspect: number }>();
-  #labelGroup = new THREE.Group();
-
-  #labelTexture(text: string, axis: "x" | "y") {
-    const key = `${axis}:${text}:${this.#dark}`;
-    let t = this.#labelTex.get(key);
-    if (t) return t;
-    const scale = 3;
-    const c = document.createElement("canvas");
-    const ctx = c.getContext("2d")!;
-    const font = `500 ${11 * scale}px ui-monospace, SFMono-Regular, Menlo, monospace`;
-    ctx.font = font;
-    const w = Math.ceil(ctx.measureText(text).width) + 2 * scale;
-    c.width = w;
-    c.height = 15 * scale;
-    ctx.font = font;
-    ctx.textBaseline = "middle";
-    const base = axis === "x" ? [240, 84, 92] : [92, 200, 108];
-    ctx.fillStyle = `rgba(${base.join(",")},${this.#dark ? 0.75 : 0.9})`;
-    ctx.fillText(text, scale, c.height / 2);
-    const tex = new THREE.CanvasTexture(c);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.anisotropy = 4;
-    t = { tex, aspect: c.width / c.height };
-    this.#labelTex.set(key, t);
-    return t;
   }
 
   // ───────────────────────── parts ─────────────────────────
@@ -963,212 +818,51 @@ export class Viewport {
     return best;
   }
 
-  /** Points of B-rep edge `index` of `part` as line segment pairs. */
-  #edgeSegments(v: PartView, index: number): number[] {
-    const out: number[] = [];
-    const pts = v.data.edgePoints;
-    for (let e = 0; e < v.data.edgeIds.length; e++) {
-      if (v.data.edgeIds[e] !== index) continue;
-      const start = v.edgeStarts[e]!, n = v.data.edgeCounts[e]!;
-      for (let i = 0; i < n - 1; i++) {
-        const a = 3 * (start + i);
-        out.push(pts[a]!, pts[a + 1]!, pts[a + 2]!, pts[a + 3]!, pts[a + 4]!, pts[a + 5]!);
-      }
-    }
-    return out;
-  }
-
-  #faceMesh(v: PartView, index: number, color: number, opacity: number): THREE.Mesh | undefined {
-    const tris = v.faceTris.get(index);
-    if (!tris) return undefined;
-    const idx = new Uint32Array(tris.length * 3);
-    tris.forEach((t, i) => {
-      idx[3 * i] = v.data.indices[3 * t]!;
-      idx[3 * i + 1] = v.data.indices[3 * t + 1]!;
-      idx[3 * i + 2] = v.data.indices[3 * t + 2]!;
-    });
-    const g = new THREE.BufferGeometry();
-    g.setAttribute("position", v.mesh.geometry.getAttribute("position"));
-    g.setIndex(new THREE.BufferAttribute(idx, 1));
-    const m = new THREE.MeshBasicMaterial({
-      color,
-      transparent: true,
-      opacity,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-      polygonOffset: true,
-      polygonOffsetFactor: -1,
-      polygonOffsetUnits: -4,
-      clippingPlanes: this.section.enabled ? [this.#clipPlane] : [],
-    });
-    const mesh = new THREE.Mesh(g, m);
-    mesh.renderOrder = 20;
-    return mesh;
-  }
-
-  #edgeLine(v: PartView, index: number, color: number, width: number): LineSegments2 | undefined {
-    const segs = this.#edgeSegments(v, index);
-    if (!segs.length) return undefined;
-    const g = new LineSegmentsGeometry();
-    g.setPositions(segs);
-    const m = this.#lineMat(new THREE.Color(color), width, true);
-    m.depthTest = false;
-    m.transparent = true;
-    const l = new LineSegments2(g, m);
-    l.renderOrder = 30;
-    return l;
-  }
-
-  #disposeOverlay(o?: THREE.Mesh | LineSegments2) {
-    if (!o) return;
-    o.removeFromParent();
-    if (o instanceof LineSegments2) {
-      o.geometry.dispose();
-      this.#dropLineMat(o.material);
-    } else {
-      o.geometry.dispose();
-      (o.material as THREE.Material).dispose();
-    }
-  }
-
-  #hoverKey = "";
+  /** Highlight what the pointer is over (or nothing). */
   setHover(hit: Hit | undefined) {
-    const key = hit ? `${hit.kind}:${hit.part}:${hit.index}` : "";
-    if (key === this.#hoverKey) return;
-    this.#hoverKey = key;
-    this.clearHover();
-    this.#hoverKey = key;
-    if (!hit) return;
-    const v = this.parts.get(hit.part);
-    if (!v) return;
-    if (hit.kind === "face") {
-      this.#hoverFace = this.#faceMesh(v, hit.index, 0x5b8cff, 0.28);
-      if (this.#hoverFace) v.group.add(this.#hoverFace);
-    } else {
-      this.#hoverEdge = this.#edgeLine(v, hit.index, 0x7fa7ff, 3.5);
-      if (this.#hoverEdge) v.group.add(this.#hoverEdge);
-    }
-    this.#needsRender = true;
+    this.#highlight.setHover(hit);
   }
 
+  /** Remove the hover highlight. */
   clearHover() {
-    this.#disposeOverlay(this.#hoverFace);
-    this.#disposeOverlay(this.#hoverEdge);
-    this.#hoverFace = this.#hoverEdge = undefined;
-    this.#hoverKey = "";
-    this.#needsRender = true;
+    this.#highlight.clearHover();
   }
 
+  /** Highlight the selected face or edge (or nothing). */
   setSelection(hit: Hit | undefined) {
-    this.clearSelection();
-    if (!hit) return;
-    const v = this.parts.get(hit.part);
-    if (!v) return;
-    if (hit.kind === "face") {
-      this.#selFace = this.#faceMesh(v, hit.index, 0xffb020, 0.45);
-      if (this.#selFace) v.group.add(this.#selFace);
-    } else {
-      this.#selEdge = this.#edgeLine(v, hit.index, 0xffb020, 4);
-      if (this.#selEdge) v.group.add(this.#selEdge);
-    }
-    this.#needsRender = true;
+    this.#highlight.setSelection(hit);
   }
 
+  /** Remove the selection highlight. */
   clearSelection() {
-    this.#disposeOverlay(this.#selFace);
-    this.#disposeOverlay(this.#selEdge);
-    this.#selFace = this.#selEdge = undefined;
-    this.#needsRender = true;
+    this.#highlight.clearSelection();
+  }
+
+  /** The section plane as a clipping-plane list for overlay materials (empty when off). */
+  get clippingPlanes(): THREE.Plane[] {
+    return this.section.enabled ? [this.#clipPlane] : [];
   }
 
   // ───────────────────────── measure ─────────────────────────
 
   /** Snap a pick to the nearest edge vertex (within 12px) or use the surface point. */
   measurePoint(clientX: number, clientY: number): THREE.Vector3 | undefined {
-    const hit = this.hitTest(clientX, clientY);
-    if (!hit) return undefined;
-    const r = this.canvas.getBoundingClientRect();
-    const mx = clientX - r.left, my = clientY - r.top;
-    let best: THREE.Vector3 | undefined;
-    let bestD = 12;
-    for (const v of this.parts.values()) {
-      if (!v.visible) continue;
-      const pts = v.data.edgePoints;
-      for (let e = 0; e < v.data.edgeCounts.length; e++) {
-        const s = v.edgeStarts[e]!, n = v.data.edgeCounts[e]!;
-        for (const i of [s, s + n - 1]) {
-          tmpA.set(pts[3 * i]!, pts[3 * i + 1]!, pts[3 * i + 2]!).add(v.group.position);
-          const p = tmpV.copy(tmpA).project(this.camera);
-          const d = Math.hypot(((p.x + 1) / 2) * r.width - mx, ((1 - p.y) / 2) * r.height - my);
-          if (d < bestD && tmpA.distanceTo(hit.point) < this.#bounds.getSize(tmpB).length() * 0.2) {
-            bestD = d;
-            best = tmpA.clone();
-          }
-        }
-      }
-    }
-    return best ?? hit.point;
+    return this.#measure.pointAt(clientX, clientY);
   }
 
+  /** Add a measure point; the second one completes a distance (and returns its ends). */
   addMeasurePoint(p: THREE.Vector3): { a: THREE.Vector3; b: THREE.Vector3 } | undefined {
-    const m = this.#measure;
-    if (m.points.length >= 2) this.clearMeasure();
-    m.points.push(p.clone());
-    const r = this.#bounds.getSize(tmpV).length() * 0.006 + 0.05;
-    const dot = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12), new THREE.MeshBasicMaterial({ color: 0xffb020, depthTest: false }));
-    dot.renderOrder = 40;
-    dot.position.copy(p);
-    m.group.add(dot);
-    if (m.points.length === 2) {
-      const [a, b] = m.points as [THREE.Vector3, THREE.Vector3];
-      const g = new LineSegmentsGeometry();
-      g.setPositions([a.x, a.y, a.z, b.x, b.y, b.z]);
-      const mat = this.#lineMat(new THREE.Color(0xffb020), 2.5, true);
-      mat.depthTest = false;
-      mat.dashed = false;
-      const l = new LineSegments2(g, mat);
-      l.renderOrder = 40;
-      m.group.add(l);
-      const label = document.createElement("div");
-      label.className = "measure-label";
-      const d = a.distanceTo(b);
-      label.innerHTML = `<b>${fmtNum(d)} mm</b><span>Δx ${fmtNum(Math.abs(b.x - a.x))} · Δy ${fmtNum(Math.abs(b.y - a.y))} · Δz ${fmtNum(Math.abs(b.z - a.z))}</span>`;
-      this.labelLayer.appendChild(label);
-      m.label = label;
-      this.#needsRender = true;
-      return { a, b };
-    }
-    this.#needsRender = true;
-    return undefined;
+    return this.#measure.add(p);
   }
 
-  #updateMeasureLabel() {
-    const m = this.#measure;
-    if (!m.label || m.points.length < 2) return;
-    const mid = m.points[0]!.clone().add(m.points[1]!).multiplyScalar(0.5).project(this.camera);
-    m.label.style.transform = `translate(${((mid.x + 1) / 2) * this.#size.x}px, ${((1 - mid.y) / 2) * this.#size.y}px) translate(-50%, -130%)`;
-  }
-
+  /** Remove the measurement. */
   clearMeasure() {
-    const m = this.#measure;
-    for (const c of [...m.group.children]) {
-      c.removeFromParent();
-      if (c instanceof LineSegments2) {
-        c.geometry.dispose();
-        this.#dropLineMat(c.material);
-      } else if (c instanceof THREE.Mesh) {
-        c.geometry.dispose();
-        (c.material as THREE.Material).dispose();
-      }
-    }
-    m.points = [];
-    m.label?.remove();
-    m.label = undefined;
-    this.#needsRender = true;
+    this.#measure.clear();
   }
 
+  /** How many measure points are placed (0–2). */
   get measureCount() {
-    return this.#measure.points.length;
+    return this.#measure.count;
   }
 
   /** A PNG of the current view. */
@@ -1184,7 +878,6 @@ interface CamState {
   zoom: number;
   up: THREE.Vector3;
 }
-
 let hatch: THREE.CanvasTexture | undefined;
 /** Diagonal section hatching (multiplied with the part colour). */
 function hatchTexture(): THREE.CanvasTexture {
@@ -1240,13 +933,3 @@ function segDist(px: number, py: number, a: THREE.Vector2, b: THREE.Vector2): { 
   return { d: Math.hypot(px - (a.x + t * dx), py - (a.y + t * dy)), t };
 }
 
-export function fmtNum(v: number, digits = 2): string {
-  if (!isFinite(v)) return "—";
-  const a = Math.abs(v);
-  const d = a >= 1000 ? 0 : a >= 100 ? 1 : digits;
-  return v.toLocaleString("en-US", { maximumFractionDigits: d, minimumFractionDigits: 0 });
-}
-
-function fmtLen(v: number): string {
-  return Math.abs(v) >= 1000 ? `${fmtNum(v / 1000)}m` : `${fmtNum(v)}`;
-}

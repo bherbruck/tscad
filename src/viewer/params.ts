@@ -1,5 +1,6 @@
 /** The auto-generated parameters panel, and param values ⇄ URL hash. */
 import { h, icon } from "./dom";
+import { parseValue } from "./fmt";
 import type { ParamSchemaData, ParamSpec, ParamValuesData } from "./protocol";
 
 type Opt = { value: string | number; label: string };
@@ -43,16 +44,9 @@ export function hashToValues(hash: string, schema?: ParamSchemaData): ParamValue
     if (RESERVED.has(k)) continue;
     const spec = schema?.[k];
     if (schema && !spec) continue;
-    out[k] = spec ? coerce(spec, raw) : guess(raw);
+    out[k] = spec ? coerce(spec, raw) : parseValue(raw);
   }
   return out;
-}
-
-function guess(raw: string): unknown {
-  if (raw === "true") return true;
-  if (raw === "false") return false;
-  if (raw !== "" && !isNaN(Number(raw))) return Number(raw);
-  return raw;
 }
 
 function coerce(spec: ParamSpec, raw: string): unknown {
@@ -72,6 +66,7 @@ function coerce(spec: ParamSpec, raw: string): unknown {
   }
 }
 
+/** The auto-generated params panel: one control per schema entry. */
 export class ParamsPanel {
   readonly el: HTMLElement;
   #schema: ParamSchemaData = {};

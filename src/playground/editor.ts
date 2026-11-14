@@ -12,6 +12,7 @@ import { tags as t } from "@lezer/highlight";
 import type { NamedDoc, TagInfo } from "./extract";
 import { tagRange } from "./source-range";
 
+/** Tag and prop completions for the editor (from the library's TSDoc). */
 export interface CompletionData {
   tags: TagInfo[];
   selectors: NamedDoc[];
@@ -19,6 +20,7 @@ export interface CompletionData {
   materials: NamedDoc[];
 }
 
+/** An error or warning to underline in the editor. */
 export interface EditorProblem {
   line: number;
   column?: number;
@@ -143,6 +145,7 @@ export function tscadCompletions(data: CompletionData) {
   };
 }
 
+/** The CodeMirror editor as the playground uses it. */
 export interface Editor {
   view: EditorView;
   getValue(): string;
@@ -156,6 +159,7 @@ export interface Editor {
 }
 
 
+/** Mount a TSX editor with completions, hover docs and problem marks. */
 export function createEditor(parent: HTMLElement, opts: { doc: string; completions?: CompletionData; onChange: (text: string) => void; onRun: () => void }): Editor {
   const runKey = { key: "Mod-s", preventDefault: true, run: () => (opts.onRun(), true) };
   const runKey2 = { key: "Mod-Enter", preventDefault: true, run: () => (opts.onRun(), true) };

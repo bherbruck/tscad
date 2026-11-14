@@ -15,6 +15,7 @@ for (let i = 0; i < B64.length; i++) B64_INDEX[B64.charCodeAt(i)] = i;
 /** Segments per generated line: [genCol, src, srcLine, srcCol] (0-based), sorted by genCol. */
 type Segment = [number, number, number, number];
 
+/** A source map v3, for mapping bundle positions back to the source. */
 export class SourceMap {
   readonly sources: string[];
   readonly contents: (string | null)[];
@@ -106,6 +107,7 @@ export function parseStack(stack: string | undefined): Loc[] {
   return out;
 }
 
+/** A URL without its query string and hash. */
 export function stripQuery(url: string): string {
   return url.replace(/[?#].*$/, "");
 }

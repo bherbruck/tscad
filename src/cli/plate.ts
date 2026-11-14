@@ -7,6 +7,7 @@ import { orientationNote, plate3MF, plateParts, transformMesh, type PlateResult 
 import { describeError, describePartError, rel, runModel } from "./model";
 import { c, fmtBytes, fmtMs, fmtNum, sym, table } from "./ui";
 
+/** Options of `tscad plate`. */
 export interface PlateCliOptions {
   file: string;
   out?: string;

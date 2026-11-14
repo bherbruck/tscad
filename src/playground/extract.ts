@@ -4,6 +4,7 @@
  * style (interfaces with `/** doc *\/` members), not a TypeScript checker.
  */
 
+/** One prop of an intrinsic element, from the TSX type declarations. */
 export interface PropInfo {
   name: string;
   type: string;
@@ -11,6 +12,7 @@ export interface PropInfo {
   optional: boolean;
 }
 
+/** An intrinsic element and its props. */
 export interface TagInfo {
   tag: string;
   doc: string;
@@ -42,6 +44,7 @@ function members(body: string): PropInfo[] {
   return out;
 }
 
+/** The intrinsic elements and their props from the library's JSX type declarations. */
 export function extractIntrinsics(source: string): TagInfo[] {
   const ifaces = new Map<string, Iface>();
   const re = /export interface (\w+)(?:<[^>]*>)?(?:\s+extends\s+([^{]+))?\s*\{(?:\}|([\s\S]*?)^\})/gm;
@@ -69,6 +72,7 @@ export function extractIntrinsics(source: string): TagInfo[] {
   }));
 }
 
+/** A documented export: its name and TSDoc. */
 export interface NamedDoc {
   name: string;
   doc: string;

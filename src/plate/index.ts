@@ -14,6 +14,7 @@ type V3 = [number, number, number];
 /** Row-major 4×4 (column vectors), like the IR. */
 export type Mat4 = number[];
 
+/** A part to put on the plate: its mesh and how many copies. */
 export interface PlateInput {
   name: string;
   color?: string;
@@ -22,6 +23,7 @@ export interface PlateInput {
   copies?: number;
 }
 
+/** One way to lay a part down: the face that goes on the bed and what it costs. */
 export interface OrientationChoice {
   /** The part-space direction that ends up pointing down (−Z). */
   down: V3;
@@ -38,6 +40,7 @@ export interface OrientationChoice {
   height: number;
 }
 
+/** One copy placed on a plate: its orientation and transform. */
 export interface Placed {
   name: string;
   /** 1 for the first copy. */
@@ -53,6 +56,7 @@ export interface Placed {
   rotated90: boolean;
 }
 
+/** Bed size, spacing and orientation policy. */
 export interface PlateOptions {
   /** Bed size x, y, mm. Default 256 × 256. */
   bed?: [number, number];
@@ -64,6 +68,7 @@ export interface PlateOptions {
   maxOverhangDeg?: number;
 }
 
+/** The plates and every placed copy. */
 export interface PlateResult {
   plates: number;
   bed: [number, number];
@@ -80,12 +85,14 @@ const norm = (a: V3): V3 => {
 };
 const I4: Mat4 = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 
+/** Row-major 4×4 matrix product `a · b`. */
 export function mul4(a: Mat4, b: Mat4): Mat4 {
   const o = new Array(16).fill(0);
   for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) for (let k = 0; k < 4; k++) o[r * 4 + c] += a[r * 4 + k]! * b[k * 4 + c]!;
   return o;
 }
 
+/** A point transformed by a row-major 4×4 matrix. */
 export function apply4(m: Mat4, p: V3): V3 {
   return [m[0]! * p[0] + m[1]! * p[1] + m[2]! * p[2] + m[3]!, m[4]! * p[0] + m[5]! * p[1] + m[6]! * p[2] + m[7]!, m[8]! * p[0] + m[9]! * p[1] + m[10]! * p[2] + m[11]!];
 }
@@ -202,12 +209,14 @@ function contactArea(P: Float32Array, I: ArrayLike<number>, z0: number): number 
 
 // ───────────────────────── packing ─────────────────────────
 
+/** A footprint rectangle to pack. */
 export interface PackItem {
   key: number;
   w: number;
   h: number;
 }
 
+/** Where a footprint went: its plate and lower-left corner. */
 export interface PackPlacement {
   key: number;
   plate: number;
@@ -364,7 +373,7 @@ export function plate3MF(parts: ExportPart[], notes: string[], bed: [number, num
   let model = threeMFModel(parts);
   model = model.replace(`<model unit="millimeter"`, `<model unit="millimeter" xmlns:tscad="https://github.com/bherbruck/tscad"`);
   model = model.replace(`<metadata name="Application">tscad</metadata>`, `<metadata name="Application">tscad</metadata>\n  <metadata name="tscad:bed">${bed[0]} x ${bed[1]} mm</metadata>`);
-  parts.forEach((p, i) => {
+  parts.forEach((_p, i) => {
     const open = new RegExp(`(<object id="${i + 2}"[^>]*>)`);
     model = model.replace(open, `$1\n      <metadatagroup>\n        <metadata name="tscad:orientation">${xml(notes[i] ?? "")}</metadata>\n      </metadatagroup>`);
   });

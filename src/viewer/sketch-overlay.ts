@@ -52,6 +52,7 @@ function dot(): THREE.Texture {
   return dotTexture;
 }
 
+/** Constraint sketches drawn over the model: curves, dimensions, patterns and drag handles. */
 export class SketchOverlay {
   readonly root = new THREE.Group();
   #views: SketchView[] = [];

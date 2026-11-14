@@ -5,6 +5,7 @@
 import type { MeshArrays } from "../kernel";
 import type { EvalError, PickInfo } from "../ir";
 
+/** Formats the viewer can export. */
 export type ExportFormat = "step" | "stl" | "3mf" | "glb" | "obj" | "dxf" | "svg";
 
 /** A TSX source position (1-based line and column). */
@@ -23,6 +24,7 @@ export interface CodeFrame {
   lines: [number, string][];
 }
 
+/** A param spec as it travels to the viewer (loosely typed: older and hand-written schemas too). */
 export interface ParamSpec {
   type: string;
   default?: unknown;
@@ -37,9 +39,12 @@ export interface ParamSpec {
   [key: string]: unknown;
 }
 
+/** Param specs by key. */
 export type ParamSchemaData = Record<string, ParamSpec>;
+/** Param values by key. */
 export type ParamValuesData = Record<string, unknown>;
 
+/** A part as the viewer shows it: result, stats, material and errors. */
 export interface PartData {
   name: string;
   color?: string;
@@ -68,6 +73,7 @@ export interface DrawingData {
   segments: Float32Array;
 }
 
+/** A sketch dimension with where to draw it. */
 export interface SketchDimensionData {
   kind: "distance" | "length" | "dx" | "dy" | "radius" | "diameter" | "angle" | "sweep";
   value: number;
@@ -83,6 +89,7 @@ export interface CopyOf {
   copy: number;
 }
 
+/** A sketch pattern (linear or circular) with its instances. */
 export interface SketchPatternData {
   kind: "mirror" | "circular" | "linear" | (string & {});
   of: number[];
@@ -127,6 +134,7 @@ export interface MateDrive {
   scale: number;
 }
 
+/** An assembly mate: its parts, values, residual and drive params. */
 export interface MateData {
   a: string;
   b: string;
@@ -148,6 +156,7 @@ export interface AssemblyData {
   anchors: { part: string; id: string; frame: number[]; loc?: Loc }[];
 }
 
+/** Everything one evaluation sends to the viewer. */
 export interface EvalData {
   assembly?: AssemblyData;
   parts: PartData[];
@@ -165,6 +174,7 @@ export interface EvalData {
   seq: number;
 }
 
+/** A failure at one stage (bundle, render, kernel), located in the source. */
 export interface StageError {
   stage: "import" | "render" | "kernel" | "worker";
   message: string;
@@ -173,6 +183,7 @@ export interface StageError {
   frame?: CodeFrame;
 }
 
+/** Messages to the eval worker. */
 export type ToWorker =
   | {
       type: "init";
@@ -208,6 +219,7 @@ export interface CheckMeshData {
   faceIds: Uint32Array;
 }
 
+/** Printability check results per part (overhang and thin-wall faces). */
 export interface PrintabilityData {
   name: string;
   /** Per triangle, 0 = fine … 1 = flat ceiling. */
@@ -221,6 +233,7 @@ export interface PrintabilityData {
   warnings: string[];
 }
 
+/** Interference check results: overlapping part pairs and their volumes. */
 export interface InterferenceData {
   pairs: { a: string; b: string; volume: number; mesh?: { positions: Float32Array; indices: Uint32Array } }[];
   checked: number;
@@ -228,6 +241,7 @@ export interface InterferenceData {
   millis: number;
 }
 
+/** Messages from the eval worker. */
 export type FromWorker =
   | { type: "ready"; version: string; loadMs: number; pool: number; /** Evaluating with the native kernel (server-side). */ native?: boolean }
   | { type: "busy"; stage: "loading" | "rendering" | "evaluating" }
@@ -240,6 +254,7 @@ export type FromWorker =
   | { type: "sketch-drag"; id: number; result?: SketchDragData; error?: string }
   | { type: "plate"; id: number; result?: PlateData; files?: Uint8Array[]; error?: string };
 
+/** A print plate layout for the viewer. */
 export interface PlateData {
   plates: number;
   bed: [number, number];
@@ -256,10 +271,12 @@ export interface SketchDragData {
   changes: SketchChange[];
 }
 
+/** A sketch edit from a drag: a dimension or a point moved. */
 export type SketchChange =
   | { kind: "prop"; loc: Loc; tag: string; prop: string; value: number; reason: "point" | "dimension"; param?: { name: string; value: number } }
   | { kind: "addPoint"; sketch: Loc; id: string; x: number; y: number };
 
+/** A geometry diff against the pinned version. */
 export interface DiffData {
   /** The evaluation (`EvalData.seq`) this diff is for. */
   seq: number;

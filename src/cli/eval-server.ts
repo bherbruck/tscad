@@ -10,6 +10,7 @@ import { SRC } from "./bundle";
 import type { BunBundle } from "./model";
 import { decode, encode } from "../viewer/wire";
 
+/** One browser connection evaluated on the server: a bun worker running the eval worker, bridged to the WebSocket. */
 export class EvalSession {
   #worker: Worker;
   #closed = false;

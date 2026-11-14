@@ -2,10 +2,10 @@
  * The tscad viewer app: wires the dev-server socket, the eval worker, the 3D viewport and the
  * panels. Configured by `window.__TSCAD__` (the dev server injects it; a static playground can too).
  */
-import { copyText, escapeHtml, h, icon, LOGO } from "./dom";
+import { copyText, h, icon, LOGO } from "./dom";
 import { hashToValues, ParamsPanel, valuesToHash } from "./params";
-import type { CodeFrame, EvalData, ExportFormat, FromWorker, Loc, ParamSchemaData, ParamValuesData, PartData, StageError, ToWorker } from "./protocol";
-import { fmtNum, PALETTE, type Hit, type SectionAxis, type ViewName, Viewport } from "./scene";
+import type { EvalData, FromWorker, Loc, ParamSchemaData, ParamValuesData, PartData, StageError, ToWorker } from "./protocol";
+import { fmtNum, PALETTE, type Hit, type ViewName, Viewport } from "./scene";
 import { SketchOverlay } from "./sketch-overlay";
 import { AssemblyOverlay } from "./assembly-overlay";
 import { RemoteWorker } from "./remote";
@@ -14,11 +14,25 @@ import { DiffOverlay } from "./diff-overlay";
 import { PlateOverlay } from "./plate-overlay";
 import type { PlateData } from "./protocol";
 import type { DiffData } from "./protocol";
-import type { InterferenceData, PrintabilityData } from "./protocol";
-import type { MateData, SketchChange, SketchData, SketchDimensionData, SketchDragData } from "./protocol";
-import { describe, selectorAttr } from "./selectors";
+import type { MateData, SketchChange, SketchData, SketchDimensionData } from "./protocol";
 import type { PickInfo } from "../ir";
+import { installErrors } from "./ui/errors";
+import { installInspector } from "./ui/inspector";
+import { installStats } from "./ui/stats";
+import { installParts } from "./ui/parts";
+import { installPlatePanel } from "./ui/plate-panel";
+import { installDiffPanel } from "./ui/diff-panel";
+import { installSketchDrag } from "./ui/sketch-drag";
+import { installChecksPanel } from "./ui/checks-panel";
+import { installExportMenu } from "./ui/export-menu";
+import { fmtMs, shortFile } from "./ui/format";
+import { installToolbar } from "./ui/toolbar";
+import { installHelp } from "./ui/help";
+import { installGizmo } from "./ui/gizmo";
+import { installPointer } from "./ui/pointer";
+import type { ViewerContext, ViewerState } from "./ui/context";
 
+/** How the viewer is hosted: where it gets models and where it sends edits. */
 export interface ViewerConfig {
   wasmUrl: string;
   glueUrl: string;
@@ -54,6 +68,7 @@ export interface ViewerConfig {
   debugGlobal?: boolean;
 }
 
+/** A bundling failure as the viewer shows it. */
 export interface BundleError {
   message: string;
   file?: string;
@@ -63,12 +78,14 @@ export interface BundleError {
   lines?: [number, string][];
 }
 
+/** What the host did with a sketch drag: applied, or refused with a reason. */
 export interface SketchEditResult {
   applied: number;
   refused: { reason: string; param?: { name: string; value: number } }[];
   error?: string;
 }
 
+/** Control of a mounted viewer. */
 export interface ViewerApi {
   /** Evaluate a bundled model module (any importable URL; blob: works). `map` is its raw source map. */
   load(url: string, map?: object, opts?: { resetParams?: boolean; refit?: boolean }): void;
@@ -83,16 +100,6 @@ export interface ViewerApi {
 
 export type { StageError, EvalData };
 
-const FORMATS: { id: ExportFormat; name: string; desc: string; ext: string; mime: string }[] = [
-  { id: "step", name: "STEP", desc: "Exact B-rep · CAD interchange", ext: "step", mime: "model/step" },
-  { id: "stl", name: "STL", desc: "Binary mesh · 3D printing", ext: "stl", mime: "model/stl" },
-  { id: "3mf", name: "3MF", desc: "Mesh with colours · slicers", ext: "3mf", mime: "model/3mf" },
-  { id: "glb", name: "GLB", desc: "glTF binary · web & AR", ext: "glb", mime: "model/gltf-binary" },
-  { id: "obj", name: "OBJ", desc: "Wavefront mesh", ext: "obj", mime: "model/obj" },
-  { id: "dxf", name: "DXF", desc: "2D · drawings, or a mid-height section", ext: "dxf", mime: "image/vnd.dxf" },
-  { id: "svg", name: "SVG", desc: "2D · laser cutters & docs", ext: "svg", mime: "image/svg+xml" },
-];
-
 /** Mount the viewer app (top bar, 3D workspace, panels, eval worker) into `root`. */
 export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {}): ViewerApi {
   const cfg: ViewerConfig = {
@@ -102,9 +109,77 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
     ...config,
   };
 
+  // ── UI features (src/viewer/ui/*): they reach the viewer state through `ctx` (read lazily).
+  const ctx = {
+    get applyAnchorButton() { return applyAnchorButton; },
+    get applySketchVisibility() { return applySketchVisibility; },
+    get assembly() { return assembly; },
+    get cfg() { return cfg; },
+    get checkState() { return checkState; },
+    get checkSummary() { return checkSummary; },
+    get checks() { return checks; },
+    get checksPop() { return checksPop; },
+    get diffBody() { return diffBody; },
+    get diffCard() { return diffCard; },
+    get diffState() { return diffState; },
+    get diffView() { return diffView; },
+    get errorBox() { return errorBox; },
+    get exportBtn() { return exportBtn; },
+    get exportMenu() { return exportMenu; },
+    get gizmo() { return gizmo; },
+    get helpBtn() { return helpBtn; },
+    get helpPop() { return helpPop; },
+    get inspectorBody() { return inspectorBody; },
+    get inspectorCard() { return inspectorCard; },
+    get left() { return left; },
+    get params() { return params; },
+    get partsList() { return partsList; },
+    get pinBtn() { return pinBtn; },
+    get plateBody() { return plateBody; },
+    get plateCard() { return plateCard; },
+    get plateState() { return plateState; },
+    get plateView() { return plateView; },
+    get request() { return request; },
+    get right() { return right; },
+    get row() { return row; },
+    get sectionPop() { return sectionPop; },
+    get send() { return send; },
+    get showTip() { return showTip; },
+    get sketches() { return sketches; },
+    get sourceClick() { return sourceClick; },
+    get state() { return state; },
+    get statsBody() { return statsBody; },
+    get statsSummary() { return statsSummary; },
+    get tb() { return tb; },
+    get toast() { return toast; },
+    get updateInsets() { return updateInsets; },
+    get viewport() { return viewport; },
+    get worker() { return worker; },
+  } as ViewerContext;
+  const { applyAnchorButton, applySketchVisibility, buildSectionPopover, toggleAnchors, toggleEdges, toggleMeasure, toggleOrtho, toggleSection, toggleSketches, toggleWire, toggleXray } = installToolbar(ctx);
+  const { buildHelp } = installHelp(ctx);
+  const { drawGizmo } = installGizmo(ctx);
+  const errorsUi = installErrors(ctx);
+  const { renderError } = errorsUi;
+  const inspectorUi = installInspector(ctx);
+  const { select } = inspectorUi;
+  const statsUi = installStats(ctx);
+  const { renderStats, row } = statsUi;
+  const partsUi = installParts(ctx);
+  const { renderParts } = partsUi;
+  const platePanelUi = installPlatePanel(ctx);
+  const { runPlate, togglePlate } = platePanelUi;
+  const diffPanelUi = installDiffPanel(ctx);
+  const { renderDiff, toggleDiff, togglePin } = diffPanelUi;
+  const sketchDragUi = installSketchDrag(ctx);
+  const checksPanelUi = installChecksPanel(ctx);
+  const { buildChecksPopover, runChecks } = checksPanelUi;
+  const exportMenuUi = installExportMenu(ctx);
+  const { buildExportMenu } = exportMenuUi;
+
   // ───────────────────────── state ─────────────────────────
 
-  const state = {
+  const state: ViewerState = {
     data: undefined as EvalData | undefined,
     error: undefined as StageError | undefined,
     bundleErrors: [] as BundleError[],
@@ -162,10 +237,6 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
     hoverTip.classList.add("hidden");
   };
   /** The user's choice for the sketch overlay (undefined: on when the model has sketches). */
-  let sketchPref: boolean | undefined = (() => {
-    const v = localStorage.getItem("tscad.sketches");
-    return v === null ? undefined : v === "1";
-  })();
   sketches.onPatternClick = (sk, pat) => {
     const loc = pat.loc ?? sk.loc;
     if (loc) sourceClick(loc, { kind: "sketch", sketch: sk });
@@ -520,260 +591,6 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
     );
   }
 
-  function fmtMs(ms: number) {
-    return ms < 10 ? `${ms.toFixed(1)} ms` : ms < 1000 ? `${ms.toFixed(0)} ms` : `${(ms / 1000).toFixed(2)} s`;
-  }
-
-  function fmtVol(mm3: number) {
-    return mm3 >= 1e5 ? `${fmtNum(mm3 / 1000)} cm³` : `${fmtNum(mm3)} mm³`;
-  }
-
-  function fmtMass(g: number) {
-    return g >= 1000 ? `${fmtNum(g / 1000)} kg` : `${fmtNum(g)} g`;
-  }
-
-  function renderStats() {
-    const d = state.data;
-    statsBody.replaceChildren();
-    statsSummary.textContent = d ? `${fmtVol(d.parts.reduce((s, p) => s + (p.ok ? (p.volume ?? 0) : 0), 0))} · ${fmtMs(d.timings.total)}` : "";
-    if (!d) return void statsBody.append(h("div", { class: "empty" }, "No model evaluated yet."));
-    const ok = d.parts.filter((p) => p.ok && !p.empty);
-    const totalVol = ok.reduce((s, p) => s + (p.volume ?? 0), 0);
-    const tris = ok.reduce((s, p) => s + (p.mesh ? p.mesh.indices.length / 3 : 0), 0);
-    const box = viewport.bounds;
-    const size = ok.length ? [box.max.x - box.min.x, box.max.y - box.min.y, box.max.z - box.min.z] : [NaN, NaN, NaN];
-    const masses = ok.filter((p) => p.density !== undefined);
-    const mass = masses.reduce((s, p) => s + ((p.volume ?? 0) / 1000) * p.density!, 0);
-    const cached = d.cacheMisses === 0 && d.cacheHits > 0;
-
-    statsBody.append(
-      h(
-        "div",
-        { class: "kpis" },
-        kpi("Volume", fmtVol(totalVol)),
-        masses.length ? kpi("Mass", fmtMass(mass)) : kpi("Parts", String(d.parts.length)),
-        kpi("Size", size.map((v) => fmtNum(v, 1)).join(" × "), "mm"),
-      ),
-      h(
-        "div",
-        { class: "timing" },
-        h("div", { class: "timing-bar" }, ...(["render", "kernel", "mesh"] as const).map((k) => h("i", { class: k, style: { flexGrow: String(Math.max(d.timings[k], 0.01)) }, title: `${k}: ${fmtMs(d.timings[k])}` }))),
-        h(
-          "div",
-          { class: "timing-legend" },
-          h("span", { class: "render" }, `jsx ${fmtMs(d.timings.render)}`),
-          h("span", { class: "kernel" }, `kernel ${fmtMs(d.timings.kernel)}`),
-          h("span", { class: "mesh" }, `mesh ${fmtMs(d.timings.mesh)}`),
-          cached ? h("span", { class: "cache-badge" }, icon("zap", 11), "cached") : h("span", { class: "muted" }, `${d.cacheHits}/${d.cacheHits + d.cacheMisses} cache hits`),
-        ),
-      ),
-      h(
-        "div",
-        { class: "stat-rows" },
-        row("Triangles", tris.toLocaleString()),
-        row("Kernel", state.kernelVersion ? `solidcore ${state.kernelVersion}${d.workers > 1 ? ` · ${d.workers}× parallel` : ""}` : "—"),
-      ),
-    );
-    for (const w of d.warnings) statsBody.append(h("div", { class: "warning" }, icon("alert", 12), w));
-  }
-
-  function kpi(label: string, value: string, unit?: string) {
-    return h("div", { class: "kpi" }, h("div", { class: "kpi-label" }, label), h("div", { class: "kpi-value" }, value, unit ? h("small", null, ` ${unit}`) : null));
-  }
-
-  function row(k: string, v: string | HTMLElement) {
-    return h("div", { class: "stat-row" }, h("span", null, k), h("b", null, v));
-  }
-
-  // ───────────────────────── parts ─────────────────────────
-
-  let isolated: string | undefined;
-
-  function renderParts() {
-    const d = state.data;
-    partsList.replaceChildren();
-    if (!d) return void partsList.append(h("div", { class: "empty pad" }, "Parts appear here once the model builds."));
-    d.parts.forEach((p, i) => {
-      const view = viewport.parts.get(p.name);
-      const color = state.colors[p.name] ?? p.color ?? PALETTE[i % PALETTE.length]!;
-      const visible = view ? view.visible : true;
-      const swatch = h("input", { type: "color", value: toHexColor(color), class: "swatch-input", title: "Display colour" }) as HTMLInputElement;
-      swatch.addEventListener("input", () => {
-        state.colors[p.name] = swatch.value;
-        (swatch.parentElement as HTMLElement).style.setProperty("--c", swatch.value);
-        viewport.setPartColor(p.name, swatch.value);
-      });
-      const eye = h("button", { class: "icon-btn sm", title: visible ? "Hide" : "Show", onclick: () => { viewport.setPartVisible(p.name, !(viewport.parts.get(p.name)?.visible ?? true)); isolated = undefined; renderParts(); } }, icon(visible ? "eye" : "eyeOff", 14));
-      const iso = h("button", { class: `icon-btn sm${isolated === p.name ? " active" : ""}`, title: "Isolate", onclick: () => isolate(p.name) }, icon("target", 14));
-      const asmPart = d.assembly?.parts.find((x) => x.name === p.name);
-      const meta: string[] = [];
-      if (asmPart && asmPart.dof > 0) meta.push(`⚠ ${asmPart.dof} DOF free`);
-      if (asmPart?.grounded) meta.push("grounded");
-      if (p.ok && p.volume !== undefined) meta.push(fmtVol(p.volume));
-      if (p.ok && p.density !== undefined && p.volume !== undefined) meta.push(fmtMass((p.volume / 1000) * p.density));
-      if (p.counts) meta.push(`${p.counts[0]}F ${p.counts[1]}E`);
-      const el = h(
-        "div",
-        { class: `part${visible ? "" : " hidden-part"}${p.ok ? "" : " failed"}` },
-        h("label", { class: "swatch", style: { "--c": color } as any }, swatch),
-        h(
-          "div",
-          { class: "part-main" },
-          h("div", { class: "part-name" }, p.name, p.cached ? h("span", { class: "cache-chip", title: "From the kernel cache" }, icon("zap", 10)) : null, p.material ? h("span", { class: "chip" }, p.material) : null),
-          h("div", { class: "part-meta" }, p.ok ? meta.join(" · ") : p.error ? `${p.error.op} failed` : "failed"),
-        ),
-        h("div", { class: "part-actions" }, iso, eye),
-      );
-      el.addEventListener("mouseenter", () => p.bbox && el.classList.add("hover"));
-      el.addEventListener("mouseleave", () => el.classList.remove("hover"));
-      el.title = p.bbox ? `${p.name}\nbbox ${p.bbox[0].map((v) => fmtNum(v)).join(", ")} → ${p.bbox[1].map((v) => fmtNum(v)).join(", ")}\n${p.counts ? `${p.counts[0]} faces, ${p.counts[1]} edges, ${p.counts[2]} vertices` : ""}\n${fmtMs(p.millis)}` : p.name;
-      partsList.append(el);
-    });
-    if (d.assembly?.mates.length) {
-      if (d.parts.length > 1) {
-        const ex = h("input", { type: "range", min: 0, max: 1, step: 0.01, value: String(assembly.explode) }) as HTMLInputElement;
-        const paint = () => ex.style.setProperty("--fill", `${Number(ex.value) * 100}%`);
-        paint();
-        ex.addEventListener("input", () => {
-          paint();
-          assembly.setExplode(Number(ex.value));
-        });
-        partsList.prepend(h("div", { class: "explode-row" }, h("span", null, "Explode"), ex));
-      }
-      for (const m of d.assembly.mates) {
-        const val = [m.angle !== undefined ? `${+m.angle.toFixed(2)}°` : "", m.offset !== undefined ? `${+m.offset.toFixed(2)} mm` : ""].filter(Boolean).join(" ");
-        const drive = [m.drive?.angle?.param, m.drive?.offset?.param].filter(Boolean);
-        const chip = m.ok ? h("span", { class: "sk-chip ok", title: `residual ${m.residual.toExponential(1)} mm` }, icon("check", 11), "ok") : h("span", { class: "sk-chip bad", title: `residual ${m.residual.toFixed(3)} mm` }, icon("x", 11), "unsolved");
-        const row = h(
-          "button",
-          { class: "part sketch-row", title: `${m.type} mate${m.loc ? ` — click to show it in the code (${shortFile(m.loc.file)}:${m.loc.line})` : ""}${drive.length ? `\ndriven by ${drive.join(", ")} — drag its gizmo` : ""}` },
-          h("span", { class: "swatch mate-swatch" }, icon(m.type === "slider" ? "slider" : m.type === "fastened" ? "link" : "joint", 12)),
-          h(
-            "div",
-            { class: "part-main" },
-            h("div", { class: "part-name" }, m.type, chip, drive.length ? h("span", { class: "chip" }, drive.join(", ")) : null),
-            h("div", { class: "part-meta" }, `${m.a} → ${m.b}${val ? ` · ${val}` : ""}`),
-          ),
-        );
-        row.addEventListener("click", () => m.loc && sourceClick(m.loc, { kind: "mate", mate: m }));
-        partsList.append(row);
-      }
-    }
-    (d.sketches ?? []).forEach((sk, i) => {
-      const status = sk.status === "ok" ? "ok" : sk.status === "under" ? "under" : "bad";
-      const chip =
-        status === "ok"
-          ? h("span", { class: "sk-chip ok", title: "Fully constrained" }, icon("check", 11), "constrained")
-          : status === "under"
-            ? h("span", { class: "sk-chip under", title: `Still free:\n${sk.free.join("\n")}` }, icon("alert", 11), `${sk.dof} DOF`)
-            : h("span", { class: "sk-chip bad", title: sk.free.join("\n") || sk.status }, icon("x", 11), "conflict");
-      const where = sk.loc ? `${shortFile(sk.loc.file)}:${sk.loc.line}` : sk.path;
-      const row = h(
-        "button",
-        { class: "part sketch-row", title: sk.loc ? `Sketch ${i + 1} — click to show it in the code (${where})` : `Sketch ${i + 1}` },
-        h("span", { class: "swatch sketch-swatch" }, icon("sketch", 12)),
-        h("div", { class: "part-main" }, h("div", { class: "part-name" }, `Sketch ${i + 1}`, chip), h("div", { class: "part-meta" }, `${sk.part ?? "part"} · ${sk.entities.length} curves · ${sk.dimensions.length} dims · ${where}`)),
-      );
-      row.addEventListener("click", () => sk.loc && sourceClick(sk.loc, { kind: "sketch", sketch: sk }));
-      partsList.append(row);
-    });
-    for (const dr of d.drawings ?? []) {
-      const v = viewport.drawings.get(dr.name);
-      const visible = v?.visible ?? true;
-      const eye = h("button", { class: "icon-btn sm", title: visible ? "Hide" : "Show", onclick: () => { viewport.setDrawingVisible(dr.name, !visible); renderParts(); } }, icon(visible ? "eye" : "eyeOff", 14));
-      partsList.append(
-        h(
-          "div",
-          { class: `part${visible ? "" : " hidden-part"}`, title: `${dr.name}: a flat drawing — export it with tscad build -o ${dr.name}.dxf` },
-          h("span", { class: "swatch drawing-swatch", style: { "--c": v?.color ?? dr.color ?? "#ffb020" } }),
-          h("div", { class: "part-main" }, h("div", { class: "part-name" }, dr.name, h("span", { class: "chip" }, "2D")), h("div", { class: "part-meta" }, `drawing · ${dr.loops} loop${dr.loops === 1 ? "" : "s"}`)),
-          h("div", { class: "part-actions" }, eye),
-        ),
-      );
-    }
-  }
-
-  function isolate(name: string) {
-    const d = state.data;
-    if (!d) return;
-    isolated = isolated === name ? undefined : name;
-    for (const p of d.parts) viewport.setPartVisible(p.name, !isolated || p.name === isolated);
-    renderParts();
-    viewport.fit();
-  }
-
-  function toHexColor(c: string): string {
-    const ctx = document.createElement("canvas").getContext("2d")!;
-    ctx.fillStyle = c;
-    const v = ctx.fillStyle;
-    return v.startsWith("#") ? v : "#888888";
-  }
-
-  // ───────────────────────── errors ─────────────────────────
-
-  function renderError() {
-    cfg.onErrors?.(state.error, state.bundleErrors, state.data);
-    errorBox.replaceChildren();
-    const be = state.bundleErrors;
-    if (!be.length && !state.error) {
-      errorBox.classList.add("hidden");
-      return;
-    }
-    errorBox.classList.remove("hidden");
-    if (be.length) {
-      const e = be[0]!;
-      errorBox.append(errorHead("Build failed", e.message, e.file ? { file: e.file, line: e.line ?? 1, column: e.column ?? 1 } : undefined));
-      if (e.line && (e.lines?.length || e.lineText !== undefined)) errorBox.append(frameEl({ file: e.file ?? "", line: e.line, column: e.column ?? 1, lines: e.lines?.length ? e.lines : [[e.line, e.lineText!]] }));
-      if (be.length > 1) errorBox.append(h("div", { class: "err-more" }, `+${be.length - 1} more`));
-      return;
-    }
-    const e = state.error!;
-    const title = { import: "Module failed to load", render: "Render failed", kernel: "Kernel error", worker: "Worker error" }[e.stage];
-    errorBox.append(errorHead(title, e.message, e.loc));
-    if (e.frame) errorBox.append(frameEl(e.frame));
-    if (e.stage === "kernel" && e.stack) errorBox.append(h("div", { class: "err-path" }, e.stack));
-    else if (e.stack && !e.frame) errorBox.append(h("pre", { class: "err-stack" }, e.stack.split("\n").slice(0, 6).join("\n")));
-    if (e.stage === "kernel" && state.data?.parts.some((p) => !p.ok && viewport.parts.has(p.name))) errorBox.append(h("div", { class: "err-hint" }, "Showing the last good geometry in red."));
-  }
-
-  function errorHead(title: string, message: string, loc?: Loc) {
-    return h(
-      "div",
-      { class: "err-head" },
-      icon("alert", 16),
-      h("div", { class: "err-text" }, h("div", { class: "err-title" }, title, loc ? h("button", { class: "err-loc", title: "Show in the code", onclick: () => sourceClick(loc, { kind: "error", message }) }, `${shortFile(loc.file)}:${loc.line}:${loc.column}`) : null), h("div", { class: "err-msg" }, message)),
-      h("button", { class: "icon-btn sm", title: "Dismiss", onclick: () => errorBox.classList.add("hidden") }, icon("x", 14)),
-    );
-  }
-
-  function frameEl(f: CodeFrame) {
-    const pre = h("pre", { class: "code-frame" });
-    const width = String(f.lines[f.lines.length - 1]?.[0] ?? 0).length;
-    for (const [n, text] of f.lines) {
-      const hot = n === f.line;
-      pre.append(h("div", { class: `cf-line${hot ? " hot" : ""}` }, h("span", { class: "cf-n" }, String(n).padStart(width)), h("span", { class: "cf-t", html: highlightTsx(text) })));
-      if (hot) pre.append(h("div", { class: "cf-caret" }, h("span", { class: "cf-n" }, " ".repeat(width)), h("span", null, " ".repeat(Math.max(0, f.column - 1)) + "^")));
-    }
-    return pre;
-  }
-
-  function shortFile(f: string) {
-    return f.replace(/^.*?:\/\/[^/]+/, "").replace(/^\.?\//, "");
-  }
-
-  /** A light TSX highlighter for code frames. */
-  function highlightTsx(src: string): string {
-    const re = /(\/\/.*$)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)|(<\/?[a-zA-Z][\w.]*)|\b(const|let|var|function|return|export|default|import|from|if|else|for|of|in|new|type|interface)\b|\b(\d+(?:\.\d+)?)\b/g;
-    let out = "", last = 0;
-    for (const m of src.matchAll(re)) {
-      out += escapeHtml(src.slice(last, m.index));
-      const cls = m[1] ? "c" : m[2] ? "s" : m[3] ? "t" : m[4] ? "k" : "n";
-      out += `<span class="tk-${cls}">${escapeHtml(m[0])}</span>`;
-      last = m.index! + m[0].length;
-    }
-    return out + escapeHtml(src.slice(last));
-  }
-
   // ───────────────────────── params ─────────────────────────
 
   let hashTimer = 0;
@@ -811,289 +628,14 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
     if (await copyText(url)) toast("Link copied — it reproduces these parameters");
   }
 
-  // ───────────────────────── picking ─────────────────────────
+  // ───────────────────────── pointer ─────────────────────────
 
-  let hoverFrame = 0;
-  let lastMove: PointerEvent | undefined;
-  let downAt: { x: number; y: number; t: number } | undefined;
-
-  viewport.canvas.addEventListener("pointermove", (e) => {
-    lastMove = e;
-    if (e.buttons) {
-      hoverTip.classList.add("hidden");
-      return;
-    }
-    if (hoverFrame) return;
-    hoverFrame = requestAnimationFrame(() => {
-      hoverFrame = 0;
-      const ev = lastMove!;
-      if (plateState.on) {
-        viewport.setHover(undefined);
-        hoverTip.classList.add("hidden");
-        viewport.canvas.style.cursor = "";
-        return;
-      }
-      const sp = !state.measure ? sketches.pickPoint(ev.clientX, ev.clientY) : undefined;
-      if (sp) {
-        viewport.setHover(undefined);
-        viewport.canvas.style.cursor = "move";
-        return showTip(`point ${sp.id}${sp.free ? "" : " (fixed)"} — drag to move · Shift: change dimensions`);
-      }
-      const giz = !state.measure ? assembly.hover(ev.clientX, ev.clientY) : undefined;
-      if (giz) {
-        viewport.setHover(undefined);
-        viewport.canvas.style.cursor = giz.drive ? "grab" : "help";
-        return showTip(assembly.describe(giz));
-      }
-      const hit = viewport.hitTest(ev.clientX, ev.clientY);
-      viewport.setHover(hit);
-      viewport.canvas.style.cursor = hit ? (state.measure ? "crosshair" : "pointer") : state.measure ? "crosshair" : "";
-      if (hit) {
-        const r = stage.getBoundingClientRect();
-        hoverTip.classList.remove("hidden");
-        hoverTip.textContent = state.measure ? `${fmtNum(hit.point.x)}, ${fmtNum(hit.point.y)}, ${fmtNum(hit.point.z)}` : `${hit.kind} ${hit.index} · ${hit.part}`;
-        hoverTip.style.transform = `translate(${ev.clientX - r.left + 14}px, ${ev.clientY - r.top + 16}px)`;
-      } else hoverTip.classList.add("hidden");
-    });
-  });
-  viewport.canvas.addEventListener("pointerleave", () => {
-    viewport.setHover(undefined);
-    hoverTip.classList.add("hidden");
-  });
-  viewport.canvas.addEventListener("pointerdown", (e) => (downAt = { x: e.clientX, y: e.clientY, t: performance.now() }));
-  // Joint gizmos get the pointer before the orbit controls (capture phase on the stage).
-  stage.addEventListener(
-    "pointerdown",
-    (e) => {
-      if (e.button !== 0 || state.measure || e.target !== viewport.canvas) return;
-      const sp = sketches.pickPoint(e.clientX, e.clientY);
-      if (sp) {
-        e.stopPropagation();
-        downAt = undefined;
-        sketchDrag = { ...sp, target: undefined, inflight: false, queued: false, result: undefined, shift: e.shiftKey };
-        viewport.controls.enabled = false;
-        try {
-          viewport.canvas.setPointerCapture(e.pointerId);
-        } catch {
-          /* synthetic */
-        }
-        return;
-      }
-      const g = assembly.beginDrag(e.clientX, e.clientY);
-      if (g === false) return;
-      e.stopPropagation();
-      downAt = undefined;
-      if (!g?.drive) {
-        if (g) toast(`${assembly.describe(g)} — bind its ${g.field} to a param to drag it`);
-        return;
-      }
-      viewport.controls.enabled = false;
-      try {
-        viewport.canvas.setPointerCapture(e.pointerId);
-      } catch {
-        /* synthetic pointer */
-      }
-      viewport.canvas.style.cursor = "grabbing";
-    },
-    { capture: true },
-  );
-  stage.addEventListener(
-    "pointermove",
-    (e) => {
-      if (sketchDrag) {
-        lastMove = e;
-        e.stopPropagation();
-        sketchDrag.shift = e.shiftKey;
-        const t = sketches.toSketch(sketchDrag.sketch, e.clientX, e.clientY);
-        if (t) {
-          sketchDrag.target = t;
-          void solveDrag();
-        }
-        return;
-      }
-      if (!assembly.dragging) return;
-      lastMove = e;
-      e.stopPropagation();
-      assembly.drag(e.clientX, e.clientY);
-    },
-    { capture: true },
-  );
-  stage.addEventListener(
-    "pointerup",
-    (e) => {
-      if (sketchDrag) {
-        e.stopPropagation();
-        const d = sketchDrag;
-        sketchDrag = undefined;
-        viewport.controls.enabled = true;
-        hoverTip.classList.add("hidden");
-        void finishDrag(d);
-        return;
-      }
-      if (!assembly.dragging) return;
-      e.stopPropagation();
-      assembly.endDrag();
-      runParams({ ...params.values });
-    },
-    { capture: true },
-  );
-  viewport.canvas.addEventListener("pointerup", (e) => {
-    if (!downAt || e.button !== 0) return;
-    const moved = Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y);
-    downAt = undefined;
-    if (moved > 4) return;
-    if (state.measure) {
-      const p = viewport.measurePoint(e.clientX, e.clientY);
-      if (!p) return;
-      const res = viewport.addMeasurePoint(p);
-      if (res) toast(`Distance ${fmtNum(res.a.distanceTo(res.b), 3)} mm`);
-      return;
-    }
-    if (plateState.on) return;
-    select(viewport.hitTest(e.clientX, e.clientY));
-  });
-  viewport.canvas.addEventListener("dblclick", (e) => {
-    if (!viewport.hitTest(e.clientX, e.clientY)) viewport.fit();
-  });
-
-  async function select(hit: Hit | undefined) {
-    viewport.setSelection(hit);
-    if (!hit) {
-      state.selection = undefined;
-      renderInspector();
-      return;
-    }
-    state.selection = { hit };
-    renderInspector();
-    const res = await request<{ info?: PickInfo; error?: string }>({ type: "pick", kind: hit.kind, part: hit.part, index: hit.index });
-    if (state.selection?.hit !== hit) return;
-    state.selection.info = res.info;
-    state.selection.error = res.error;
-    renderInspector();
-  }
-
-  function renderInspector() {
-    const s = state.selection;
-    inspectorCard.classList.toggle("hidden", !s);
-    queueMicrotask(updateInsets);
-    inspectorBody.replaceChildren();
-    if (!s) return;
-    const { hit, info } = s;
-    const noun = hit.kind === "edge" ? "edges" : "faces";
-    const kindLabel = info?.kind ?? "…";
-    inspectorBody.append(
-      h(
-        "div",
-        { class: "sel-head" },
-        h("span", { class: `badge ${hit.kind}` }, hit.kind),
-        h("span", { class: "sel-kind" }, kindLabel),
-        info?.radius !== undefined ? h("span", { class: "chip" }, `r ${fmtNum(info.radius, 3)}`) : null,
-        h("span", { class: "spacer" }),
-        h("span", { class: "muted" }, hit.part),
-      ),
-    );
-    const facts: [string, string][] = [];
-    if (info?.direction) facts.push([hit.kind === "face" ? "Normal" : "Direction", info.direction.map((v) => fmtNum(v, 3)).join(", ")]);
-    if (info?.kind === "line" && info.points.length >= 2) {
-      const a = info.points[0]!, b = info.points[info.points.length - 1]!;
-      facts.push(["Length", `${fmtNum(Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]), 3)} mm`]);
-    }
-    facts.push(["Picked at", [hit.point.x, hit.point.y, hit.point.z].map((v) => fmtNum(v)).join(", ")]);
-    inspectorBody.append(h("div", { class: "stat-rows" }, ...facts.map(([k, v]) => row(k, v))));
-    if (s.error) {
-      inspectorBody.append(h("div", { class: "warning" }, icon("alert", 12), s.error));
-      return;
-    }
-    if (!info) {
-      inspectorBody.append(h("div", { class: "skeleton" }), h("div", { class: "skeleton" }));
-      return;
-    }
-    if ((info as { smooth?: boolean }).smooth) {
-      inspectorBody.append(h("div", { class: "note" }, icon("info", 12), h("span", null, h("b", null, "Smooth edge"), " — a tangent joint between faces, nothing to fillet. Broad selectors skip these; only its index names it.")));
-    }
-    const formToggle = h(
-      "div",
-      { class: "segmented sm" },
-      ...(["string", "builder"] as const).map((f) =>
-        h("button", { class: state.form === f ? "active" : "", onclick: () => { state.form = f; localStorage.setItem("tscad.selectorForm", f); renderInspector(); } }, f === "string" ? '"string"' : "builder"),
-      ),
-    );
-    inspectorBody.append(h("div", { class: "sel-sub" }, h("span", null, "Selectors"), h("span", { class: "spacer" }), formToggle));
-    const list = h("div", { class: "selectors" });
-    // A selector that matches nothing can't be pasted usefully; keep the rest in kernel order.
-    const suggestions = info.suggestions.filter((x) => x.count > 0);
-    suggestions.forEach((sug, i) => {
-      const attr = selectorAttr(sug.selector, noun, state.form);
-      const exact = sug.count === 1;
-      const item = h(
-        "button",
-        { class: `selector${i === 0 ? " best" : ""}`, title: "Copy" },
-        h("code", { html: highlightTsx(attr) }),
-        h("div", { class: "selector-meta" }, h("span", null, describe(sug.selector, noun)), h("span", { class: `count${exact ? " exact" : ""}` }, `${sug.count} ${sug.count === 1 ? noun.replace(/s$/, "") : noun}`)),
-        h("span", { class: "copy" }, icon("copy", 13)),
-      );
-      item.onclick = async () => {
-        if (await copyText(attr)) {
-          item.classList.add("copied");
-          setTimeout(() => item.classList.remove("copied"), 900);
-          toast(`Copied ${attr}`);
-        }
-      };
-      list.append(item);
-    });
-    inspectorBody.append(list);
-    const best = suggestions[0];
-    // A smooth edge has nothing to fillet: no fillet snippet for it.
-    if (best && !(info as { smooth?: boolean }).smooth) {
-      const op = hit.kind === "edge" ? `<fillet radius={1} ${selectorAttr(best.selector, noun, state.form)}>` : `<shell thickness={2} ${selectorAttr(best.selector, noun, state.form)}>`;
-      inspectorBody.append(h("div", { class: "snippet" }, h("code", { html: highlightTsx(op) }), h("button", { class: "icon-btn sm", title: "Copy snippet", onclick: async () => (await copyText(op)) && toast("Snippet copied") }, icon("copy", 13))));
-    }
-  }
+  const pointerUi = installPointer(ctx, { stage, hoverTip, select, runParams, drag: sketchDragUi });
 
   // ───────────────────────── toolbar actions ─────────────────────────
 
-  function toggleAnchors() {
-    if (!assembly.present) return void toast("This model has no anchors or mates");
-    assembly.setShowAnchors(!assembly.showAnchors);
-    try {
-      localStorage.setItem("tscad.anchors", assembly.showAnchors ? "1" : "0");
-    } catch {
-      /* private mode */
-    }
-    applyAnchorButton();
-  }
-
-  function applyAnchorButton() {
-    tb.anchors.classList.toggle("active", assembly.present && assembly.showAnchors);
-    tb.anchors.classList.toggle("dim", !assembly.present);
-  }
-
   function showTip(text: string) {
-    if (!lastMove) return;
-    const r = stage.getBoundingClientRect();
-    hoverTip.classList.remove("hidden");
-    hoverTip.textContent = text;
-    hoverTip.style.transform = `translate(${lastMove.clientX - r.left + 14}px, ${lastMove.clientY - r.top + 16}px)`;
-  }
-
-  function applySketchVisibility() {
-    const has = sketches.count > 0;
-    const on = has && (sketchPref ?? true);
-    sketches.setVisible(on);
-    tb.sketch.classList.toggle("active", on);
-    tb.sketch.classList.toggle("dim", !has);
-    tb.sketch.title = has ? "Sketch overlay (K)" : "Sketch overlay (K) — this model has no constraint sketches";
-  }
-
-  function toggleSketches() {
-    if (!sketches.count) return void toast("This model has no constraint sketches");
-    sketchPref = !sketches.visible;
-    try {
-      localStorage.setItem("tscad.sketches", sketchPref ? "1" : "0");
-    } catch {
-      /* private mode */
-    }
-    applySketchVisibility();
+    pointerUi.showTip(text);
   }
 
   function sourceClick(loc: Loc, target: Parameters<NonNullable<ViewerConfig["onSourceClick"]>>[1]) {
@@ -1103,445 +645,7 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
     toast(`${target.kind === "dimension" ? `${target.dimension.text} — ` : ""}${where} (copied)`);
   }
 
-  function togglePlate() {
-    plateState.on = !plateState.on;
-    tb.plate.classList.toggle("active", plateState.on);
-    plateCard.classList.toggle("hidden", !plateState.on);
-    viewport.clearHover();
-    if (plateState.on) {
-      // Joints and sketches belong to the assembled model, not the plate.
-      assembly.root.visible = false;
-      sketches.setVisible(false);
-      void runPlate();
-    } else {
-      plateView.clear(true, [...viewport.parts.keys()]);
-      plateState.data = undefined;
-      assembly.root.visible = assembly.showAnchors;
-      applySketchVisibility();
-      viewport.fit();
-    }
-    renderPlate();
-    queueMicrotask(updateInsets);
-  }
-
-  /** Orient + pack the current parts in the worker, then show the beds (latest wins). */
-  async function runPlate(download = false) {
-    if (!plateState.on) return;
-    if (plateState.busy && !download) return void (plateState.again = true);
-    plateState.busy = true;
-    renderPlate();
-    const res = await request<{ result?: PlateData; files?: Uint8Array[]; error?: string }>({ type: "plate", bed: plateState.bed, spacing: plateState.spacing, orient: plateState.orient, download });
-    plateState.busy = false;
-    if (!plateState.on) return;
-    plateState.error = res.error ?? "";
-    if (res.result) {
-      const first = !plateState.data;
-      plateState.data = res.result;
-      plateView.show(res.result, [...viewport.parts.keys()]);
-      if (first) viewport.setView("iso");
-    }
-    if (download && res.files) {
-      const base = state.file.replace(/^.*\//, "").replace(/\.[jt]sx?$/, "");
-      res.files.forEach((f, i) => {
-        const a = h("a", { href: URL.createObjectURL(new Blob([f as BlobPart], { type: "model/3mf" })), download: `${base}-plate${res.files!.length > 1 ? `-${i + 1}` : ""}.3mf` });
-        a.click();
-      });
-      toast(`${res.files.length} plate${res.files.length > 1 ? "s" : ""} saved as 3MF`);
-    }
-    renderPlate();
-    if (plateState.again) {
-      plateState.again = false;
-      void runPlate();
-    }
-  }
-
-  function renderPlate() {
-    plateBody.replaceChildren();
-    const num = (value: number, step: number, set: (v: number) => void) => {
-      const i = h("input", { type: "number", value: String(value), step: String(step), min: "1", class: "num" }) as HTMLInputElement;
-      i.addEventListener("change", () => {
-        const v = Number(i.value);
-        if (v > 0) {
-          set(v);
-          try {
-            localStorage.setItem("tscad.bed", JSON.stringify(plateState.bed));
-          } catch {
-            /* private */
-          }
-          void runPlate();
-        }
-      });
-      return h("div", { class: "num-wrap sm" }, i, h("span", { class: "unit" }, "mm"));
-    };
-    const orient = h(
-      "div",
-      { class: "segmented sm" },
-      ...(["auto", "keep"] as const).map((o) => h("button", { class: plateState.orient === o ? "active" : "", title: o === "auto" ? "Least overhang" : "As modelled", onclick: () => { plateState.orient = o; void runPlate(); } }, o === "auto" ? "Best" : "As modelled")),
-    );
-    plateBody.append(
-      h("div", { class: "plate-row" }, h("span", null, "Bed"), num(plateState.bed[0], 1, (v) => (plateState.bed = [v, plateState.bed[1]])), h("span", { class: "muted" }, "×"), num(plateState.bed[1], 1, (v) => (plateState.bed = [plateState.bed[0], v]))),
-      h("div", { class: "plate-row" }, h("span", null, "Spacing"), num(plateState.spacing, 0.5, (v) => (plateState.spacing = v)), orient),
-    );
-    if (plateState.error) plateBody.append(h("div", { class: "warning" }, icon("alert", 12), plateState.error));
-    const d = plateState.data;
-    if (!d) {
-      plateBody.append(h("div", { class: "skeleton" }));
-      return;
-    }
-    plateBody.append(h("div", { class: "diff-head muted" }, `${d.plates} plate${d.plates === 1 ? "" : "s"}${plateState.busy ? " · updating…" : ""}`));
-    for (const it of d.items) {
-      plateBody.append(
-        h(
-          "div",
-          { class: "diff-row" },
-          h("div", { class: "diff-name" }, it.name, d.plates > 1 ? h("span", { class: "chip" }, `plate ${it.plate + 1}`) : null),
-          h("div", { class: "diff-nums" }, h("span", null, `bottom ${it.bottom}`), h("span", { class: it.overhangArea < 1 ? "add" : "rem" }, it.overhangArea < 1 ? "no overhang" : `${(it.overhang * 100).toFixed(1)}% overhang`)),
-          h("div", { class: "diff-size muted" }, `height ${fmtNum(it.height, 1)} mm${it.rotated90 ? " · turned 90°" : ""}`),
-        ),
-      );
-    }
-    plateBody.append(h("button", { class: "btn primary plate-dl", onclick: () => void runPlate(true) }, icon("download", 14), h("span", null, d.plates > 1 ? `Download ${d.plates} plates (3MF)` : "Download plate (3MF)")));
-  }
-
-  function toggleDiff() {
-    diffState.on = !diffState.on;
-    send({ type: "diff", on: diffState.on });
-    tb.diff.classList.toggle("active", diffState.on);
-    diffCard.classList.toggle("hidden", !diffState.on);
-    if (!diffState.on) {
-      diffView.clear();
-      diffState.data = undefined;
-      if (diffState.pinned) togglePin();
-    } else renderDiff();
-    queueMicrotask(updateInsets);
-  }
-
-  function togglePin() {
-    diffState.pinned = !diffState.pinned;
-    send({ type: "diff-pin", pin: diffState.pinned });
-    pinBtn.classList.toggle("active", diffState.pinned);
-    toast(diffState.pinned ? "Pinned: later changes are compared with this version" : "Comparing with the previous version");
-  }
-
-  function renderDiff() {
-    diffBody.replaceChildren();
-    const d = diffState.data;
-    if (!d || d.seq !== state.data?.seq) {
-      diffBody.append(h("div", { class: "empty" }, diffState.pinned ? "Pinned. Change a param or the code to compare." : "Change a param or the code: what it adds shows green, what it removes red."));
-      return;
-    }
-    if (d.baseline === "none") {
-      diffBody.append(h("div", { class: "empty" }, "Change a param or the code to see what it adds (green) and removes (red)."));
-      return;
-    }
-    const vs = d.baseline === "pinned" ? `vs pinned${d.baselineValues ? ` (${changedParams(d.baselineValues)})` : ""}` : "vs previous";
-    diffBody.append(h("div", { class: "diff-head muted" }, `${vs} · ${fmtMs(d.millis)}`));
-    const changed = d.parts.filter((p) => p.status !== "same");
-    if (!changed.length) {
-      diffBody.append(h("div", { class: "empty" }, "No geometry changed."));
-      return;
-    }
-    for (const p of d.parts) {
-      if (p.status === "same") continue;
-      const size = p.deltaSize?.some((v) => Math.abs(v) > 1e-6) ? `Δ ${p.deltaSize.map((v) => (v > 0 ? "+" : "") + fmtNum(v)).join(" × ")} mm` : "";
-      diffBody.append(
-        h(
-          "div",
-          { class: "diff-row" },
-          h("div", { class: "diff-name" }, p.part, p.status !== "changed" ? h("span", { class: `chip ${p.status}` }, p.status) : null),
-          h(
-            "div",
-            { class: "diff-nums" },
-            h("span", { class: "add" }, `+${fmtVol(p.addedVolume)}`),
-            h("span", { class: "rem" }, `−${fmtVol(p.removedVolume)}`),
-            h("span", { class: "net" }, `net ${p.deltaVolume >= 0 ? "+" : "−"}${fmtVol(Math.abs(p.deltaVolume))}`),
-          ),
-          size ? h("div", { class: "diff-size muted" }, size) : null,
-          p.error ? h("div", { class: "warning" }, icon("alert", 12), p.error) : null,
-        ),
-      );
-    }
-  }
-
-  /** "width 60, holes 3": the pinned values that differ from the current ones. */
-  function changedParams(base: ParamValuesData): string {
-    const diffs = Object.entries(base).filter(([k, v]) => state.values[k] !== v).map(([k, v]) => `${k} ${String(v)}`);
-    return diffs.length ? diffs.join(", ") : "same params";
-  }
-
-  // ── sketch drag-to-edit
-
-  let sketchDrag:
-    | { sketch: number; id: string; free: boolean; target?: [number, number]; inflight: boolean; queued: boolean; result?: SketchDragData; shift: boolean }
-    | undefined;
-
-  /** Re-solve for the latest cursor position (one request in flight, latest wins). */
-  async function solveDrag() {
-    const d = sketchDrag;
-    if (!d?.target) return;
-    if (d.inflight) return void (d.queued = true);
-    d.inflight = true;
-    const res = await request<{ result?: SketchDragData; error?: string }>({ type: "sketch-drag", sketch: d.sketch, point: d.id, target: d.target, changeDimensions: d.shift });
-    d.inflight = false;
-    if (sketchDrag !== d) return;
-    if (res.result) {
-      d.result = res.result;
-      sketches.showPreview(d.sketch, res.result.entities, res.result.points, d.id, res.result.reached);
-      const b = res.result.blockedBy[0];
-      showTip(res.result.reached ? `${d.id} → ${d.target.map((v) => fmtNum(v)).join(", ")}${d.shift ? " · changing dimensions" : ""}` : `held by ${b?.label ?? "constraints"}${b?.loc ? ` (line ${b.loc.line})` : ""} — Shift to change it`);
-    } else if (res.error) showTip(res.error);
-    if (d.queued) {
-      d.queued = false;
-      void solveDrag();
-    }
-  }
-
-  /** Drop: write the edits that make the drag the design (or move a param slider). */
-  async function finishDrag(d: NonNullable<typeof sketchDrag>) {
-    while (d.inflight) await new Promise((r) => setTimeout(r, 20));
-    const r = d.result;
-    sketches.clearPreview();
-    if (!r || !d.target) return;
-    const params_: { name: string; value: number }[] = [];
-    const textual = r.changes.filter((c) => {
-      if (c.kind === "prop" && c.param) {
-        params_.push(c.param);
-        return false;
-      }
-      return true;
-    });
-    for (const p of params_) params.setValue(p.name, p.value, true);
-    if (!textual.length) {
-      if (!params_.length) toast(r.blockedBy[0] ? `Nothing to change: held by ${r.blockedBy[0].label}` : "Nothing to change");
-      else toast(`Moved ${params_.map((p) => `${p.name} → ${fmtNum(p.value)}`).join(", ")}`);
-      return;
-    }
-    const apply = cfg.onSketchEdit ?? (cfg.ws ? serverEdit : undefined);
-    if (!apply) return void toast("This viewer can't edit the source");
-    const res = await apply(textual);
-    if (res.error) return void toast(`Edit failed: ${res.error}`);
-    for (const f of res.refused) if (f.param) params.setValue(f.param.name, f.param.value, true);
-    const msg = [res.applied ? `${res.applied} edit${res.applied > 1 ? "s" : ""} written` : "", params_.length ? `moved ${params_.map((p) => p.name).join(", ")}` : "", res.refused.filter((f) => !f.param).map((f) => f.reason)[0] ?? ""].filter(Boolean).join(" · ");
-    toast(msg || "No change");
-  }
-
-  async function serverEdit(changes: SketchChange[]): Promise<SketchEditResult> {
-    try {
-      const r = await fetch("/__edit", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ changes }) });
-      return (await r.json()) as SketchEditResult;
-    } catch (e) {
-      return { applied: 0, refused: [], error: String((e as Error).message) };
-    }
-  }
-
-  function toggleOrtho() {
-    viewport.setOrtho(!viewport.isOrtho);
-    tb.ortho.classList.toggle("active", viewport.isOrtho);
-    tb.ortho.replaceChildren(icon(viewport.isOrtho ? "square" : "square", 17));
-    toast(viewport.isOrtho ? "Orthographic" : "Perspective");
-  }
-  function toggleEdges() {
-    viewport.showEdges = !viewport.showEdges;
-    tb.edges.classList.toggle("active", viewport.showEdges);
-    viewport.restyle();
-  }
-  function toggleWire() {
-    viewport.wireframe = !viewport.wireframe;
-    tb.wire.classList.toggle("active", viewport.wireframe);
-    viewport.restyle();
-  }
-  function toggleXray() {
-    viewport.xray = !viewport.xray;
-    tb.xray.classList.toggle("active", viewport.xray);
-    viewport.restyle();
-  }
-  function toggleSection() {
-    const on = !viewport.section.enabled;
-    viewport.setSection({ enabled: on });
-    tb.section.classList.toggle("active", on);
-    sectionPop.classList.toggle("hidden", !on);
-  }
-  function toggleMeasure() {
-    state.measure = !state.measure;
-    tb.measure.classList.toggle("active", state.measure);
-    if (!state.measure) viewport.clearMeasure();
-    else toast("Click two points to measure · Esc to clear");
-  }
-
-  function buildChecksPopover() {
-    const modes: [CheckMode, string][] = [
-      ["none", "Off"],
-      ["overhang", "Overhang"],
-      ["thin", "Thin walls"],
-      ["interference", "Interference"],
-    ];
-    const seg = h("div", { class: "segmented sm" });
-    const btns = modes.map(([m, label]) =>
-      h("button", { class: m === "none" ? "active" : "", onclick: () => { checkState.mode = m; btns.forEach((b, i) => b.classList.toggle("active", modes[i]![0] === m)); tb.checks.classList.toggle("active", m !== "none"); runChecks(); } }, label),
-    );
-    seg.append(...btns);
-    const num = (value: number, step: number, unit: string, set: (v: number) => void) => {
-      const i = h("input", { type: "number", value: String(value), step: String(step), min: "0", class: "num" }) as HTMLInputElement;
-      i.addEventListener("change", () => {
-        const v = Number(i.value);
-        if (v > 0) {
-          set(v);
-          runChecks();
-        }
-      });
-      return h("div", { class: "num-wrap sm" }, i, h("span", { class: "unit" }, unit));
-    };
-    return h(
-      "div",
-      { class: "checks-pop hidden" },
-      h("div", { class: "checks-row" }, icon("shield", 15), seg, h("span", { class: "spacer" }), h("button", { class: "icon-btn sm", title: "Close", onclick: () => checksPop.classList.add("hidden") }, icon("x", 14))),
-      h(
-        "div",
-        { class: "checks-row opts" },
-        h("label", null, "Max overhang", num(checkState.maxOverhang, 1, "°", (v) => (checkState.maxOverhang = v))),
-        h("label", null, "Min wall", num(checkState.minWall, 0.1, "mm", (v) => (checkState.minWall = v))),
-        h("div", { class: "legend" }, h("i"), h("span", null, "ok → past limit")),
-      ),
-      checkSummary,
-    );
-  }
-
-  /** Run the active check (latest wins), then colour the model. */
-  async function runChecks() {
-    if (checkState.mode === "none") {
-      checks.clear();
-      checkSummary.textContent = "Pick a check to colour the model.";
-      return;
-    }
-    if (checkState.busy) return void (checkState.again = true);
-    const d = state.data;
-    if (!d) return;
-    checkState.busy = true;
-    const mode = checkState.mode;
-    checkSummary.textContent = "Checking…";
-    try {
-      const visible = d.parts.filter((p) => p.ok && !p.empty && (viewport.parts.get(p.name)?.visible ?? true));
-      if (mode === "interference") {
-        const r = await request<{ interference?: InterferenceData; error?: string }>({ type: "check", kind: "interference", parts: visible.map((p) => p.name) });
-        if (r.error || !r.interference) throw new Error(r.error ?? "no result");
-        if (checkState.mode !== mode) return;
-        checks.showInterference(r.interference);
-        const pr = r.interference.pairs;
-        checkSummary.replaceChildren(
-          pr.length
-            ? h("span", { class: "bad" }, `${pr.length} interfering pair${pr.length > 1 ? "s" : ""}: ${pr.map((p) => `${p.a} ∩ ${p.b} ${fmtVol(p.volume)}`).join(" · ")}`)
-            : h("span", { class: "good" }, `No interference (${r.interference.checked} pair${r.interference.checked === 1 ? "" : "s"} checked, ${fmtMs(r.interference.millis)})`),
-        );
-      } else {
-        const parts = visible
-          .map((p) => viewport.parts.get(p.name))
-          .filter((v) => !!v)
-          .map((v) => ({ name: v!.name, positions: v!.data.positions.slice(), indices: v!.data.indices.slice(), faceIds: v!.data.faceIds.slice() }));
-        const r = await request<{ printability?: PrintabilityData[]; error?: string }>({ type: "check", kind: "printability", parts, maxOverhangDeg: checkState.maxOverhang, minWall: checkState.minWall, thickness: mode === "thin" });
-        if (r.error || !r.printability) throw new Error(r.error ?? "no result");
-        if (checkState.mode !== mode) return;
-        checks.showPrintability(r.printability, mode, checkState.minWall);
-        if (mode === "overhang") {
-          const area = r.printability.reduce((s, x) => s + x.overhangArea, 0);
-          checkSummary.replaceChildren(area > 0 ? h("span", { class: "warn" }, `Overhang past ${checkState.maxOverhang}°: ${fmtArea(area)} — needs support`) : h("span", { class: "good" }, `No overhangs past ${checkState.maxOverhang}° (build direction +Z)`));
-        } else {
-          const min = Math.min(...r.printability.map((x) => x.minWall ?? Infinity));
-          const thin = r.printability.some((x) => (x.thinFraction ?? 0) > 0);
-          checkSummary.replaceChildren(thin ? h("span", { class: "bad" }, `Thinnest wall ${fmtNum(min)} mm — under ${checkState.minWall} mm in red`) : h("span", { class: "good" }, `Thinnest wall ${isFinite(min) ? `${fmtNum(min)} mm` : "—"}: all ≥ ${checkState.minWall} mm`));
-        }
-      }
-    } catch (e) {
-      checkSummary.textContent = `Check failed: ${(e as Error).message}`;
-    } finally {
-      checkState.busy = false;
-      if (checkState.again) {
-        checkState.again = false;
-        runChecks();
-      }
-    }
-  }
-
-  function fmtArea(mm2: number) {
-    return mm2 >= 1e4 ? `${fmtNum(mm2 / 100)} cm²` : `${fmtNum(mm2)} mm²`;
-  }
-
-  function buildSectionPopover() {
-    const axes = (["x", "y", "z"] as SectionAxis[]).map((a) =>
-      h("button", { class: a === "z" ? "active" : "", onclick: () => { viewport.setSection({ axis: a }); axes.forEach((b) => b.classList.toggle("active", b.textContent === a.toUpperCase())); } }, a.toUpperCase()),
-    );
-    const slider = h("input", { type: "range", min: 0, max: 1, step: 0.001, value: "0.5" }) as HTMLInputElement;
-    const paint = () => slider.style.setProperty("--fill", `${Number(slider.value) * 100}%`);
-    paint();
-    slider.addEventListener("input", () => {
-      paint();
-      viewport.setSection({ offset: Number(slider.value) });
-    });
-    const flip = h("button", { class: "icon-btn sm", title: "Flip side", onclick: () => viewport.setSection({ flip: !viewport.section.flip }) }, icon("flip", 14));
-    return h("div", { class: "section-pop hidden" }, icon("section", 15), h("div", { class: "segmented sm" }, ...axes), slider, flip);
-  }
-
   // ───────────────────────── export ─────────────────────────
-
-
-  function buildExportMenu() {
-    let tol = 0.01;
-    const tolSeg = h(
-      "div",
-      { class: "segmented sm" },
-      ...[
-        ["Draft", 0.1],
-        ["Normal", 0.01],
-        ["Fine", 0.002],
-      ].map(([label, v]) => h("button", { class: v === tol ? "active" : "", onclick: (e: Event) => { tol = v as number; for (const b of (e.currentTarget as HTMLElement).parentElement!.children) b.classList.toggle("active", b === e.currentTarget); } }, String(label))),
-    );
-    const menu = h(
-      "div",
-      { class: "menu export-menu hidden" },
-      ...FORMATS.map((f) =>
-        h(
-          "button",
-          { class: "menu-item", onclick: () => doExport(f, tol) },
-          h("span", { class: `fmt fmt-${f.id}` }, f.name),
-          h("span", { class: "menu-desc" }, f.desc),
-          h("span", { class: "kbd-hint" }, `.${f.ext}`),
-        ),
-      ),
-      h("div", { class: "menu-foot" }, h("span", null, "Mesh tolerance"), tolSeg),
-    );
-    exportBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      menu.classList.toggle("hidden");
-      helpPop.classList.add("hidden");
-    });
-    document.addEventListener("click", (e) => {
-      if (!menu.contains(e.target as Node)) menu.classList.add("hidden");
-    });
-    return menu;
-  }
-
-  async function doExport(f: (typeof FORMATS)[number], tolerance: number) {
-    exportMenu.classList.add("hidden");
-    const d = state.data;
-    if (!d) return toast("Nothing to export yet");
-    const parts = d.parts.filter((p) => p.ok && !p.empty && (viewport.parts.get(p.name)?.visible ?? true)).map((p) => ({ name: p.name, color: state.colors[p.name] ?? p.color }));
-    if (!parts.length && !((f.id === "dxf" || f.id === "svg") && d.drawings?.length)) return toast("No visible parts to export");
-    const t = performance.now();
-    const done = toast(`Exporting ${f.name}…`, true);
-    const res = await request<{ data?: Uint8Array | string; error?: string }>({ type: "export", format: f.id, parts, tolerance });
-    done();
-    if (res.error || res.data === undefined) return toast(`Export failed: ${res.error}`);
-    const base = state.file.replace(/^.*\//, "").replace(/\.[jt]sx?$/, "");
-    const name = parts.length === 1 && d.parts.length > 1 ? `${base}-${parts[0]!.name}` : base;
-    const blob = new Blob([res.data as BlobPart], { type: f.mime });
-    const a = h("a", { href: URL.createObjectURL(blob), download: `${name}.${f.ext}` });
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-    toast(`${name}.${f.ext} · ${fmtBytes(blob.size)} · ${fmtMs(performance.now() - t)}`);
-  }
-
-  function fmtBytes(n: number) {
-    return n > 1e6 ? `${(n / 1e6).toFixed(1)} MB` : `${(n / 1e3).toFixed(1)} kB`;
-  }
 
   shotBtn.onclick = () => {
     const a = h("a", { href: viewport.screenshot(), download: `${state.file.replace(/^.*\//, "").replace(/\.[jt]sx?$/, "")}.png` });
@@ -1549,44 +653,6 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
   };
 
   // ───────────────────────── help / keys ─────────────────────────
-
-  function buildHelp() {
-    const keys: [string, string][] = [
-      ["F", "Fit to view"],
-      ["1 2 3 4", "Iso · Top · Front · Right"],
-      ["O", "Orthographic / perspective"],
-      ["E", "Toggle edges"],
-      ["W", "Toggle wireframe"],
-      ["T", "X-ray"],
-      ["X", "Section plane"],
-      ["M", "Measure"],
-      ["K", "Sketch overlay"],
-      ["D", "Diff with the previous / pinned version"],
-      ["P", "Plate: print orientation and bed layout"],
-      ["A", "Anchors & joints (drag a joint to drive it)"],
-      ["C", "Checks: overhang, thin walls, interference"],
-      ["Click", "Select face / edge → selectors"],
-      ["Double-click", "Fit (on empty space)"],
-      ["Esc", "Clear selection / measure"],
-      ["?", "This help"],
-    ];
-    const pop = h(
-      "div",
-      { class: "menu help-pop hidden" },
-      h("div", { class: "menu-title" }, "Keyboard shortcuts"),
-      ...keys.map(([k, d]) => h("div", { class: "help-row" }, h("span", null, d), h("span", { class: "keys" }, ...k.split(" ").map((x) => h("kbd", null, x))))),
-      h("div", { class: "menu-foot muted" }, "Drag to orbit · right-drag to pan · scroll to zoom"),
-    );
-    helpBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      pop.classList.toggle("hidden");
-      exportMenu.classList.add("hidden");
-    });
-    document.addEventListener("click", (e) => {
-      if (!pop.contains(e.target as Node)) pop.classList.add("hidden");
-    });
-    return pop;
-  }
 
   window.addEventListener("keydown", (e) => {
     const t = e.target as HTMLElement;
@@ -1644,32 +710,6 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
 
   // ───────────────────────── gizmo ─────────────────────────
 
-  function drawGizmo() {
-    const ax = viewport.axesOnScreen();
-    const R = 34, C = 46;
-    const items = (["x", "y", "z"] as const).flatMap((k) => {
-      const [x, y, z] = ax[k];
-      return [
-        { k, neg: false, x: C + x * R, y: C + y * R, z },
-        { k, neg: true, x: C - x * R, y: C - y * R, z: -z },
-      ];
-    });
-    items.sort((a, b) => a.z - b.z);
-    const color = { x: "var(--axis-x)", y: "var(--axis-y)", z: "var(--axis-z)" };
-    const view: Record<string, ViewName> = { x: "right", "-x": "left", y: "back", "-y": "front", z: "top", "-z": "bottom" };
-    gizmo.innerHTML = `<svg width="92" height="92" viewBox="0 0 92 92">
-      <circle cx="${C}" cy="${C}" r="44" class="gz-bg"/>
-      ${items
-        .map((it) => {
-          const c = color[it.k];
-          const id = `${it.neg ? "-" : ""}${it.k}`;
-          return it.neg
-            ? `<g class="gz-hit" data-view="${view[id]}"><circle cx="${it.x}" cy="${it.y}" r="7" fill="${c}" fill-opacity=".22" stroke="${c}" stroke-opacity=".6"/></g>`
-            : `<line x1="${C}" y1="${C}" x2="${it.x}" y2="${it.y}" stroke="${c}" stroke-width="2.2" stroke-linecap="round"/><g class="gz-hit" data-view="${view[id]}"><circle cx="${it.x}" cy="${it.y}" r="9" fill="${c}"/><text x="${it.x}" y="${it.y + 3.6}" text-anchor="middle">${it.k.toUpperCase()}</text></g>`;
-        })
-        .join("")}
-    </svg>`;
-  }
   gizmo.addEventListener("click", (e) => {
     const g = (e.target as Element).closest("[data-view]");
     if (g) viewport.setView(g.getAttribute("data-view") as ViewName);

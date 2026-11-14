@@ -6,6 +6,7 @@
 import type { FromWorker, ToWorker } from "./protocol";
 import { decode, encode } from "./wire";
 
+/** The eval worker on the server, over a WebSocket, with the Worker interface. */
 export class RemoteWorker {
   onmessage: ((e: MessageEvent<FromWorker>) => void) | null = null;
   onerror: ((e: ErrorEvent) => void) | null = null;

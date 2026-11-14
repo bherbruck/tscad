@@ -5,6 +5,7 @@
  */
 import type { Selector } from "../ir";
 
+/** What a selector selects. */
 export type Noun = "edges" | "faces";
 
 const AX = (a: string) => a.toUpperCase();

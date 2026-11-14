@@ -30,12 +30,15 @@ function runtimePlugin(): BunPlugin {
 let generation = 0;
 const outDir = join(tmpdir(), `tscad-cli-${process.pid}`);
 
+/** A model module: its default export is the model component (renderModule checks this). */
+export type ModelModule = Parameters<typeof renderModule>[0];
+
 /**
  * Import the model module, fresh each call. It is bundled with Bun.build first (JSX → tscad
  * whatever the user's tsconfig says; `tscad` pinned to this package) and its source map
  * points at the original files, so stack traces and source locations name the TSX lines.
  */
-export async function importModel(file: string): Promise<any> {
+export async function importModel(file: string): Promise<ModelModule> {
   const b = await bundleModel(file);
   try {
     return await import(b.path);
@@ -44,6 +47,7 @@ export async function importModel(file: string): Promise<any> {
   }
 }
 
+/** A model bundled for bun (server-side evaluation). */
 export interface BunBundle {
   /** The bundled module, written to a temp file (delete it when done). */
   path: string;
@@ -82,6 +86,7 @@ export async function bundleModel(file: string): Promise<BunBundle> {
   return { path, map };
 }
 
+/** A model rendered and evaluated in-process, with timings. */
 export interface ModelRun {
   rendered: RenderResult;
   result: EvalResult;
@@ -96,6 +101,7 @@ async function useParallel(base: KernelHost, parts: number): Promise<KernelHost 
   return createParallelKernel();
 }
 
+/** Bundle, render and evaluate a model file with param overrides (the CLI's build/info/render/plate path). */
 export async function runModel(file: string, overrides: Record<string, unknown>, opts: { tolerance?: number; noMesh?: boolean; /** Spread ≥ 2 parts over kernel processes (default true). */ parallel?: boolean } = {}): Promise<ModelRun> {
   const t0 = performance.now();
   const [mod, kernel] = await Promise.all([importModel(file), loadKernel()]);

@@ -9,6 +9,7 @@ import type { Viewport } from "./scene";
 /** Gap between plates laid side by side, mm. */
 export const PLATE_GAP = 40;
 
+/** Print plate preview: the bed, and the parts laid out on it. */
 export class PlateOverlay {
   #group = new THREE.Group();
   #mats: LineMaterial[] = [];

@@ -18,6 +18,7 @@ export const RUNTIME_ENTRIES: Record<string, string> = {
   "tscad/parts": "parts/index.ts",
 };
 
+/** A file of the app bundle, served from memory. */
 export interface Asset {
   body: Uint8Array | string;
   type: string;
@@ -42,29 +43,49 @@ export function browserRuntimePlugin(prefix = APP_PREFIX): BunPlugin {
   };
 }
 
-/** Bundle the viewer app, the eval worker and the tscad runtime into memory (shared chunks). */
-export async function buildApp(opts: { minify?: boolean; /** App entries (relative to src/); default the dev viewer. */ entries?: string[] } = {}): Promise<Map<string, Asset>> {
-  const app = opts.entries ?? ["viewer/main.ts"];
-  const entrypoints = [...Object.values(RUNTIME_ENTRIES), ...app, "viewer/worker.ts"].map((e) => resolve(SRC, e));
-  const result = await Bun.build({
-    entrypoints,
+/** The dev viewer's entries (relative to src/). */
+export const VIEWER_ENTRIES = ["viewer/main.ts", "viewer/gallery.ts"];
+
+const NODE_EXTERNALS = ["node:fs/promises", "node:fs", "node:path", "node:url"];
+
+/**
+ * Bundle the tscad runtime, the eval worker and an app (the viewer, or the playground) into memory.
+ *
+ * Two builds: the runtime and the worker share chunks (one runtime instance for the worker and
+ * the user's module) and keep their identifiers, since source capture reads function names from
+ * stack frames. The app page shares no runtime state with them, so it is fully minified
+ * (`minify: false` keeps it readable for debugging).
+ */
+export async function buildApp(opts: { minify?: boolean; /** App entries (relative to src/); default {@link VIEWER_ENTRIES}. */ entries?: string[] } = {}): Promise<Map<string, Asset>> {
+  const common = {
     root: SRC,
     target: "browser",
     format: "esm",
     splitting: true,
-    // Keep identifiers: the runtime's source capture reads function names from stack frames.
-    minify: opts.minify ? { whitespace: true, syntax: true, identifiers: false } : false,
     sourcemap: "linked",
-    naming: { entry: "[dir]/[name].[ext]", chunk: "chunks/[name]-[hash].[ext]", asset: "assets/[name]-[hash].[ext]" },
     define: { "process.env.NODE_ENV": JSON.stringify("development") },
-    // The kernel loads node:fs only for file: URLs, never in the browser.
-    // (and src/cli/parallel.ts, which the worker loads only when it runs in bun)
-    external: ["node:fs/promises", "node:fs", "node:path", "node:url"],
+    // The kernel loads node:fs only for file: URLs, never in the browser
+    // (and src/cli/parallel.ts, which the worker loads only when it runs in bun).
+    external: NODE_EXTERNALS,
     throw: false,
-  });
-  if (!result.success) throw new BundleError("Failed to bundle the tscad viewer", result.logs);
+  } as const;
+  const [runtime, app] = await Promise.all([
+    Bun.build({
+      ...common,
+      entrypoints: [...Object.values(RUNTIME_ENTRIES), "viewer/worker.ts"].map((e) => resolve(SRC, e)),
+      minify: opts.minify ? { whitespace: true, syntax: true, identifiers: false } : false,
+      naming: { entry: "[dir]/[name].[ext]", chunk: "chunks/[name]-[hash].[ext]", asset: "assets/[name]-[hash].[ext]" },
+    }),
+    Bun.build({
+      ...common,
+      entrypoints: (opts.entries ?? VIEWER_ENTRIES).map((e) => resolve(SRC, e)),
+      minify: opts.minify !== false,
+      naming: { entry: "[dir]/[name].[ext]", chunk: "app-chunks/[name]-[hash].[ext]", asset: "assets/[name]-[hash].[ext]" },
+    }),
+  ]);
+  for (const r of [runtime, app]) if (!r.success) throw new BundleError("Failed to bundle the tscad viewer", r.logs);
   const assets = new Map<string, Asset>();
-  for (const out of result.outputs) {
+  for (const out of [...runtime.outputs, ...app.outputs]) {
     const path = out.path.replace(/^\.\//, "");
     assets.set(path, { body: new Uint8Array(await out.arrayBuffer()), type: mime(path) });
   }
@@ -73,6 +94,7 @@ export async function buildApp(opts: { minify?: boolean; /** App entries (relati
   return assets;
 }
 
+/** The user's model bundled for the browser. */
 export interface UserBundle {
   js: string;
   map?: string;
@@ -81,6 +103,7 @@ export interface UserBundle {
   millis: number;
 }
 
+/** One bundler error, with its location and a few source lines. */
 export interface BuildMessage {
   message: string;
   file?: string;
@@ -91,6 +114,7 @@ export interface BuildMessage {
   lines?: [number, string][];
 }
 
+/** Bun.build failed: the messages, located in the user's files. */
 export class BundleError extends Error {
   messages: BuildMessage[];
   constructor(message: string, logs: readonly (BuildMessage | any)[]) {
@@ -174,6 +198,7 @@ export async function buildUser(entry: string, root = dirname(entry)): Promise<U
   return { js, map, inputs: [...inputs], millis: performance.now() - t };
 }
 
+/** The Content-Type for a served path. */
 export function mime(path: string): string {
   if (path.endsWith(".js") || path.endsWith(".mjs")) return "text/javascript; charset=utf-8";
   if (path.endsWith(".css")) return "text/css; charset=utf-8";

@@ -41,6 +41,7 @@ export default function MountingPlate(p: ParamValues<typeof params>) {
 }
 `;
 
+/** The files of a new project named `name`, by relative path. */
 export function files(name: string): Record<string, string> {
   return {
     "package.json": JSON.stringify(

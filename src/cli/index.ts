@@ -60,6 +60,7 @@ ${c.bold("Examples")}
   ${c.gray("$")} tscad build bracket.tsx -o bracket.step -o bracket.stl -p width=80
 `;
 
+/** Run the CLI with argv (after `tscad`); resolves to the exit code. */
 export async function main(argv: string[]): Promise<number> {
   let args: Parsed;
   try {

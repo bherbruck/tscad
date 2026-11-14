@@ -7,11 +7,13 @@
 import { createKernel, loadKernel, type KernelHost, type MeshArrays, KernelPanic } from "../kernel";
 import type { Document, EvalOptions, EvalResult, Part, PartResult, PickInfo } from "../ir";
 
+/** An evaluation and its meshes. */
 export interface Evaluated {
   result: EvalResult;
   meshes: Map<string, MeshArrays>;
 }
 
+/** Something that evaluates documents: a kernel in this thread, a worker, or a process. */
 export interface Evaluator {
   evaluate(doc: Document, opts?: EvalOptions): Promise<Evaluated>;
   pick(kind: "edge" | "face", part: string, index: number): Promise<PickInfo>;
@@ -210,7 +212,7 @@ export class Pool {
     const byIndex: PartResult[] = new Array(parts.length);
     const meshes = new Map<string, MeshArrays>();
     let hits = 0, misses = 0, size = 0;
-    const frames = new Map<string, number[]>();
+    const frames: Record<string, number[]> = {};
     for (const o of outs) {
       if (!o) continue;
       o.r.result.parts.forEach((pr, k) => {
@@ -221,9 +223,10 @@ export class Pool {
       });
       for (const [name, m] of o.r.meshes) meshes.set(name, m);
       // Face frames are keyed by IR path: renumber the sub-document's part index too.
-      const fr = (o.r.result as any).frames as Map<string, number[]> | Record<string, number[]> | undefined;
+      // (older wasm builds returned a Map)
+      const fr = o.r.result.frames as Record<string, number[]> | Map<string, number[]> | undefined;
       for (const [k, v] of fr instanceof Map ? fr : Object.entries(fr ?? {})) {
-        frames.set(k.replace(/^parts\/(\d+)/, (_m, i) => `parts/${o.g[Number(i)]}`), v);
+        frames[k.replace(/^parts\/(\d+)/, (_m, i) => `parts/${o.g[Number(i)]}`)] = v;
       }
       hits += o.r.result.cacheHits;
       misses += o.r.result.cacheMisses;

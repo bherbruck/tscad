@@ -19,6 +19,7 @@ export function isModelSource(name: string, text: string): boolean {
   return /^\s*import\s(?:[^;]*?from\s*)?["']tscad(?:\/[\w-]+)?["']/m.test(text) || /<(part|assembly|drawing|box|cylinder|sphere|cone|torus|extrude|revolve|loft|sweep|union|difference|intersection)[\s/>]/.test(text);
 }
 
+/** A model found by the gallery: its file and what it describes. */
 export interface ModelEntry {
   /** Absolute path. */
   file: string;
@@ -112,6 +113,7 @@ export interface ThumbInfo {
   renderedAt: number;
 }
 
+/** Thumbnail rendering options. */
 export interface ThumbOptions {
   width?: number;
   height?: number;

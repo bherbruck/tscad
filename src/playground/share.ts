@@ -1,6 +1,7 @@
 /** Share links: the model source deflated (fflate) and base64url-encoded into the URL hash. */
 import { deflateSync, inflateSync, strFromU8, strToU8 } from "fflate";
 
+/** Source compressed for a share link (deflate + base64url). */
 export function encodeSource(source: string): string {
   const bytes = deflateSync(strToU8(source), { level: 9 });
   let bin = "";
@@ -8,6 +9,7 @@ export function encodeSource(source: string): string {
   return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
+/** The source from a share link (see {@link encodeSource}). */
 export function decodeSource(encoded: string): string {
   const b64 = encoded.replace(/-/g, "+").replace(/_/g, "/");
   const bin = atob(b64 + "===".slice((b64.length + 3) % 4));

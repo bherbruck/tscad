@@ -18,6 +18,7 @@ import { join } from "node:path";
 import { bundleModel, type BunBundle } from "./model";
 import { loadKernel, WasmKernelHost } from "../kernel";
 
+/** Options of `tscad dev`. */
 export interface DevOptions {
   file: string;
   port?: number;
@@ -39,10 +40,11 @@ export interface DevOptions {
   gallery?: boolean;
 }
 
+/** A running dev server. */
 export interface DevServer {
   url: string;
   port: number;
-  server: Server<any>;
+  server: Server<WsData>;
   /** Where models are evaluated. */
   evalMode: "server" | "browser";
   /** Whether bun has the native kernel (else server-side evaluation uses the wasm). */
@@ -56,6 +58,7 @@ type State =
   | { type: "bundle-error"; errors: BuildMessage[] }
   | { type: "building" };
 
+/** Start the dev server: viewer app, model bundling with hot reload, WebSocket and HTTP API. */
 export async function startDev(opts: DevOptions): Promise<DevServer> {
   const galleryRoot = opts.gallery ? resolve(opts.file) : undefined;
   const firstModel = galleryRoot ? discoverModels(galleryRoot)[0]?.file : undefined;
@@ -68,7 +71,7 @@ export async function startDev(opts: DevOptions): Promise<DevServer> {
   };
   let fileLabel = labelOf(entry);
 
-  let [app, html] = await Promise.all([buildApp({ entries: ["viewer/main.ts", "viewer/gallery.ts"] }), Bun.file(resolve(SRC, "viewer/index.html")).text()]);
+  let [app, html] = await Promise.all([buildApp(), Bun.file(resolve(SRC, "viewer/index.html")).text()]);
   const evalMode = await chooseEvalMode(opts.evaluate ?? "auto");
   const makePage = () => html.replace(
     "<!--TSCAD_CONFIG-->",
@@ -420,7 +423,8 @@ function notFound() {
   return new Response("not found", { status: 404 });
 }
 
-interface WsData {
+/** Per-socket data of the dev server. */
+export interface WsData {
   kind: string;
   session?: EvalSession;
 }

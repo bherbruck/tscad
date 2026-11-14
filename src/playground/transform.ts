@@ -5,11 +5,13 @@
  */
 import { transform as sucrase } from "sucrase";
 
+/** A model compiled for the browser: JS and its source map. */
 export interface Transformed {
   code: string;
   map: { version: number; sources: string[]; sourcesContent: string[]; mappings: string; [k: string]: unknown };
 }
 
+/** A syntax error, located in the source. */
 export interface TransformError {
   message: string;
   line?: number;

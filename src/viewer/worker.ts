@@ -15,7 +15,7 @@ import type { EvalData, FromWorker, Loc, ParamSchemaData, ParamValuesData, PartD
 import { codeFrame, parseStack, SourceMap, stripQuery } from "./sourcemap";
 import type { AssemblyData, DiffData, DrawingData, MateData, SketchData } from "./protocol";
 import { diffDocument, summarize, type PartStats } from "./diff";
-import { orientationNote, plate3MF, plateParts, transformMesh } from "../plate";
+import { mul4, orientationNote, plate3MF, plateParts, transformMesh } from "../plate";
 import type { PlateData } from "./protocol";
 import { flattenNurbs } from "../drawing/common";
 import { polylineLoops, section, toDXF, toSVG } from "../drawing";
@@ -412,7 +412,7 @@ async function run() {
   const data: EvalData = {
     parts,
     drawings,
-    sketches: await sketchesOf(rendered, docParts, (result as any).frames),
+    sketches: await sketchesOf(rendered, docParts, result.frames),
     assembly: await assemblyOf(rendered),
     schema: lastSchema,
     values: rendered.values ?? values,
@@ -509,13 +509,6 @@ async function assemblyOf(rendered: any): Promise<AssemblyData | undefined> {
   return { parts: a.parts, mates, anchors };
 }
 
-/** Row-major 4×4 product. */
-function mul4rm(a: number[], b: number[]): number[] {
-  const o = new Array(16).fill(0);
-  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) for (let k = 0; k < 4; k++) o[r * 4 + c] += a[r * 4 + k]! * b[k * 4 + c]!;
-  return o;
-}
-
 /** The render's constraint sketches with their source locations mapped to the TSX. */
 async function sketchesOf(rendered: any, docParts: { name?: string }[], frames?: Map<string, number[]> | Record<string, number[]>): Promise<SketchData[]> {
   const frameOf = (path: string) => (frames instanceof Map ? frames.get(path) : frames?.[path]);
@@ -527,7 +520,7 @@ async function sketchesOf(rendered: any, docParts: { name?: string }[], frames?:
     out.push({
       path: s.path,
       // A sketch on a face: its plane is relative to the face frame the kernel used.
-      plane: s.onFace && frameOf(s.onFace) ? mul4rm(frameOf(s.onFace)!, s.plane) : s.plane,
+      plane: s.onFace && frameOf(s.onFace) ? mul4(frameOf(s.onFace)!, s.plane) : s.plane,
       loc: (await locate(normalizeLoc(s.loc))).loc,
       status: s.status,
       dof: s.dof,

@@ -7,6 +7,7 @@ import * as THREE from "three";
 import type { InterferenceData, PrintabilityData } from "./protocol";
 import type { Viewport } from "./scene";
 
+/** Which check heatmap the viewport shows. */
 export type CheckMode = "none" | "overhang" | "thin" | "interference";
 
 const YELLOW = new THREE.Color("#ffd23f");
@@ -26,6 +27,7 @@ export function thinSeverity(thickness: number, minWall: number): number {
   return Math.max(0, 1 - (thickness - minWall) / minWall);
 }
 
+/** Overhang / thin-wall heatmaps and interference volumes over the parts. */
 export class CheckOverlay {
   #objects: THREE.Object3D[] = [];
   #xrayBefore: boolean | undefined;

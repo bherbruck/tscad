@@ -1,5 +1,9 @@
 /** Hand-rolled argument parsing: `cmd pos... --flag value --flag=value -o x --bool`. */
+import { parseValue } from "../viewer/fmt";
 
+export { parseValue };
+
+/** How a command-line flag parses. */
 export interface FlagSpec {
   /** Takes a value (otherwise boolean). */
   value?: boolean;
@@ -8,6 +12,7 @@ export interface FlagSpec {
   alias?: string;
 }
 
+/** Parsed argv: the command, its positionals and its flags. */
 export interface Parsed {
   command?: string;
   positionals: string[];
@@ -17,6 +22,7 @@ export interface Parsed {
 }
 
 export const COMMANDS = ["init", "dev", "build", "info", "render", "mcp", "convert", "plate"] as const;
+/** A `tscad` subcommand. */
 export type Command = (typeof COMMANDS)[number];
 
 export const FLAGS: Record<string, FlagSpec> = {
@@ -52,6 +58,7 @@ export const FLAGS: Record<string, FlagSpec> = {
   orient: { value: true },
 };
 
+/** Parse argv (after `tscad`) against the flag specs; unknown flags are reported, not thrown. */
 export function parseArgs(argv: string[], spec: Record<string, FlagSpec> = FLAGS): Parsed {
   const out: Parsed = { positionals: [], flags: {}, unknown: [] };
   const byAlias = new Map(Object.entries(spec).flatMap(([k, s]) => (s.alias ? [[s.alias, k] as const] : [])));
@@ -118,17 +125,13 @@ export function parseParams(list: string[] | undefined): Record<string, unknown>
   return out;
 }
 
-export function parseValue(raw: string): unknown {
-  if (raw === "true") return true;
-  if (raw === "false") return false;
-  if (raw !== "" && !isNaN(Number(raw))) return Number(raw);
-  return raw.replace(/^(["'])(.*)\1$/, "$2");
-}
 
+/** A flag value as one string (the last one when the flag was repeated). */
 export function str(v: unknown): string | undefined {
   return typeof v === "string" ? v : Array.isArray(v) ? v[v.length - 1] : undefined;
 }
 
+/** A flag value as a list (repeated flags, or one). */
 export function list(v: unknown): string[] {
   return Array.isArray(v) ? v : typeof v === "string" ? [v] : [];
 }

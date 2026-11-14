@@ -5,8 +5,10 @@
  */
 import type { Document, Node, Part } from "../ir";
 
+/** How a part changed between two versions. */
 export type DiffStatus = "changed" | "same" | "new" | "gone";
 
+/** A part in a document diff. */
 export interface DiffEntry {
   part: string;
   status: DiffStatus;
@@ -58,11 +60,13 @@ export function sameNode(a: Node, b: Node): boolean {
 
 type Box = [[number, number, number], [number, number, number]];
 
+/** The stats a part diff compares. */
 export interface PartStats {
   volume?: number;
   bbox?: Box;
 }
 
+/** A part diff with the volumes added and removed. */
 export interface DiffPartData {
   part: string;
   status: DiffStatus;
