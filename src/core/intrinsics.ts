@@ -479,9 +479,10 @@ export interface OffsetProps extends Placement2D, SketchChildren {
  * A sheet-metal part: a base `<flange>` (a closed 2D outline) with `<edgeFlange>`, `<hem>` and
  * `<jog>` children hanging from its edges, nested to any depth. Bends are exact cylindrical
  * sections. Besides the folded part, the **flat pattern** comes out as drawings named
- * `<name>-flat` (layer `cut`), `<name>-bends` (layer `bend`, the bend centre lines) and
- * `<name>-notes` (layer `engrave`, "UP 90° R2" labels), so `tscad build -o part.dxf` gives a
- * cut-and-bend-ready flat. Bend allowance: BA = θ·(R + K·T).
+ * `<name>-flat` (layer `cut`) and `<name>-bends` (layer `bend`: the bend centre lines as open
+ * paths, with an "UP 90° R2" text note beside each), so `tscad build -o part.dxf` gives a
+ * cut-and-bend-ready flat; `engraveNotes` adds the labels as text outlines (`<name>-notes`,
+ * layer `engrave`). Bend allowance: BA = θ·(R + K·T).
  * @example
  * <sheetMetal name="bracket" thickness={2} bendRadius={2}>
  *   <flange>
@@ -501,6 +502,8 @@ export interface SheetMetalProps extends Placement {
   name?: string;
   /** Show the flat pattern (extruded) instead of the folded part. */
   flat?: boolean;
+  /** Also emit the bend labels as text outlines (`<name>-notes`, layer `engrave`) for laser marking. Default false. */
+  engraveNotes?: boolean;
   /** One base `<flange>`. */
   children?: Children;
 }

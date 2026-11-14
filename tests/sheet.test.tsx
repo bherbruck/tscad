@@ -41,7 +41,7 @@ describe("sheet metal", () => {
     near(area, 60 * (40 + BA(90) + 30));
     near(volume, 60 * 40 * T + 60 * 30 * T + bendVol(90, 60));
     expect(bbox[1]).toEqual([30, 20 + R + T, T + R + 30].map((v) => expect.closeTo(v, 6)) as any);
-    expect(r.drawings.map((d) => [d.name, d.layer])).toEqual([["L-flat", "cut"], ["L-bends", "bend"], ["L-notes", "engrave"]]);
+    expect(r.drawings.map((d) => [d.name, d.layer])).toEqual([["L-flat", "cut"], ["L-bends", "bend"]]);
     const bendLine = r.drawings[1]!.paths![0]![0]!;
     expect(r.drawings[1]!.loops).toEqual([]);
     expect(r.drawings[1]!.notes!.map((n) => n.text)).toEqual(["UP 90° R2"]);
@@ -283,7 +283,15 @@ describe("sheet metal flat pattern → DXF / SVG", () => {
     const { renderModule } = await import("tscad");
     const r = renderModule(await import("../examples/sheet-chassis.tsx"));
     const prim = dxfEntities(toDXF(r.drawings));
-    expect(prim.layers).toEqual(["CUT", "BEND", "ENGRAVE"]);
+    expect(prim.layers).toEqual(["CUT", "BEND"]);
+    // opt-in: the labels as engraved outlines too
+    const marked = compile(
+      <sheetMetal name="m" thickness={1} engraveNotes>
+        <flange><rect w={40} h={20} /><edgeFlange edge="+y" length={10} /></flange>
+      </sheetMetal>,
+    );
+    expect(marked.drawings.map((d) => [d.name, d.layer])).toEqual([["m-flat", "cut"], ["m-bends", "bend"], ["m-notes", "engrave"]]);
+    expect(marked.drawings[2]!.loops.length).toBeGreaterThan(5);
     const bend = prim.out.filter((e) => e.layer === "BEND");
     expect(bend.filter((e) => e.type === "LINE").length).toBe(6);
     const texts = bend.filter((e) => e.type === "TEXT");

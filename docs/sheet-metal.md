@@ -28,7 +28,7 @@ tscad build bracket.tsx -o bracket.step -o bracket.dxf    # folded part + flat p
 
 | Element | |
 |---|---|
-| `<sheetMetal thickness bendRadius? kFactor? name? flat?>` | The part. `bendRadius` is the inside radius (default: the thickness), `kFactor` is the neutral-axis position (default 0.44). `flat` shows the flat pattern extruded instead of the folded part. Placement props move the folded part. |
+| `<sheetMetal thickness bendRadius? kFactor? name? flat? engraveNotes?>` | The part. `bendRadius` is the inside radius (default: the thickness), `kFactor` is the neutral-axis position (default 0.44). `flat` shows the flat pattern extruded instead of the folded part. `engraveNotes` also emits the bend labels as engraved text outlines. Placement props move the folded part. |
 | `<flange>` | The base: a closed 2D outline (any 2D shapes, `<sketch>`, constraint sketches, `<svg>`/`<dxf>`), holes nested inside it, and the edge flanges. It lies on z = 0 with material up to z = thickness. |
 | `<edgeFlange edge length angle? direction? bendRadius? inset? insetEnd? reliefs? reliefWidth? profile? corner? cornerGap? cornerRelief? cornerReliefSize?>` | Folds from `edge` by `angle` (default 90°, up to 180°) toward +Z (`direction="up"`, default) or −Z (`"down"`), with `length` of flat beyond the bend. Its 2D children are holes in its own coordinates (x along the edge from the edge's start, y away from the bend); with `profile` they are its outline instead (see below). Its `<edgeFlange>`/`<hem>`/`<jog>` children hang from its own edges. `corner*` props: see Corners. |
 | `<hem edge length gap?>` | A 180° fold back over the sheet, bend radius `gap / 2` (default gap: the thickness). |
@@ -98,7 +98,7 @@ in the base's coordinates. It comes out in `CompileResult.drawings`:
 |---|---|---|
 | `<name>-flat` | `cut` | the outline and holes (exact lines and arcs) |
 | `<name>-bends` | `bend` | each bend's centre line, an open path (`Drawing.paths`), plus a text note per bend, `UP 90° R2` / `DN 45° R2`, beside it (`Drawing.notes`) |
-| `<name>-notes` | `engrave` | the same labels as text outlines, for lasers that mark parts |
+| `<name>-notes` | `engrave` | only with `engraveNotes`: the same labels as text outlines, for shops that laser-mark them |
 
 `tscad build -o part.dxf` (or `.svg`) writes them on those layers:
 - DXF: bend lines as LINE (or an open POLYLINE with `entities: "polyline"`), notes as TEXT

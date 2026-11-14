@@ -388,7 +388,8 @@ export function buildSheet(h: Host, ctx: SheetContext): SheetResult {
   drawings.push({ name: `${name}-flat`, layer: "cut", loops: outline, ...loc });
   if (bends.length) {
     drawings.push({ name: `${name}-bends`, layer: "bend", loops: [], paths: bends.map((b) => [line(b.centre[0], b.centre[1])]), notes: bends.map((b) => bendLabel(b, T)), ...loc });
-    const notes = bendNotes(bends, T);
+    // the labels as text outlines too, for shops that laser-mark them (opt-in)
+    const notes = p.engraveNotes === true ? bendNotes(bends, T) : [];
     if (notes.length) drawings.push({ name: `${name}-notes`, layer: "engrave", loops: notes, ...loc });
   }
   const node = solids.length === 0 ? null : solids.length === 1 ? solids[0]! : ctx.emit({ type: "union", children: solids } as Node, h);
