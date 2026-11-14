@@ -13,6 +13,11 @@ if (new URLSearchParams(location.search).has("embed") && window.parent !== windo
       "*",
     );
   };
+  // Drag edits go to the editor too (VS Code applies them to the open document and saves).
+  config.onSketchEdit = async (changes) => {
+    window.parent.postMessage({ type: "tscad:edit", changes }, "*");
+    return { applied: changes.length, refused: [] };
+  };
   document.documentElement.classList.add("embedded");
 }
 

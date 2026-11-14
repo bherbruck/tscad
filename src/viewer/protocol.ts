@@ -191,6 +191,8 @@ export type ToWorker =
   | { type: "diff"; on: boolean }
   /** Pin the current evaluation as the diff baseline (or unpin: back to "previous"). */
   | { type: "diff-pin"; pin: boolean }
+  /** Re-solve sketch `sketch` (index in the last result's `sketches`) with `point` dragged to `target` (sketch coords). */
+  | { type: "sketch-drag"; id: number; sketch: number; point: string; target: [number, number]; changeDimensions: boolean }
   | { type: "pick"; id: number; kind: "edge" | "face"; part: string; index: number }
   | { type: "export"; id: number; format: ExportFormat; parts: { name: string; color?: string }[]; tolerance?: number }
   | { type: "check"; id: number; kind: "printability"; parts: CheckMeshData[]; maxOverhangDeg: number; minWall: number; thickness: boolean }
@@ -232,7 +234,22 @@ export type FromWorker =
   | { type: "pick"; id: number; info?: PickInfo; error?: string }
   | { type: "export"; id: number; data?: Uint8Array | string; error?: string }
   | { type: "check"; id: number; printability?: PrintabilityData[]; interference?: InterferenceData; error?: string }
-  | { type: "diff"; data: DiffData };
+  | { type: "diff"; data: DiffData }
+  | { type: "sketch-drag"; id: number; result?: SketchDragData; error?: string };
+
+/** A sketch re-solved with one point dragged (core's `dragSolve`), locations mapped to the TSX. */
+export interface SketchDragData {
+  reached: boolean;
+  points: { id: string; x: number; y: number; moved: boolean; free: boolean }[];
+  entities: SketchData["entities"];
+  blockedBy: { label: string; loc?: Loc; dimension?: { kind: string; value: number; prop?: string } }[];
+  /** Source edits that make the drag the new design (`applyChanges` input). */
+  changes: SketchChange[];
+}
+
+export type SketchChange =
+  | { kind: "prop"; loc: Loc; tag: string; prop: string; value: number; reason: "point" | "dimension"; param?: { name: string; value: number } }
+  | { kind: "addPoint"; sketch: Loc; id: string; x: number; y: number };
 
 export interface DiffData {
   /** The evaluation (`EvalData.seq`) this diff is for. */

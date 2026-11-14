@@ -10,6 +10,7 @@ import { createEditor, type CompletionData, type EditorProblem } from "./editor"
 import { decodeSource, encodeSource } from "./share";
 import { transformModel } from "./transform";
 import { convertScad, ScadSyntaxError } from "../convert";
+import { applyChanges } from "../index";
 import { scadImportDialog, withNotes, NOTES_HEAD } from "./scad-import";
 
 interface Example {
@@ -152,6 +153,13 @@ async function main() {
     topbarExtras: [h("div", { class: "pg-extras" }, exampleWrap, importBtn, shareBtn, codeBtn)],
     sidePane: pane,
     hashKeep: ["code", "example", "files"],
+    // Sketch drags edit the code in the editor (then it re-runs like any edit).
+    onSketchEdit: async (changes) => {
+      const ours = changes.map((c) => (c.kind === "addPoint" ? { ...c, sketch: { ...c.sketch, file: FILE } } : { ...c, loc: { ...c.loc, file: FILE } }));
+      const r = applyChanges(editor!.getValue(), ours as any);
+      if (r.applied.length) editor!.setValue(r.source);
+      return { applied: r.applied.length, refused: r.refused.map((f: any) => ({ reason: f.reason, param: f.param })) };
+    },
     onSourceClick: (loc, target) => {
       if (!sameFile(loc.file)) return void viewer.toast(`${loc.file}:${loc.line}`);
       document.body.classList.remove("pg-code-hidden");

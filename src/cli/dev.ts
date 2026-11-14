@@ -9,6 +9,7 @@ import { rmSync } from "node:fs";
 import { APP_PREFIX, type Asset, buildApp, buildUser, BundleError, type BuildMessage, mime, SRC, WASM_DIR } from "./bundle";
 import { EvalSession } from "./eval-server";
 import { discoverModels, ThumbnailCache } from "./gallery";
+import { applyChanges } from "../index";
 import { type DiagnosticItem, DiagnosticsRunner } from "./diagnostics";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
@@ -187,6 +188,7 @@ export async function startDev(opts: DevOptions): Promise<DevServer> {
       // Editors: show another model in the same server (`{ "file": "/abs/or/relative.tsx" }`).
       if (path === "/__model" && req.method === "POST") return switchModel(req);
       if (path === "/__export" && req.method === "POST") return exportModel(req);
+      if (path === "/__edit" && req.method === "POST") return applyEdits(req);
       if (path.startsWith("/wasm/")) {
         const name = path.slice("/wasm/".length);
         if (!/^[\w.-]+$/.test(name)) return notFound();
@@ -259,6 +261,33 @@ export async function startDev(opts: DevOptions): Promise<DevServer> {
       addWatchers();
     }
     return Response.json({ file: entry, state });
+  }
+
+  /** Sketch drag edits from the viewer: apply them to the source files (under the root) and save. */
+  async function applyEdits(req: Request): Promise<Response> {
+    const body = (await req.json().catch(() => ({}))) as { changes?: any[] };
+    const byFile = new Map<string, any[]>();
+    for (const c of body.changes ?? []) {
+      const loc = c.kind === "addPoint" ? c.sketch : c.loc;
+      if (!loc?.file) continue;
+      const file = resolve(root, String(loc.file).replace(/^file:\/\//, ""));
+      if (!file.startsWith(root)) continue;
+      // applyChanges finds elements by location; locations here are the file's own.
+      const local = { ...loc, file };
+      const fixed = c.kind === "addPoint" ? { ...c, sketch: local } : { ...c, loc: local };
+      if (!byFile.has(file)) byFile.set(file, []);
+      byFile.get(file)!.push(fixed);
+    }
+    let applied = 0;
+    const refused: { reason: string; param?: unknown }[] = [];
+    for (const [file, changes] of byFile) {
+      const text = await Bun.file(file).text();
+      const r = applyChanges(text, changes);
+      applied += r.applied.length;
+      for (const f of r.refused) refused.push({ reason: f.reason, ...(f.param ? { param: f.param } : {}) });
+      if (r.applied.length) await Bun.write(file, r.source); // the watcher rebuilds
+    }
+    return Response.json({ applied, refused });
   }
 
   /** Build the current model to a file next to it (`{ format, out?, params? }`), in a subprocess. */

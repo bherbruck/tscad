@@ -84,7 +84,98 @@ export class SketchOverlay {
     this.viewport.requestRender();
   }
 
+  // ── drag-to-edit: picking points, mapping the cursor into a sketch, a live preview
+
+  /** The sketch point under the cursor (within 9 px), when the overlay is shown. */
+  pickPoint(clientX: number, clientY: number): { sketch: number; id: string; free: boolean } | undefined {
+    if (!this.#visible) return undefined;
+    const r = this.viewport.canvas.getBoundingClientRect();
+    const mx = clientX - r.left, my = clientY - r.top;
+    let best: { sketch: number; id: string; free: boolean } | undefined;
+    let bestD = 9;
+    for (const v of this.#views) {
+      if (v.opacity < 0.2) continue;
+      for (const p of v.data.points) {
+        const q = this.#tmp.set(p.x, p.y, 0).applyMatrix4(v.group.matrix).project(this.viewport.camera);
+        if (q.z > 1) continue;
+        const d = Math.hypot(((q.x + 1) / 2) * r.width - mx, ((1 - q.y) / 2) * r.height - my);
+        if (d < bestD) {
+          bestD = d;
+          best = { sketch: v.index, id: p.id, free: p.free };
+        }
+      }
+    }
+    return best;
+  }
+
+  /** The cursor in sketch `index`'s own coordinates (ray ∩ its plane). */
+  toSketch(index: number, clientX: number, clientY: number): [number, number] | undefined {
+    const v = this.#views[index];
+    if (!v) return undefined;
+    const origin = new THREE.Vector3().setFromMatrixPosition(v.group.matrix);
+    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(v.normal, origin);
+    const hit = this.viewport.raycasterAt(clientX, clientY).ray.intersectPlane(plane, new THREE.Vector3());
+    if (!hit) return undefined;
+    hit.applyMatrix4(new THREE.Matrix4().copy(v.group.matrix).invert());
+    return [hit.x, hit.y];
+  }
+
+  #preview?: { index: number; group: THREE.Group; mats: LineMaterial[]; pointMat?: THREE.PointsMaterial };
+
+  /** Draw a dragged solution over sketch `index` (its own drawing dimmed). */
+  showPreview(index: number, entities: SketchData["entities"], points: { id: string; x: number; y: number }[], dragged: string, reached: boolean) {
+    this.clearPreview();
+    const v = this.#views[index];
+    if (!v) return;
+    const group = new THREE.Group();
+    const segs: number[] = [];
+    for (const e of entities) {
+      if (e.construction) continue;
+      const pts = entityPoints(e);
+      for (let i = 0; i + 1 < pts.length; i++) segs.push(pts[i]![0], pts[i]![1], 0, pts[i + 1]![0], pts[i + 1]![1], 0);
+    }
+    const mats: LineMaterial[] = [];
+    if (segs.length) {
+      const g = new LineSegmentsGeometry();
+      g.setPositions(segs);
+      const m = this.viewport.lineMaterial(reached ? "#ffb020" : "#ff6b6b", 2.4);
+      m.depthTest = false;
+      m.transparent = true;
+      mats.push(m);
+      const l = new LineSegments2(g, m);
+      l.renderOrder = 66;
+      group.add(l);
+    }
+    const p = points.find((x) => x.id === dragged);
+    let pointMat: THREE.PointsMaterial | undefined;
+    if (p) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.Float32BufferAttribute([p.x, p.y, 0], 3));
+      pointMat = new THREE.PointsMaterial({ color: reached ? "#ffb020" : "#ff6b6b", size: 14, sizeAttenuation: false, map: dot(), transparent: true, depthTest: false, alphaTest: 0.05 });
+      const pts = new THREE.Points(g, pointMat);
+      pts.renderOrder = 67;
+      group.add(pts);
+    }
+    v.group.add(group);
+    for (const m of v.mats) m.userData.dim = true;
+    this.#preview = { index, group, mats, pointMat };
+    this.viewport.requestRender();
+  }
+
+  clearPreview() {
+    const pv = this.#preview;
+    if (!pv) return;
+    pv.group.removeFromParent();
+    pv.group.traverse((o) => (o as THREE.Mesh).geometry?.dispose());
+    for (const m of pv.mats) this.viewport.releaseLineMaterial(m);
+    pv.pointMat?.dispose();
+    for (const m of this.#views[pv.index]?.mats ?? []) m.userData.dim = false;
+    this.#preview = undefined;
+    this.viewport.requestRender();
+  }
+
   set(sketches: SketchData[]) {
+    this.clearPreview();
     this.clear();
     sketches.forEach((s, i) => this.#views.push(this.#build(s, i)));
     this.setVisible(this.#visible);
@@ -270,7 +361,7 @@ export class SketchOverlay {
       const o = Math.min(1, Math.max(0, (f - 0.08) / 0.32));
       v.opacity = o;
       v.group.visible = o > 0.02;
-      for (const m of v.mats) m.opacity = o * (m.userData.base ?? 1);
+      for (const m of v.mats) m.opacity = o * (m.userData.base ?? 1) * (m.userData.dim ? 0.3 : 1);
       for (const m of v.pointMats) m.opacity = o;
     }
   }

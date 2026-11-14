@@ -5,7 +5,7 @@
  * here only (latest wins). No server-only APIs: a static playground can host this file as is.
  */
 import { loadKernel, type KernelHost, KernelPanic, WasmKernelHost } from "../kernel";
-import { renderModule } from "../index";
+import { dragSolve, renderModule } from "../index";
 import { toGLB, toOBJ, toSTL, to3MF, type ExportPart } from "../export";
 import { ChildEvaluator, LocalEvaluator, Pool, serveChild } from "./pool";
 import { checkInterference, checkPrintability } from "../check";
@@ -42,6 +42,9 @@ interface Snapshot {
   seq: number;
 }
 let diffOn = false;
+/** The last render as core returned it (raw source locations), for sketch drags. */
+let lastRaw: any;
+const sameRawLoc = (a: any, b: any) => !!a && !!b && a.file === b.file && a.line === b.line && a.column === b.column;
 let pinned: Snapshot | undefined;
 let previous: Snapshot | undefined;
 let current: Snapshot | undefined;
@@ -170,6 +173,23 @@ self.onmessage = async (e: MessageEvent<ToWorker | { type: "child-init"; module?
         pinned = msg.pin ? current : undefined;
         if (diffOn) void runDiff();
         break;
+      case "sketch-drag": {
+        try {
+          const raw = lastRaw?.sketches?.[msg.sketch];
+          if (!raw?.loc) throw new Error("that sketch has no source location");
+          const occurrence = (lastRaw!.sketches as any[]).slice(0, msg.sketch).filter((s) => sameRawLoc(s.loc, raw.loc)).length;
+          const d: any = dragSolve(mod, lastRaw!.values ?? values, { sketch: raw.loc, occurrence, point: msg.point, target: msg.target, changeDimensions: msg.changeDimensions });
+          const mapLoc = async (l: any) => (await locate(normalizeLoc(l))).loc;
+          const changes = [];
+          for (const c of d.changes ?? []) changes.push(c.kind === "prop" ? { ...c, loc: await mapLoc(c.loc) } : { ...c, sketch: await mapLoc(c.sketch) });
+          const blockedBy = [];
+          for (const b of d.blockedBy ?? []) blockedBy.push({ ...b, loc: b.loc ? await mapLoc(b.loc) : undefined });
+          post({ type: "sketch-drag", id: msg.id, result: { reached: d.reached, points: d.points, entities: d.entities, blockedBy, changes } });
+        } catch (err) {
+          post({ type: "sketch-drag", id: msg.id, error: String((err as Error)?.message ?? err) });
+        }
+        break;
+      }
       case "dispose":
         pool?.dispose();
         break;
@@ -302,6 +322,7 @@ async function run() {
   let result;
   let meshes: Map<string, import("../kernel").MeshArrays>;
   try {
+    lastRaw = rendered;
     const ev = await pool!.evaluate(rendered.document);
     result = ev.result;
     meshes = ev.meshes;

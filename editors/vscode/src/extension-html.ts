@@ -12,7 +12,7 @@ export function previewHtml(url: string): string {
 <script>
   const vscode = acquireVsCodeApi();
   window.addEventListener("message", (e) => {
-    if (e.origin === ${JSON.stringify(origin)} && e.data && e.data.type === "tscad:reveal") vscode.postMessage(e.data);
+    if (e.origin === ${JSON.stringify(origin)} && e.data && (e.data.type === "tscad:reveal" || e.data.type === "tscad:edit")) vscode.postMessage(e.data);
   });
 </script>
 </body></html>`;

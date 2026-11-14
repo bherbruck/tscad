@@ -9,6 +9,7 @@ import { basename, isAbsolute, resolve } from "node:path";
 import { defaultExportLine, DIMENSION_PROPS, groupDiagnostics, isModel, revealSpan, type DiagnosticItem } from "./model";
 import { resolveCommand, ServerManager, type RunningServer } from "./server";
 import { previewHtml } from "./extension-html";
+import { applyChanges } from "../../../src/core/sketch/drag";
 
 let manager: ServerManager;
 let output: vscode.OutputChannel;
@@ -115,6 +116,7 @@ async function openPreview(uri: vscode.Uri | undefined, quiet = false) {
   panel.webview.html = previewHtml(external.toString(true).replace(/\/$/, ""));
   panel.webview.onDidReceiveMessage((m) => {
     if (m?.type === "tscad:reveal" && m.loc) void reveal(server.root, m.loc, m.dimension?.kind, m.kind);
+    if (m?.type === "tscad:edit" && Array.isArray(m.changes)) void applySketchEdits(server.root, m.changes);
   });
   panel.onDidDispose(() => {
     if (preview?.panel === panel) preview = undefined;
@@ -131,6 +133,29 @@ async function reveal(root: string, loc: { file: string; line: number; column: n
   const range = new vscode.Range(s.startLine, s.startCol, s.endLine, s.endCol);
   const editor = await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.One, selection: range, preserveFocus: false });
   editor.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+}
+
+/** A sketch drag dropped in the preview: edit the open documents (undoable) and save them. */
+async function applySketchEdits(root: string, changes: any[]) {
+  const byFile = new Map<string, any[]>();
+  for (const c of changes) {
+    const loc = c.kind === "addPoint" ? c.sketch : c.loc;
+    if (!loc?.file) continue;
+    const file = isAbsolute(loc.file) ? loc.file : resolve(root, loc.file);
+    const local = { ...loc, file };
+    if (!byFile.has(file)) byFile.set(file, []);
+    byFile.get(file)!.push(c.kind === "addPoint" ? { ...c, sketch: local } : { ...c, loc: local });
+  }
+  for (const [file, list] of byFile) {
+    const doc = await vscode.workspace.openTextDocument(file);
+    const r = applyChanges(doc.getText(), list);
+    for (const f of r.refused) output.appendLine(`sketch edit refused: ${f.reason}`);
+    if (!r.applied.length) continue;
+    const edit = new vscode.WorkspaceEdit();
+    edit.replace(doc.uri, new vscode.Range(doc.positionAt(0), doc.positionAt(doc.getText().length)), r.source);
+    await vscode.workspace.applyEdit(edit);
+    await doc.save(); // the dev server rebuilds from disk
+  }
 }
 
 // ───────────────────────── diagnostics ─────────────────────────
