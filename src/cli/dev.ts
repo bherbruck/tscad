@@ -41,6 +41,8 @@ export interface DevServer {
   server: Server<any>;
   /** Where models are evaluated. */
   evalMode: "server" | "browser";
+  /** Whether bun has the native kernel (else server-side evaluation uses the wasm). */
+  nativeKernel: boolean;
   rebuild(): Promise<void>;
   stop(): Promise<void>;
 }
@@ -303,6 +305,7 @@ export async function startDev(opts: DevOptions): Promise<DevServer> {
     port,
     server,
     evalMode,
+    nativeKernel: await hasNativeKernel(),
     rebuild,
     async stop() {
       clearTimeout(timer);
@@ -323,6 +326,14 @@ function notFound() {
 interface WsData {
   kind: string;
   session?: EvalSession;
+}
+
+async function hasNativeKernel(): Promise<boolean> {
+  try {
+    return !((await loadKernel()) instanceof WasmKernelHost);
+  } catch {
+    return false;
+  }
 }
 
 /** Server-side evaluation needs the native kernel (that's the point: ~2× the wasm). */

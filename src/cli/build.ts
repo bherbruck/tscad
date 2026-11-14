@@ -136,7 +136,15 @@ function printParts(parts: PartResult[], infos: { name: string; density?: number
   console.log();
   console.log(table(head, rows, ["l", "r", ...(anyMass ? (["r"] as const) : []), "r", "r", "r", "l"]));
   const t = run.timings;
-  console.log(c.gray(`\n  import ${fmtMs(t.import)} · render ${fmtMs(t.render)} · kernel ${fmtMs(t.kernel)} · cache ${run.result.cacheHits} hit / ${run.result.cacheMisses} miss`));
+  console.log(c.gray(`\n  import ${fmtMs(t.import)} · render ${fmtMs(t.render)} · kernel ${fmtMs(t.kernel)} (${kernelKind(run.kernel)}) · cache ${run.result.cacheHits}/${run.result.cacheHits + run.result.cacheMisses}`));
+}
+
+/** "native", "native ×3" (kernel processes) or "wasm" (no native library for this platform). */
+function kernelKind(k: unknown): string {
+  const any = k as any;
+  if (any?.constructor?.name === "WasmKernelHost") return "wasm";
+  if (any?.pool?.size > 1) return `native ×${any.pool.size}`;
+  return "native";
 }
 
 /** `tscad info`: params and part stats. */
@@ -153,19 +161,26 @@ export async function info(opts: { file: string; params: Record<string, unknown>
     console.log(JSON.stringify({ params: rendered.params, values: rendered.values, parts: result.parts, info: rendered.parts, warnings: rendered.warnings }, null, 2));
     return result.ok ? 0 : 1;
   }
-  console.log(`\n${c.bold(relative(process.cwd(), resolve(opts.file)))}`);
+  console.log(`\n${c.bold(rel(resolve(opts.file)))}`);
   const schema = rendered.params as Record<string, any>;
   const keys = Object.keys(schema);
   console.log(`\n${c.accent("Parameters")}${keys.length ? "" : c.gray("  (none)")}`);
   if (keys.length) {
     const rows = keys.map((k) => {
       const s = schema[k];
-      const range = s.options ? s.options.map((o: any) => (typeof o === "object" ? o.value : o)).join(" | ") : s.min !== undefined || s.max !== undefined ? `${s.min ?? "−∞"} … ${s.max ?? "∞"}${s.step ? ` step ${s.step}` : ""}` : "";
+      const unit = s.unit ? ` ${s.unit}` : "";
+      const range = s.options
+        ? s.options.map((o: any) => (typeof o === "object" ? o.value : o)).join("|")
+        : s.min !== undefined || s.max !== undefined
+          ? `${s.min ?? "−∞"}–${s.max ?? "∞"}${unit}${s.step && s.step !== 1 ? ` /${s.step}` : ""}`
+          : "";
       const v = (rendered.values as any)[k];
-      const changed = v !== s.default;
-      return [c.bold(k), c.gray(s.type), JSON.stringify(s.default), changed ? c.yellow(JSON.stringify(v)) : c.gray(JSON.stringify(v)), range, s.unit ?? "", s.label ?? ""];
+      const show = (x: unknown) => (typeof x === "string" ? x : JSON.stringify(x));
+      // One value column: the default, or "default → value" when overridden with -p.
+      const value = v !== s.default ? `${c.gray(show(s.default))} → ${c.yellow(show(v))}` : `${show(v)}${typeof v === "number" ? unit : ""}`;
+      return [c.bold(k), c.gray(s.type), value, c.gray(range), s.label && s.label !== k ? s.label : ""];
     });
-    console.log(table(["name", "type", "default", "value", "range", "unit", "label"], rows));
+    console.log(table(["name", "type", "value", "range", "label"], rows));
   }
   console.log(`\n${c.accent("Parts")}`);
   printParts(result.parts, rendered.parts, run);

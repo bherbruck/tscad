@@ -36,13 +36,17 @@ export const visibleLength = (s: string) => s.replace(ANSI, "").length;
 
 /** A table with box-drawing rules; `align` per column ("l" | "r"). */
 export function table(head: string[], rows: string[][], align: ("l" | "r")[] = []): string {
-  const widths = head.map((h, i) => Math.max(visibleLength(h), ...rows.map((r) => visibleLength(r[i] ?? ""))));
-  const pad = (s: string, i: number) => {
-    const n = widths[i]! - visibleLength(s);
-    return align[i] === "r" ? " ".repeat(n) + s : s + " ".repeat(n);
+  // Columns that are empty in every row (and the header) are dropped.
+  const keep = head.map((h, i) => visibleLength(h) > 0 || rows.some((r) => visibleLength(r[i] ?? "") > 0));
+  const cols = head.map((_, i) => i).filter((i) => keep[i]);
+  const widths = cols.map((i) => Math.max(visibleLength(head[i]!), ...rows.map((r) => visibleLength(r[i] ?? ""))));
+  const pad = (s: string, k: number) => {
+    const n = widths[k]! - visibleLength(s);
+    return align[cols[k]!] === "r" ? " ".repeat(n) + s : s + " ".repeat(n);
   };
-  const line = (cells: string[]) => "  " + cells.map(pad).join(c.gray("  │  "));
-  const rule = "  " + widths.map((w) => c.gray("─".repeat(w))).join(c.gray("──┼──"));
+  // Compact enough for an 80-column terminal; no trailing spaces.
+  const line = (cells: string[]) => ("  " + cols.map((i, k) => pad(cells[i] ?? "", k)).join(c.gray(" │ "))).replace(/\s+$/, "");
+  const rule = "  " + widths.map((w) => c.gray("─".repeat(w))).join(c.gray("─┼─"));
   return [line(head.map((h) => c.bold(h))), rule, ...rows.map(line)].join("\n");
 }
 

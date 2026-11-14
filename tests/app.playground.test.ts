@@ -119,8 +119,9 @@ describe("static build", () => {
   let out = join(ROOT, "dist/playground");
 
   beforeAll(() => {
-    // CI builds dist/playground first; locally, build a dev copy into a temp dir.
-    if (existsSync(join(out, "index.html"))) return;
+    // Always a fresh build (it takes ~0.1 s): a dist/ from an earlier run may predate new examples.
+    // CI (pages.yml) builds dist/playground with the release wasm; check that one as is.
+    if (process.env.CI && existsSync(join(out, "index.html"))) return;
     out = mkdtempSync(join(tmpdir(), "tscad-pg-build-"));
     const r = Bun.spawnSync(["bun", join(ROOT, "scripts/build-playground.ts"), "--dev", "--out", out]);
     if (r.exitCode !== 0) throw new Error(r.stderr.toString());

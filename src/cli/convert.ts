@@ -38,6 +38,6 @@ export function convert(opts: { file: string; out?: string; name?: string; force
   }
   writeFileSync(out, result.tsx);
   const n = result.warnings.length;
-  console.error(`${sym.ok} ${c.bold(rel(resolve(out)))}${n ? c.yellow(` · ${n} note${n > 1 ? "s" : ""} above`) : ""}  ${c.gray(`next: tscad dev ${rel(resolve(out))}`)}`);
+  console.error(`${sym.ok} ${c.bold(rel(resolve(out)))}${n ? c.yellow(` · ${n} note${n > 1 ? "s" : ""} above`) : ""}  ${c.gray(`next: bunx tscad dev ${rel(resolve(out))}`)}`);
   return 0;
 }

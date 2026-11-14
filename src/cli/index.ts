@@ -9,43 +9,47 @@ const HELP = `
 ${logo()} ${c.gray(`v${pkg.version}`)} — CAD as TSX
 
 ${c.bold("Usage")}
-  ${c.accent("tscad init")} ${c.gray("[dir]")}                   scaffold a model project
-  ${c.accent("tscad dev")} ${c.gray("[file=index.tsx]")}         live viewer with hot reload
-  ${c.accent("tscad build")} ${c.gray("[file] -o out.stl")}      export STEP / STL / 3MF / GLB / OBJ
-  ${c.accent("tscad info")} ${c.gray("[file]")}                  params and part stats
-  ${c.accent("tscad render")} ${c.gray("[file] -o out.png")}     a PNG image of the model
-  ${c.accent("tscad convert")} ${c.gray("in.scad [-o out.tsx]")}   OpenSCAD → tscad (--name Component, -o - for stdout)
-  ${c.accent("tscad mcp")}                          MCP server for AI agents ${c.gray("(see docs/mcp.md)")}
+  ${c.accent("tscad init")} ${c.gray("[dir]")}                 scaffold a model project
+  ${c.accent("tscad dev")} ${c.gray("[file]")}                 live viewer with hot reload
+  ${c.accent("tscad build")} ${c.gray("[file] -o out.step")}   export STEP/STL/3MF/GLB/OBJ/DXF/SVG
+  ${c.accent("tscad info")} ${c.gray("[file]")}                params and part stats
+  ${c.accent("tscad render")} ${c.gray("[file] -o out.png")}   a PNG of the model
+  ${c.accent("tscad convert")} ${c.gray("in.scad")}            OpenSCAD → tscad TSX
+  ${c.accent("tscad mcp")}                         MCP server for AI agents
+  ${c.gray("[file] defaults to index.tsx")}
 
 ${c.bold("dev")}
-  --port <n>            port ${c.gray("(default 3333; next free one if taken)")}
+  --port <n>            port ${c.gray("(default 3333, or the next free one)")}
   --host <h>            interface ${c.gray("(default localhost)")}
   --open                open the browser
-  --root <dir>          paths relative to this ${c.gray("(editors pass the workspace folder)")}
-  --diagnostics         evaluate after each change and publish problems at /__diagnostics
-  --browser-eval        evaluate in the browser (wasm) instead of on the server ${c.gray("(default: server when the native kernel is built)")}
+  --browser-eval        evaluate in the page (wasm), not in the server
+  --root <dir>          make paths relative to this folder
+  --diagnostics         evaluate on change; problems at /__diagnostics
 
 ${c.bold("build")}
-  -o, --out <file>      output file; the extension picks the format ${c.gray("(repeatable)")}
-  -f, --format <fmt>    step | stl | 3mf | glb | obj | dxf | svg ${c.gray("(when -o has no extension)")}
-  -p, --param <k=v>     override a parameter ${c.gray("(repeatable, or a=1,b=2)")}
+  -o, --out <file>      output; extension = format ${c.gray("(repeat; default <name>.stl)")}
+  -f, --format <fmt>    format when -o has no extension
+  -p, --param <k=v>     override a parameter ${c.gray("(repeat, or a=1,b=2)")}
   -t, --tolerance <mm>  mesh chord tolerance ${c.gray("(default 0.01)")}
-  --part <name>         only this part ${c.gray("(repeatable)")}
-  --section-z <mm>      .dxf/.svg of a model without <drawing>s: cut at this Z ${c.gray("(default mid-height)")}
+  --part <name>         only this part ${c.gray("(repeat)")}
+  --section-z <mm>      .dxf/.svg without <drawing>s: cut at this Z
   --ascii               ASCII STL
   --json                machine-readable output
 
 ${c.bold("render")}
   -o, --out <file.png>  output ${c.gray("(default <name>.png)")}
-  --view <v>            iso | front | back | top | bottom | right | left | <azimuth>,<elevation>
-  --width/--height <px> image size ${c.gray("(default 1200×800)")}
+  --view <v>            iso front back top bottom right left, or az,el
+  --width, --height     pixels ${c.gray("(default 1200 × 800)")}
   --background <bg>     dark | light | transparent | <css colour>
-  --ortho               orthographic projection;  --no-edges  hide edge lines
-  -p, --param <k=v>     as for build
+  --ortho, --no-edges   orthographic; hide edge lines
+
+${c.bold("convert")}
+  -o, --out <file.tsx>  output ${c.gray("(default next to the .scad; - for stdout)")}
+  --name <Component>    component name ${c.gray("(default from the file name)")}
 
 ${c.bold("Examples")}
   ${c.gray("$")} tscad dev bracket.tsx --open
-  ${c.gray("$")} tscad build bracket.tsx -o bracket.step -o bracket.stl -p width=80 -p holes=6
+  ${c.gray("$")} tscad build bracket.tsx -o bracket.step -o bracket.stl -p width=80
 `;
 
 export async function main(argv: string[]): Promise<number> {
@@ -175,10 +179,17 @@ async function dev(file: string, f: Parsed["flags"]): Promise<number> {
     }
   }
   console.log(`\n  ${logo()} ${c.gray(`v${pkg.version}`)}  ${c.gray(`ready in ${fmtMs(performance.now() - t)}`)}\n`);
+  const kernel =
+    server.evalMode === "server"
+      ? `${server.nativeKernel ? "native" : "wasm"}, in this process ${c.gray("(--browser-eval: in the page)")}`
+      : server.nativeKernel
+        ? `wasm, in the browser ${c.gray("(--browser-eval)")}`
+        : `wasm, in the browser ${c.gray(`(no native kernel for ${process.platform}-${process.arch})`)}`;
+  const arrow = c.gray(sym.arrow.includes("➜") ? "➜" : "->");
   console.log(`  ${sym.arrow}  ${c.bold("Viewer")}  ${c.accent(c.underline(server.url))}`);
-  console.log(`  ${c.gray("➜")}  ${c.gray("Model")}   ${file}`);
-  console.log(`  ${c.gray("➜")}  ${c.gray("Kernel")}  ${server.evalMode === "server" ? `native, on the server ${c.gray("(--browser-eval for wasm in the page)")}` : "wasm, in the browser"}`);
-  console.log(`  ${c.gray("➜")}  ${c.gray("Press")}   ${c.bold("Ctrl+C")} ${c.gray("to stop")}\n`);
+  console.log(`  ${arrow}  ${c.gray("Model")}   ${file}`);
+  console.log(`  ${arrow}  ${c.gray("Kernel")}  ${kernel}`);
+  console.log(`  ${arrow}  ${c.gray("Stop")}    ${c.bold("Ctrl+C")}\n`);
   if (f.open) openBrowser(server.url);
   // Editor integrations: a machine-readable ready line, and exit when the editor goes away.
   if (process.env.TSCAD_EDITOR) console.log(`TSCAD_READY ${JSON.stringify({ url: server.url, pid: process.pid, evalMode: server.evalMode })}`);

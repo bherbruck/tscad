@@ -935,7 +935,8 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
     });
     inspectorBody.append(list);
     const best = suggestions[0];
-    if (best) {
+    // A smooth edge has nothing to fillet: no fillet snippet for it.
+    if (best && !(info as { smooth?: boolean }).smooth) {
       const op = hit.kind === "edge" ? `<fillet radius={1} ${selectorAttr(best.selector, noun, state.form)}>` : `<shell thickness={2} ${selectorAttr(best.selector, noun, state.form)}>`;
       inspectorBody.append(h("div", { class: "snippet" }, h("code", { html: highlightTsx(op) }), h("button", { class: "icon-btn sm", title: "Copy snippet", onclick: async () => (await copyText(op)) && toast("Snippet copied") }, icon("copy", 13))));
     }
