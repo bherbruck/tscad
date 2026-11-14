@@ -3,7 +3,7 @@ import { readdirSync } from "node:fs";
 import { renderModule } from "../src/index";
 
 const dir = new URL("../examples/", import.meta.url);
-const files = readdirSync(dir).filter((f) => f.endsWith(".tsx") && !f.startsWith("_"));
+const files = readdirSync(dir).filter((f) => f.endsWith(".tsx") && !f.startsWith("_") && !/\.(spec|test)\.tsx$/.test(f));
 
 // Every example compiles to IR with its default params (evaluation is covered by the CLI build).
 describe("examples compile", () => {

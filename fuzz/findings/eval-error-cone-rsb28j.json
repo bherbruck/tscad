@@ -1,0 +1,278 @@
+{
+  "id": "eval-error-cone-rsb28j",
+  "oracle": "eval-error",
+  "op": "cone",
+  "message": "invalid argument",
+  "count": 27,
+  "seeds": [
+    148,
+    229,
+    378,
+    676,
+    1524,
+    1906,
+    1907,
+    2367
+  ],
+  "replay": "bun scripts/fuzz/fuzz.ts --replay 148",
+  "minimal": {
+    "parts": [
+      {
+        "name": "f",
+        "node": {
+          "type": "cone",
+          "bottomRadius": 3,
+          "topRadius": 3,
+          "height": 15
+        }
+      }
+    ]
+  },
+  "original": {
+    "parts": [
+      {
+        "name": "f",
+        "node": {
+          "type": "intersection",
+          "children": [
+            {
+              "type": "transform",
+              "matrix": [
+                0.505682,
+                -0.012852,
+                -0.862624,
+                -14,
+                0.735466,
+                0.529097,
+                0.423257,
+                5.142,
+                0.450972,
+                -0.848464,
+                0.277007,
+                8,
+                0,
+                0,
+                0,
+                1
+              ],
+              "children": [
+                {
+                  "type": "revolve",
+                  "profile": [
+                    {
+                      "type": "line",
+                      "start": [
+                        0,
+                        0,
+                        0
+                      ],
+                      "end": [
+                        1.287,
+                        0,
+                        0
+                      ]
+                    },
+                    {
+                      "type": "line",
+                      "start": [
+                        1.287,
+                        0,
+                        0
+                      ],
+                      "end": [
+                        11,
+                        0,
+                        3
+                      ]
+                    },
+                    {
+                      "type": "line",
+                      "start": [
+                        11,
+                        0,
+                        3
+                      ],
+                      "end": [
+                        17,
+                        0,
+                        6
+                      ]
+                    },
+                    {
+                      "type": "line",
+                      "start": [
+                        17,
+                        0,
+                        6
+                      ],
+                      "end": [
+                        0,
+                        0,
+                        6
+                      ]
+                    },
+                    {
+                      "type": "line",
+                      "start": [
+                        0,
+                        0,
+                        6
+                      ],
+                      "end": [
+                        0,
+                        0,
+                        0
+                      ]
+                    }
+                  ],
+                  "origin": [
+                    0,
+                    0,
+                    0
+                  ],
+                  "axis": [
+                    0,
+                    0,
+                    1
+                  ],
+                  "angle": 6.283185307179586
+                }
+              ]
+            },
+            {
+              "type": "transform",
+              "matrix": [
+                1,
+                0,
+                0,
+                8.609078,
+                0,
+                1,
+                0,
+                18.41177,
+                0,
+                0,
+                1,
+                1.196022,
+                0,
+                0,
+                0,
+                1
+              ],
+              "children": [
+                {
+                  "type": "difference",
+                  "children": [
+                    {
+                      "type": "difference",
+                      "children": [
+                        {
+                          "type": "cone",
+                          "bottomRadius": 3,
+                          "topRadius": 3,
+                          "height": 15
+                        },
+                        {
+                          "type": "transform",
+                          "matrix": [
+                            1,
+                            0,
+                            0,
+                            -0.000001,
+                            0,
+                            1,
+                            0,
+                            0,
+                            0,
+                            0,
+                            1,
+                            0,
+                            0,
+                            0,
+                            0,
+                            1
+                          ],
+                          "children": [
+                            {
+                              "type": "cone",
+                              "bottomRadius": 3,
+                              "topRadius": 3,
+                              "height": 15
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "transform",
+                      "matrix": [
+                        1,
+                        0,
+                        0,
+                        1.206,
+                        0,
+                        1,
+                        0,
+                        -12,
+                        0,
+                        0,
+                        1,
+                        -5.5965,
+                        0,
+                        0,
+                        0,
+                        1
+                      ],
+                      "children": [
+                        {
+                          "type": "difference",
+                          "children": [
+                            {
+                              "type": "cone",
+                              "bottomRadius": 7,
+                              "topRadius": 15,
+                              "height": 26.463
+                            },
+                            {
+                              "type": "transform",
+                              "matrix": [
+                                1,
+                                0,
+                                0,
+                                0,
+                                0,
+                                1,
+                                0,
+                                0,
+                                0,
+                                0,
+                                1,
+                                0,
+                                0,
+                                0,
+                                0,
+                                1
+                              ],
+                              "children": [
+                                {
+                                  "type": "cone",
+                                  "bottomRadius": 7,
+                                  "topRadius": 15,
+                                  "height": 26.463
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

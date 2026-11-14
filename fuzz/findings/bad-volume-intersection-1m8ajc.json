@@ -1,0 +1,606 @@
+{
+  "id": "bad-volume-intersection-1m8ajc",
+  "oracle": "bad-volume",
+  "op": "intersection",
+  "message": "volume 0",
+  "count": 4,
+  "seeds": [
+    5809,
+    5979,
+    10427,
+    13673
+  ],
+  "replay": "bun scripts/fuzz/fuzz.ts --replay 5809",
+  "minimal": {
+    "parts": [
+      {
+        "name": "f",
+        "node": {
+          "type": "intersection",
+          "children": [
+            {
+              "type": "difference",
+              "children": [
+                {
+                  "type": "extrude",
+                  "profile": [
+                    {
+                      "type": "line",
+                      "start": [
+                        -0.805,
+                        -13,
+                        0
+                      ],
+                      "end": [
+                        0.805,
+                        -13,
+                        0
+                      ]
+                    },
+                    {
+                      "type": "arc",
+                      "center": [
+                        0.805,
+                        -10.805,
+                        0
+                      ],
+                      "axis": [
+                        0,
+                        0,
+                        1
+                      ],
+                      "reference": [
+                        1,
+                        0,
+                        0
+                      ],
+                      "radius": 2.195,
+                      "start": -1.5707963267948966,
+                      "end": 0
+                    },
+                    {
+                      "type": "line",
+                      "start": [
+                        3,
+                        -10.805,
+                        0
+                      ],
+                      "end": [
+                        3,
+                        10.805,
+                        0
+                      ]
+                    },
+                    {
+                      "type": "arc",
+                      "center": [
+                        0.805,
+                        10.805,
+                        0
+                      ],
+                      "axis": [
+                        0,
+                        0,
+                        1
+                      ],
+                      "reference": [
+                        1,
+                        0,
+                        0
+                      ],
+                      "radius": 2.195,
+                      "start": 0,
+                      "end": 1.5707963267948966
+                    },
+                    {
+                      "type": "line",
+                      "start": [
+                        0.805,
+                        13,
+                        0
+                      ],
+                      "end": [
+                        -0.805,
+                        13,
+                        0
+                      ]
+                    },
+                    {
+                      "type": "arc",
+                      "center": [
+                        -0.805,
+                        10.805,
+                        0
+                      ],
+                      "axis": [
+                        0,
+                        0,
+                        1
+                      ],
+                      "reference": [
+                        1,
+                        0,
+                        0
+                      ],
+                      "radius": 2.195,
+                      "start": 1.5707963267948966,
+                      "end": 3.141592653589793
+                    },
+                    {
+                      "type": "line",
+                      "start": [
+                        -3,
+                        10.805,
+                        0
+                      ],
+                      "end": [
+                        -3,
+                        -10.805,
+                        0
+                      ]
+                    },
+                    {
+                      "type": "arc",
+                      "center": [
+                        -0.805,
+                        -10.805,
+                        0
+                      ],
+                      "axis": [
+                        0,
+                        0,
+                        1
+                      ],
+                      "reference": [
+                        1,
+                        0,
+                        0
+                      ],
+                      "radius": 2.195,
+                      "start": 3.141592653589793,
+                      "end": 4.71238898038469
+                    }
+                  ],
+                  "direction": [
+                    0,
+                    0,
+                    1
+                  ],
+                  "distance": 18
+                },
+                {
+                  "type": "transform",
+                  "matrix": [
+                    1,
+                    0,
+                    0,
+                    -15.831,
+                    0,
+                    1,
+                    0,
+                    0,
+                    0,
+                    0,
+                    1,
+                    9,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  "children": [
+                    {
+                      "type": "torus",
+                      "majorRadius": 18,
+                      "minorRadius": 0.831
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "transform",
+              "matrix": [
+                1,
+                0,
+                0,
+                -15.831,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                9,
+                0,
+                0,
+                0,
+                1
+              ],
+              "children": [
+                {
+                  "type": "torus",
+                  "majorRadius": 18,
+                  "minorRadius": 0.831
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "original": {
+    "parts": [
+      {
+        "name": "f",
+        "node": {
+          "type": "intersection",
+          "children": [
+            {
+              "type": "difference",
+              "children": [
+                {
+                  "type": "extrude",
+                  "profile": [
+                    {
+                      "type": "line",
+                      "start": [
+                        -0.805,
+                        -13,
+                        0
+                      ],
+                      "end": [
+                        0.805,
+                        -13,
+                        0
+                      ]
+                    },
+                    {
+                      "type": "arc",
+                      "center": [
+                        0.805,
+                        -10.805,
+                        0
+                      ],
+                      "axis": [
+                        0,
+                        0,
+                        1
+                      ],
+                      "reference": [
+                        1,
+                        0,
+                        0
+                      ],
+                      "radius": 2.195,
+                      "start": -1.5707963267948966,
+                      "end": 0
+                    },
+                    {
+                      "type": "line",
+                      "start": [
+                        3,
+                        -10.805,
+                        0
+                      ],
+                      "end": [
+                        3,
+                        10.805,
+                        0
+                      ]
+                    },
+                    {
+                      "type": "arc",
+                      "center": [
+                        0.805,
+                        10.805,
+                        0
+                      ],
+                      "axis": [
+                        0,
+                        0,
+                        1
+                      ],
+                      "reference": [
+                        1,
+                        0,
+                        0
+                      ],
+                      "radius": 2.195,
+                      "start": 0,
+                      "end": 1.5707963267948966
+                    },
+                    {
+                      "type": "line",
+                      "start": [
+                        0.805,
+                        13,
+                        0
+                      ],
+                      "end": [
+                        -0.805,
+                        13,
+                        0
+                      ]
+                    },
+                    {
+                      "type": "arc",
+                      "center": [
+                        -0.805,
+                        10.805,
+                        0
+                      ],
+                      "axis": [
+                        0,
+                        0,
+                        1
+                      ],
+                      "reference": [
+                        1,
+                        0,
+                        0
+                      ],
+                      "radius": 2.195,
+                      "start": 1.5707963267948966,
+                      "end": 3.141592653589793
+                    },
+                    {
+                      "type": "line",
+                      "start": [
+                        -3,
+                        10.805,
+                        0
+                      ],
+                      "end": [
+                        -3,
+                        -10.805,
+                        0
+                      ]
+                    },
+                    {
+                      "type": "arc",
+                      "center": [
+                        -0.805,
+                        -10.805,
+                        0
+                      ],
+                      "axis": [
+                        0,
+                        0,
+                        1
+                      ],
+                      "reference": [
+                        1,
+                        0,
+                        0
+                      ],
+                      "radius": 2.195,
+                      "start": 3.141592653589793,
+                      "end": 4.71238898038469
+                    }
+                  ],
+                  "direction": [
+                    0,
+                    0,
+                    1
+                  ],
+                  "distance": 18
+                },
+                {
+                  "type": "transform",
+                  "matrix": [
+                    1,
+                    0,
+                    0,
+                    -15.831,
+                    0,
+                    1,
+                    0,
+                    0,
+                    0,
+                    0,
+                    1,
+                    9,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  "children": [
+                    {
+                      "type": "torus",
+                      "majorRadius": 18,
+                      "minorRadius": 0.831
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "difference",
+              "children": [
+                {
+                  "type": "extrude",
+                  "profile": [
+                    {
+                      "type": "line",
+                      "start": [
+                        -0.805,
+                        -13,
+                        0
+                      ],
+                      "end": [
+                        0.805,
+                        -13,
+                        0
+                      ]
+                    },
+                    {
+                      "type": "arc",
+                      "center": [
+                        0.805,
+                        -10.805,
+                        0
+                      ],
+                      "axis": [
+                        0,
+                        0,
+                        1
+                      ],
+                      "reference": [
+                        1,
+                        0,
+                        0
+                      ],
+                      "radius": 2.195,
+                      "start": -1.5707963267948966,
+                      "end": 0
+                    },
+                    {
+                      "type": "line",
+                      "start": [
+                        3,
+                        -10.805,
+                        0
+                      ],
+                      "end": [
+                        3,
+                        10.805,
+                        0
+                      ]
+                    },
+                    {
+                      "type": "arc",
+                      "center": [
+                        0.805,
+                        10.805,
+                        0
+                      ],
+                      "axis": [
+                        0,
+                        0,
+                        1
+                      ],
+                      "reference": [
+                        1,
+                        0,
+                        0
+                      ],
+                      "radius": 2.195,
+                      "start": 0,
+                      "end": 1.5707963267948966
+                    },
+                    {
+                      "type": "line",
+                      "start": [
+                        0.805,
+                        13,
+                        0
+                      ],
+                      "end": [
+                        -0.805,
+                        13,
+                        0
+                      ]
+                    },
+                    {
+                      "type": "arc",
+                      "center": [
+                        -0.805,
+                        10.805,
+                        0
+                      ],
+                      "axis": [
+                        0,
+                        0,
+                        1
+                      ],
+                      "reference": [
+                        1,
+                        0,
+                        0
+                      ],
+                      "radius": 2.195,
+                      "start": 1.5707963267948966,
+                      "end": 3.141592653589793
+                    },
+                    {
+                      "type": "line",
+                      "start": [
+                        -3,
+                        10.805,
+                        0
+                      ],
+                      "end": [
+                        -3,
+                        -10.805,
+                        0
+                      ]
+                    },
+                    {
+                      "type": "arc",
+                      "center": [
+                        -0.805,
+                        -10.805,
+                        0
+                      ],
+                      "axis": [
+                        0,
+                        0,
+                        1
+                      ],
+                      "reference": [
+                        1,
+                        0,
+                        0
+                      ],
+                      "radius": 2.195,
+                      "start": 3.141592653589793,
+                      "end": 4.71238898038469
+                    }
+                  ],
+                  "direction": [
+                    0,
+                    0,
+                    1
+                  ],
+                  "distance": 18
+                },
+                {
+                  "type": "transform",
+                  "matrix": [
+                    1,
+                    0,
+                    0,
+                    -15.831,
+                    0,
+                    1,
+                    0,
+                    0,
+                    0,
+                    0,
+                    1,
+                    9,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  "children": [
+                    {
+                      "type": "torus",
+                      "majorRadius": 18,
+                      "minorRadius": 0.831
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,461 @@
+{
+  "id": "eval-error-intersection-iarru0",
+  "oracle": "eval-error",
+  "op": "intersection",
+  "message": "mass::enclosure: a face whose sides are not one material region and one void",
+  "count": 3,
+  "seeds": [
+    5130,
+    8297,
+    9291
+  ],
+  "replay": "bun scripts/fuzz/fuzz.ts --replay 5130",
+  "minimal": {
+    "parts": [
+      {
+        "name": "f",
+        "node": {
+          "type": "intersection",
+          "children": [
+            {
+              "type": "loft",
+              "sections": [
+                [
+                  {
+                    "type": "line",
+                    "start": [
+                      -7.5,
+                      -7.5,
+                      0
+                    ],
+                    "end": [
+                      7.5,
+                      -7.5,
+                      0
+                    ]
+                  },
+                  {
+                    "type": "line",
+                    "start": [
+                      7.5,
+                      -7.5,
+                      0
+                    ],
+                    "end": [
+                      7.5,
+                      7.5,
+                      0
+                    ]
+                  },
+                  {
+                    "type": "line",
+                    "start": [
+                      7.5,
+                      7.5,
+                      0
+                    ],
+                    "end": [
+                      -7.5,
+                      7.5,
+                      0
+                    ]
+                  },
+                  {
+                    "type": "line",
+                    "start": [
+                      -7.5,
+                      7.5,
+                      0
+                    ],
+                    "end": [
+                      -7.5,
+                      -7.5,
+                      0
+                    ]
+                  }
+                ],
+                [
+                  {
+                    "type": "arc",
+                    "center": [
+                      0,
+                      0,
+                      19
+                    ],
+                    "axis": [
+                      0,
+                      0,
+                      1
+                    ],
+                    "reference": [
+                      1,
+                      0,
+                      0
+                    ],
+                    "radius": 5,
+                    "start": 0,
+                    "end": 6.283185307179586
+                  }
+                ]
+              ]
+            },
+            {
+              "type": "union",
+              "children": [
+                {
+                  "type": "transform",
+                  "matrix": [
+                    0.866025,
+                    -0.5,
+                    0,
+                    7.328,
+                    -0.5,
+                    -0.866025,
+                    0,
+                    14.012,
+                    0,
+                    0,
+                    1,
+                    -9,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  "children": [
+                    {
+                      "type": "box",
+                      "size": [
+                        4,
+                        13,
+                        6
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "transform",
+                  "matrix": [
+                    1,
+                    0,
+                    0,
+                    5,
+                    0,
+                    1,
+                    0,
+                    5,
+                    0,
+                    0,
+                    1,
+                    -6,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  "children": [
+                    {
+                      "type": "torus",
+                      "majorRadius": 7,
+                      "minorRadius": 5
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "original": {
+    "parts": [
+      {
+        "name": "f",
+        "node": {
+          "type": "difference",
+          "children": [
+            {
+              "type": "intersection",
+              "children": [
+                {
+                  "type": "loft",
+                  "sections": [
+                    [
+                      {
+                        "type": "line",
+                        "start": [
+                          -7.5,
+                          -7.5,
+                          0
+                        ],
+                        "end": [
+                          7.5,
+                          -7.5,
+                          0
+                        ]
+                      },
+                      {
+                        "type": "line",
+                        "start": [
+                          7.5,
+                          -7.5,
+                          0
+                        ],
+                        "end": [
+                          7.5,
+                          7.5,
+                          0
+                        ]
+                      },
+                      {
+                        "type": "line",
+                        "start": [
+                          7.5,
+                          7.5,
+                          0
+                        ],
+                        "end": [
+                          -7.5,
+                          7.5,
+                          0
+                        ]
+                      },
+                      {
+                        "type": "line",
+                        "start": [
+                          -7.5,
+                          7.5,
+                          0
+                        ],
+                        "end": [
+                          -7.5,
+                          -7.5,
+                          0
+                        ]
+                      }
+                    ],
+                    [
+                      {
+                        "type": "arc",
+                        "center": [
+                          0,
+                          0,
+                          19
+                        ],
+                        "axis": [
+                          0,
+                          0,
+                          1
+                        ],
+                        "reference": [
+                          1,
+                          0,
+                          0
+                        ],
+                        "radius": 4.5,
+                        "start": 0,
+                        "end": 6.283185307179586
+                      }
+                    ]
+                  ]
+                },
+                {
+                  "type": "transform",
+                  "matrix": [
+                    1,
+                    0,
+                    0,
+                    -5.122528,
+                    0,
+                    1,
+                    0,
+                    -10.092069,
+                    0,
+                    0,
+                    1,
+                    15.5,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  "children": [
+                    {
+                      "type": "union",
+                      "children": [
+                        {
+                          "type": "transform",
+                          "matrix": [
+                            0.866025,
+                            -0.5,
+                            0,
+                            7.328,
+                            -0.5,
+                            -0.866025,
+                            0,
+                            14.012,
+                            0,
+                            0,
+                            1,
+                            -9,
+                            0,
+                            0,
+                            0,
+                            1
+                          ],
+                          "children": [
+                            {
+                              "type": "box",
+                              "size": [
+                                4,
+                                13,
+                                6
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "transform",
+                          "matrix": [
+                            1,
+                            0,
+                            0,
+                            5.122528,
+                            0,
+                            1,
+                            0,
+                            4.572069,
+                            0,
+                            0,
+                            1,
+                            -6,
+                            0,
+                            0,
+                            0,
+                            1
+                          ],
+                          "children": [
+                            {
+                              "type": "torus",
+                              "majorRadius": 7.389,
+                              "minorRadius": 5
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "transform",
+              "matrix": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                3.18047,
+                0,
+                0,
+                1,
+                6.5,
+                0,
+                0,
+                0,
+                1
+              ],
+              "children": [
+                {
+                  "type": "revolve",
+                  "profile": [
+                    {
+                      "type": "line",
+                      "start": [
+                        0,
+                        0,
+                        0
+                      ],
+                      "end": [
+                        10.886,
+                        0,
+                        0
+                      ]
+                    },
+                    {
+                      "type": "line",
+                      "start": [
+                        10.886,
+                        0,
+                        0
+                      ],
+                      "end": [
+                        16.5,
+                        0,
+                        3
+                      ]
+                    },
+                    {
+                      "type": "line",
+                      "start": [
+                        16.5,
+                        0,
+                        3
+                      ],
+                      "end": [
+                        14,
+                        0,
+                        6
+                      ]
+                    },
+                    {
+                      "type": "line",
+                      "start": [
+                        14,
+                        0,
+                        6
+                      ],
+                      "end": [
+                        0,
+                        0,
+                        6
+                      ]
+                    },
+                    {
+                      "type": "line",
+                      "start": [
+                        0,
+                        0,
+                        6
+                      ],
+                      "end": [
+                        0,
+                        0,
+                        0
+                      ]
+                    }
+                  ],
+                  "origin": [
+                    0,
+                    0,
+                    0
+                  ],
+                  "axis": [
+                    0,
+                    0,
+                    1
+                  ],
+                  "angle": 6.283185307179586
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -11,8 +11,6 @@ import { to3MF } from "./threemf";
 
 export { toSTL, to3MF, toGLB, toOBJ };
 export type { ExportPart };
-export { weld } from "./mesh";
-export { parseColor, toHex } from "./color";
 
 export type ExportFormat = "stl" | "3mf" | "glb" | "obj" | "step";
 

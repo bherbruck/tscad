@@ -1,0 +1,196 @@
+{
+  "id": "eval-error-intersection-16ioib",
+  "oracle": "eval-error",
+  "op": "intersection",
+  "message": "the result is not a closed solid",
+  "count": 38,
+  "seeds": [
+    521,
+    656,
+    926,
+    1158,
+    1295,
+    1994,
+    2213,
+    3174
+  ],
+  "replay": "bun scripts/fuzz/fuzz.ts --replay 521",
+  "minimal": {
+    "parts": [
+      {
+        "name": "f",
+        "node": {
+          "type": "intersection",
+          "children": [
+            {
+              "type": "transform",
+              "matrix": [
+                1,
+                0,
+                0,
+                -7,
+                0,
+                1,
+                0,
+                -13,
+                0,
+                0,
+                1,
+                6.968,
+                0,
+                0,
+                0,
+                1
+              ],
+              "children": [
+                {
+                  "type": "sphere",
+                  "radius": 13
+                }
+              ]
+            },
+            {
+              "type": "transform",
+              "matrix": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0.001,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                1
+              ],
+              "children": [
+                {
+                  "type": "transform",
+                  "matrix": [
+                    1,
+                    0,
+                    0,
+                    -7,
+                    0,
+                    1,
+                    0,
+                    -13,
+                    0,
+                    0,
+                    1,
+                    6.968,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  "children": [
+                    {
+                      "type": "sphere",
+                      "radius": 13
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "original": {
+    "parts": [
+      {
+        "name": "f",
+        "node": {
+          "type": "intersection",
+          "children": [
+            {
+              "type": "transform",
+              "matrix": [
+                1,
+                0,
+                0,
+                -7,
+                0,
+                1,
+                0,
+                -13,
+                0,
+                0,
+                1,
+                6.968,
+                0,
+                0,
+                0,
+                1
+              ],
+              "children": [
+                {
+                  "type": "sphere",
+                  "radius": 13
+                }
+              ]
+            },
+            {
+              "type": "transform",
+              "matrix": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0.001,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                1
+              ],
+              "children": [
+                {
+                  "type": "transform",
+                  "matrix": [
+                    1,
+                    0,
+                    0,
+                    -7,
+                    0,
+                    1,
+                    0,
+                    -13,
+                    0,
+                    0,
+                    1,
+                    6.968,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  "children": [
+                    {
+                      "type": "sphere",
+                      "radius": 13
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

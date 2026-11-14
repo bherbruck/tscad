@@ -1,0 +1,88 @@
+{
+  "id": "mesh-error-meshAt-1xtnt3",
+  "oracle": "mesh-error",
+  "op": "meshAt",
+  "message": "the part has no record",
+  "count": 112,
+  "seeds": [
+    24,
+    719,
+    990,
+    1194,
+    1195,
+    1240,
+    1443,
+    1519
+  ],
+  "replay": "bun scripts/fuzz/fuzz.ts --replay 24",
+  "minimal": {
+    "parts": [
+      {
+        "name": "f",
+        "node": {
+          "type": "transform",
+          "matrix": [
+            1,
+            0,
+            0,
+            -12,
+            0,
+            1,
+            0,
+            5,
+            0,
+            0,
+            1,
+            9,
+            0,
+            0,
+            0,
+            1
+          ],
+          "children": [
+            {
+              "type": "torus",
+              "majorRadius": 8,
+              "minorRadius": 7
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "original": {
+    "parts": [
+      {
+        "name": "f",
+        "node": {
+          "type": "transform",
+          "matrix": [
+            1,
+            0,
+            0,
+            -12,
+            0,
+            1,
+            0,
+            5,
+            0,
+            0,
+            1,
+            9,
+            0,
+            0,
+            0,
+            1
+          ],
+          "children": [
+            {
+              "type": "torus",
+              "majorRadius": 8,
+              "minorRadius": 7
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,316 @@
+{
+  "id": "eval-error-difference-vl1xum",
+  "oracle": "eval-error",
+  "op": "difference",
+  "message": "solidcore failed (status 1001)",
+  "count": 30,
+  "seeds": [
+    485,
+    730,
+    981,
+    3961,
+    4056,
+    4527,
+    4713,
+    5313
+  ],
+  "replay": "bun scripts/fuzz/fuzz.ts --replay 485",
+  "minimal": {
+    "parts": [
+      {
+        "name": "f",
+        "node": {
+          "type": "difference",
+          "children": [
+            {
+              "type": "revolve",
+              "profile": [
+                {
+                  "type": "line",
+                  "start": [
+                    4.5,
+                    0,
+                    0
+                  ],
+                  "end": [
+                    6,
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "type": "line",
+                  "start": [
+                    6,
+                    0,
+                    0
+                  ],
+                  "end": [
+                    9,
+                    0,
+                    4
+                  ]
+                },
+                {
+                  "type": "line",
+                  "start": [
+                    9,
+                    0,
+                    4
+                  ],
+                  "end": [
+                    14.866,
+                    0,
+                    8
+                  ]
+                },
+                {
+                  "type": "line",
+                  "start": [
+                    14.866,
+                    0,
+                    8
+                  ],
+                  "end": [
+                    4.5,
+                    0,
+                    8
+                  ]
+                },
+                {
+                  "type": "line",
+                  "start": [
+                    4.5,
+                    0,
+                    8
+                  ],
+                  "end": [
+                    4.5,
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "origin": [
+                0,
+                0,
+                0
+              ],
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "angle": 6.283185307179586
+            },
+            {
+              "type": "transform",
+              "matrix": [
+                1,
+                0,
+                0,
+                3,
+                0,
+                1,
+                0,
+                -2,
+                0,
+                0,
+                1,
+                2,
+                0,
+                0,
+                0,
+                1
+              ],
+              "children": [
+                {
+                  "type": "transform",
+                  "matrix": [
+                    1,
+                    0,
+                    0,
+                    -3,
+                    0,
+                    1,
+                    0,
+                    2,
+                    0,
+                    0,
+                    1,
+                    2,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  "children": [
+                    {
+                      "type": "torus",
+                      "majorRadius": 16,
+                      "minorRadius": 5
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "original": {
+    "parts": [
+      {
+        "name": "f",
+        "node": {
+          "type": "chamfer",
+          "distance": 0.5384,
+          "edges": {
+            "type": "parallel",
+            "axis": "x"
+          },
+          "children": [
+            {
+              "type": "difference",
+              "children": [
+                {
+                  "type": "revolve",
+                  "profile": [
+                    {
+                      "type": "line",
+                      "start": [
+                        4.5,
+                        0,
+                        0
+                      ],
+                      "end": [
+                        6,
+                        0,
+                        0
+                      ]
+                    },
+                    {
+                      "type": "line",
+                      "start": [
+                        6,
+                        0,
+                        0
+                      ],
+                      "end": [
+                        9,
+                        0,
+                        4
+                      ]
+                    },
+                    {
+                      "type": "line",
+                      "start": [
+                        9,
+                        0,
+                        4
+                      ],
+                      "end": [
+                        14.866,
+                        0,
+                        8
+                      ]
+                    },
+                    {
+                      "type": "line",
+                      "start": [
+                        14.866,
+                        0,
+                        8
+                      ],
+                      "end": [
+                        4.5,
+                        0,
+                        8
+                      ]
+                    },
+                    {
+                      "type": "line",
+                      "start": [
+                        4.5,
+                        0,
+                        8
+                      ],
+                      "end": [
+                        4.5,
+                        0,
+                        0
+                      ]
+                    }
+                  ],
+                  "origin": [
+                    0,
+                    0,
+                    0
+                  ],
+                  "axis": [
+                    0,
+                    0,
+                    1
+                  ],
+                  "angle": 6.283185307179586
+                },
+                {
+                  "type": "transform",
+                  "matrix": [
+                    1,
+                    0,
+                    0,
+                    3,
+                    0,
+                    1,
+                    0,
+                    -2,
+                    0,
+                    0,
+                    1,
+                    2,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  "children": [
+                    {
+                      "type": "transform",
+                      "matrix": [
+                        -1,
+                        0,
+                        0,
+                        -3,
+                        0,
+                        -1,
+                        0,
+                        2,
+                        0,
+                        0,
+                        1,
+                        2,
+                        0,
+                        0,
+                        0,
+                        1
+                      ],
+                      "children": [
+                        {
+                          "type": "torus",
+                          "majorRadius": 16,
+                          "minorRadius": 5.384
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

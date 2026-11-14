@@ -1,0 +1,156 @@
+{
+  "id": "mesh-volume-difference-1hmwie",
+  "oracle": "mesh-volume",
+  "op": "difference",
+  "message": "mesh volume differs from kernel volume",
+  "detail": "difference: kernel 0.0070, mesh 0.0072 (2.43%)",
+  "minimalDetail": "kernel 0.0054, mesh 0.0055 (2.35%)",
+  "count": 11,
+  "seeds": [
+    553,
+    2204,
+    4561,
+    4718,
+    5363,
+    9691,
+    11191,
+    13601
+  ],
+  "mode": "coplanar",
+  "replay": "bun scripts/fuzz/fuzz.ts --replay 553",
+  "minimal": {
+    "parts": [
+      {
+        "name": "f",
+        "node": {
+          "type": "difference",
+          "children": [
+            {
+              "type": "cylinder",
+              "radius": 0.5,
+              "height": 5,
+              "center": true
+            },
+            {
+              "type": "transform",
+              "matrix": [
+                1,
+                0,
+                0,
+                -11,
+                0,
+                1,
+                0,
+                -8.114704,
+                0,
+                0,
+                1,
+                -0.506,
+                0,
+                0,
+                0,
+                1
+              ],
+              "children": [
+                {
+                  "type": "transform",
+                  "matrix": [
+                    0.707107,
+                    -0.707107,
+                    0,
+                    11,
+                    0.707107,
+                    0.707107,
+                    0,
+                    8,
+                    0,
+                    0,
+                    1,
+                    8.07,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  "children": [
+                    {
+                      "type": "sphere",
+                      "radius": 10.064
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "original": {
+    "identity": true,
+    "parts": [
+      {
+        "name": "A",
+        "node": {
+          "type": "cylinder",
+          "radius": 0.536,
+          "height": 5,
+          "center": true
+        }
+      },
+      {
+        "name": "B",
+        "node": {
+          "type": "transform",
+          "matrix": [
+            1,
+            0,
+            0,
+            -11,
+            0,
+            1,
+            0,
+            -8.114704,
+            0,
+            0,
+            1,
+            -0.506,
+            0,
+            0,
+            0,
+            1
+          ],
+          "children": [
+            {
+              "type": "transform",
+              "matrix": [
+                0.707107,
+                -0.707107,
+                0,
+                11,
+                0.707107,
+                0.707107,
+                0,
+                8,
+                0,
+                0,
+                1,
+                8.07,
+                0,
+                0,
+                0,
+                1
+              ],
+              "children": [
+                {
+                  "type": "sphere",
+                  "radius": 10.064
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

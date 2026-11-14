@@ -1,0 +1,792 @@
+{
+  "id": "eval-error-intersection-1cmf4z",
+  "oracle": "eval-error",
+  "op": "intersection",
+  "message": "not supported yet: SmFace::PointClassify",
+  "count": 1,
+  "seeds": [
+    11290
+  ],
+  "replay": "bun scripts/fuzz/fuzz.ts --replay 11290",
+  "minimal": {
+    "parts": [
+      {
+        "name": "f",
+        "node": {
+          "type": "intersection",
+          "children": [
+            {
+              "type": "extrude",
+              "profile": [
+                {
+                  "type": "arc",
+                  "center": [
+                    0,
+                    0,
+                    0
+                  ],
+                  "axis": [
+                    0,
+                    0,
+                    1
+                  ],
+                  "reference": [
+                    1,
+                    0,
+                    0
+                  ],
+                  "radius": 18,
+                  "start": 0,
+                  "end": 6.283185307179586
+                }
+              ],
+              "direction": [
+                0,
+                0,
+                1
+              ],
+              "distance": 21
+            },
+            {
+              "type": "union",
+              "children": [
+                {
+                  "type": "transform",
+                  "matrix": [
+                    1,
+                    0,
+                    0,
+                    -0.5,
+                    0,
+                    -1,
+                    0,
+                    4,
+                    0,
+                    0,
+                    -1,
+                    9,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  "children": [
+                    {
+                      "type": "revolve",
+                      "profile": [
+                        {
+                          "type": "line",
+                          "start": [
+                            2.279,
+                            0,
+                            0
+                          ],
+                          "end": [
+                            5.5,
+                            0,
+                            0
+                          ]
+                        },
+                        {
+                          "type": "line",
+                          "start": [
+                            5.5,
+                            0,
+                            0
+                          ],
+                          "end": [
+                            8,
+                            0,
+                            5.75
+                          ]
+                        },
+                        {
+                          "type": "line",
+                          "start": [
+                            8,
+                            0,
+                            5.75
+                          ],
+                          "end": [
+                            2.867,
+                            0,
+                            11.5
+                          ]
+                        },
+                        {
+                          "type": "line",
+                          "start": [
+                            2.867,
+                            0,
+                            11.5
+                          ],
+                          "end": [
+                            7,
+                            0,
+                            17.25
+                          ]
+                        },
+                        {
+                          "type": "line",
+                          "start": [
+                            7,
+                            0,
+                            17.25
+                          ],
+                          "end": [
+                            17.639,
+                            0,
+                            23
+                          ]
+                        },
+                        {
+                          "type": "line",
+                          "start": [
+                            17.639,
+                            0,
+                            23
+                          ],
+                          "end": [
+                            2.279,
+                            0,
+                            23
+                          ]
+                        },
+                        {
+                          "type": "line",
+                          "start": [
+                            2.279,
+                            0,
+                            23
+                          ],
+                          "end": [
+                            2.279,
+                            0,
+                            0
+                          ]
+                        }
+                      ],
+                      "origin": [
+                        0,
+                        0,
+                        0
+                      ],
+                      "axis": [
+                        0,
+                        0,
+                        1
+                      ],
+                      "angle": 3.007
+                    }
+                  ]
+                },
+                {
+                  "type": "transform",
+                  "matrix": [
+                    1,
+                    0,
+                    0,
+                    0,
+                    0,
+                    1,
+                    0,
+                    4,
+                    0,
+                    0,
+                    1,
+                    -16,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  "children": [
+                    {
+                      "type": "extrude",
+                      "profile": [
+                        {
+                          "type": "line",
+                          "start": [
+                            -13.133,
+                            -4.5,
+                            0
+                          ],
+                          "end": [
+                            13.133,
+                            -4.5,
+                            0
+                          ]
+                        },
+                        {
+                          "type": "arc",
+                          "center": [
+                            13.133,
+                            -3,
+                            0
+                          ],
+                          "axis": [
+                            0,
+                            0,
+                            1
+                          ],
+                          "reference": [
+                            1,
+                            0,
+                            0
+                          ],
+                          "radius": 1.5,
+                          "start": -1.5707963267948966,
+                          "end": 0
+                        },
+                        {
+                          "type": "line",
+                          "start": [
+                            14.633,
+                            -3,
+                            0
+                          ],
+                          "end": [
+                            14.633,
+                            3,
+                            0
+                          ]
+                        },
+                        {
+                          "type": "arc",
+                          "center": [
+                            13.133,
+                            3,
+                            0
+                          ],
+                          "axis": [
+                            0,
+                            0,
+                            1
+                          ],
+                          "reference": [
+                            1,
+                            0,
+                            0
+                          ],
+                          "radius": 1.5,
+                          "start": 0,
+                          "end": 1.5707963267948966
+                        },
+                        {
+                          "type": "line",
+                          "start": [
+                            13.133,
+                            4.5,
+                            0
+                          ],
+                          "end": [
+                            -13.133,
+                            4.5,
+                            0
+                          ]
+                        },
+                        {
+                          "type": "arc",
+                          "center": [
+                            -13.133,
+                            3,
+                            0
+                          ],
+                          "axis": [
+                            0,
+                            0,
+                            1
+                          ],
+                          "reference": [
+                            1,
+                            0,
+                            0
+                          ],
+                          "radius": 1.5,
+                          "start": 1.5707963267948966,
+                          "end": 3.141592653589793
+                        },
+                        {
+                          "type": "line",
+                          "start": [
+                            -14.633,
+                            3,
+                            0
+                          ],
+                          "end": [
+                            -14.633,
+                            -3,
+                            0
+                          ]
+                        },
+                        {
+                          "type": "arc",
+                          "center": [
+                            -13.133,
+                            -3,
+                            0
+                          ],
+                          "axis": [
+                            0,
+                            0,
+                            1
+                          ],
+                          "reference": [
+                            1,
+                            0,
+                            0
+                          ],
+                          "radius": 1.5,
+                          "start": 3.141592653589793,
+                          "end": 4.71238898038469
+                        }
+                      ],
+                      "direction": [
+                        0,
+                        0,
+                        1
+                      ],
+                      "distance": 28
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "original": {
+    "parts": [
+      {
+        "name": "f",
+        "node": {
+          "type": "intersection",
+          "children": [
+            {
+              "type": "difference",
+              "children": [
+                {
+                  "type": "extrude",
+                  "profile": [
+                    {
+                      "type": "arc",
+                      "center": [
+                        0,
+                        0,
+                        0
+                      ],
+                      "axis": [
+                        0,
+                        0,
+                        1
+                      ],
+                      "reference": [
+                        1,
+                        0,
+                        0
+                      ],
+                      "radius": 18,
+                      "start": 0,
+                      "end": 6.283185307179586
+                    }
+                  ],
+                  "direction": [
+                    0,
+                    0,
+                    1
+                  ],
+                  "distance": 21
+                },
+                {
+                  "type": "transform",
+                  "matrix": [
+                    1,
+                    0,
+                    0,
+                    0.001,
+                    0,
+                    1,
+                    0,
+                    0,
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  "children": [
+                    {
+                      "type": "extrude",
+                      "profile": [
+                        {
+                          "type": "arc",
+                          "center": [
+                            0,
+                            0,
+                            0
+                          ],
+                          "axis": [
+                            0,
+                            0,
+                            1
+                          ],
+                          "reference": [
+                            1,
+                            0,
+                            0
+                          ],
+                          "radius": 18,
+                          "start": 0,
+                          "end": 6.283185307179586
+                        }
+                      ],
+                      "direction": [
+                        0,
+                        0,
+                        1
+                      ],
+                      "distance": 21
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "transform",
+              "matrix": [
+                1,
+                0,
+                0,
+                0.5005,
+                0,
+                1,
+                0,
+                -4,
+                0,
+                0,
+                1,
+                13,
+                0,
+                0,
+                0,
+                1
+              ],
+              "children": [
+                {
+                  "type": "union",
+                  "children": [
+                    {
+                      "type": "transform",
+                      "matrix": [
+                        1,
+                        0,
+                        0,
+                        -0.5,
+                        0,
+                        -1,
+                        0,
+                        4,
+                        0,
+                        0,
+                        -1,
+                        9,
+                        0,
+                        0,
+                        0,
+                        1
+                      ],
+                      "children": [
+                        {
+                          "type": "revolve",
+                          "profile": [
+                            {
+                              "type": "line",
+                              "start": [
+                                2.279,
+                                0,
+                                0
+                              ],
+                              "end": [
+                                5.5,
+                                0,
+                                0
+                              ]
+                            },
+                            {
+                              "type": "line",
+                              "start": [
+                                5.5,
+                                0,
+                                0
+                              ],
+                              "end": [
+                                8,
+                                0,
+                                5.75
+                              ]
+                            },
+                            {
+                              "type": "line",
+                              "start": [
+                                8,
+                                0,
+                                5.75
+                              ],
+                              "end": [
+                                2.867,
+                                0,
+                                11.5
+                              ]
+                            },
+                            {
+                              "type": "line",
+                              "start": [
+                                2.867,
+                                0,
+                                11.5
+                              ],
+                              "end": [
+                                7,
+                                0,
+                                17.25
+                              ]
+                            },
+                            {
+                              "type": "line",
+                              "start": [
+                                7,
+                                0,
+                                17.25
+                              ],
+                              "end": [
+                                17.639,
+                                0,
+                                23
+                              ]
+                            },
+                            {
+                              "type": "line",
+                              "start": [
+                                17.639,
+                                0,
+                                23
+                              ],
+                              "end": [
+                                2.279,
+                                0,
+                                23
+                              ]
+                            },
+                            {
+                              "type": "line",
+                              "start": [
+                                2.279,
+                                0,
+                                23
+                              ],
+                              "end": [
+                                2.279,
+                                0,
+                                0
+                              ]
+                            }
+                          ],
+                          "origin": [
+                            0,
+                            0,
+                            0
+                          ],
+                          "axis": [
+                            0,
+                            0,
+                            1
+                          ],
+                          "angle": 3.007
+                        }
+                      ]
+                    },
+                    {
+                      "type": "transform",
+                      "matrix": [
+                        1,
+                        0,
+                        0,
+                        -0.5,
+                        0,
+                        1,
+                        0,
+                        4,
+                        0,
+                        0,
+                        1,
+                        -16.5,
+                        0,
+                        0,
+                        0,
+                        1
+                      ],
+                      "children": [
+                        {
+                          "type": "extrude",
+                          "profile": [
+                            {
+                              "type": "line",
+                              "start": [
+                                -13.133,
+                                -4.5,
+                                0
+                              ],
+                              "end": [
+                                13.133,
+                                -4.5,
+                                0
+                              ]
+                            },
+                            {
+                              "type": "arc",
+                              "center": [
+                                13.133,
+                                -3,
+                                0
+                              ],
+                              "axis": [
+                                0,
+                                0,
+                                1
+                              ],
+                              "reference": [
+                                1,
+                                0,
+                                0
+                              ],
+                              "radius": 1.5,
+                              "start": -1.5707963267948966,
+                              "end": 0
+                            },
+                            {
+                              "type": "line",
+                              "start": [
+                                14.633,
+                                -3,
+                                0
+                              ],
+                              "end": [
+                                14.633,
+                                3,
+                                0
+                              ]
+                            },
+                            {
+                              "type": "arc",
+                              "center": [
+                                13.133,
+                                3,
+                                0
+                              ],
+                              "axis": [
+                                0,
+                                0,
+                                1
+                              ],
+                              "reference": [
+                                1,
+                                0,
+                                0
+                              ],
+                              "radius": 1.5,
+                              "start": 0,
+                              "end": 1.5707963267948966
+                            },
+                            {
+                              "type": "line",
+                              "start": [
+                                13.133,
+                                4.5,
+                                0
+                              ],
+                              "end": [
+                                -13.133,
+                                4.5,
+                                0
+                              ]
+                            },
+                            {
+                              "type": "arc",
+                              "center": [
+                                -13.133,
+                                3,
+                                0
+                              ],
+                              "axis": [
+                                0,
+                                0,
+                                1
+                              ],
+                              "reference": [
+                                1,
+                                0,
+                                0
+                              ],
+                              "radius": 1.5,
+                              "start": 1.5707963267948966,
+                              "end": 3.141592653589793
+                            },
+                            {
+                              "type": "line",
+                              "start": [
+                                -14.633,
+                                3,
+                                0
+                              ],
+                              "end": [
+                                -14.633,
+                                -3,
+                                0
+                              ]
+                            },
+                            {
+                              "type": "arc",
+                              "center": [
+                                -13.133,
+                                -3,
+                                0
+                              ],
+                              "axis": [
+                                0,
+                                0,
+                                1
+                              ],
+                              "reference": [
+                                1,
+                                0,
+                                0
+                              ],
+                              "radius": 1.5,
+                              "start": 3.141592653589793,
+                              "end": 4.71238898038469
+                            }
+                          ],
+                          "direction": [
+                            0,
+                            0,
+                            1
+                          ],
+                          "distance": 28
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

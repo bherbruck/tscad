@@ -2,7 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { unzlibSync } from "fflate";
 import { loadKernel } from "../src/kernel";
-import { crc32, renderImage, renderPNG, type RenderPart } from "../src/render";
+import { renderImage, renderPNG, type RenderPart } from "../src/render";
+import { crc32 } from "../src/render/png";
 
 /** A hand-built unit box mesh (independent of the kernel, so its render is fully deterministic). */
 function boxPart(size: [number, number, number], color = "#4f7cac"): RenderPart {

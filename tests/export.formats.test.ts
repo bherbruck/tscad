@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { unzipSync, strFromU8 } from "fflate";
-import { exportModel, parseColor, toGLB, toOBJ, toSTL, to3MF, toHex, weld } from "../src/export";
+import { exportModel, toGLB, toOBJ, toSTL, to3MF } from "../src/export";
+import { parseColor, toHex } from "../src/export/color";
+import { weld } from "../src/export/mesh";
 import { docs, evaluated, meshVolume, openEdges, parseBinarySTL } from "./export.helpers";
 
 const TOL = 0.01;

@@ -34,7 +34,7 @@ const VIEWS: Record<string, RenderOptions["view"]> = {
 };
 
 const files = readdirSync(join(root, "examples"))
-  .filter((f) => f.endsWith(".tsx") && !f.startsWith("_"))
+  .filter((f) => f.endsWith(".tsx") && !f.startsWith("_") && !/\.(spec|test)\.tsx$/.test(f))
   .filter((f) => !names.length || names.includes(basename(f, ".tsx")));
 const kernel = await loadKernel();
 for (const f of files) {

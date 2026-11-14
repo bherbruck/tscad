@@ -1,0 +1,367 @@
+{
+  "id": "bad-volume-transform-1ceys9",
+  "oracle": "bad-volume",
+  "op": "transform",
+  "message": "volume 0",
+  "detail": "B",
+  "count": 3,
+  "seeds": [
+    1570,
+    4761,
+    11824
+  ],
+  "mode": "contain",
+  "replay": "bun scripts/fuzz/fuzz.ts --replay 1570",
+  "minimal": {
+    "parts": [
+      {
+        "name": "f",
+        "node": {
+          "type": "transform",
+          "matrix": [
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          "children": [
+            {
+              "type": "difference",
+              "children": [
+                {
+                  "type": "transform",
+                  "matrix": [
+                    1,
+                    0,
+                    0,
+                    7,
+                    0,
+                    1,
+                    0,
+                    -12,
+                    0,
+                    0,
+                    1,
+                    -1,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  "children": [
+                    {
+                      "type": "extrude",
+                      "profile": [
+                        {
+                          "type": "arc",
+                          "center": [
+                            0,
+                            0,
+                            0
+                          ],
+                          "axis": [
+                            0,
+                            0,
+                            1
+                          ],
+                          "reference": [
+                            1,
+                            0,
+                            0
+                          ],
+                          "radius": 19,
+                          "start": 0,
+                          "end": 6.283185307179586
+                        }
+                      ],
+                      "direction": [
+                        0,
+                        0,
+                        1
+                      ],
+                      "distance": 15,
+                      "draft": 0.134
+                    }
+                  ]
+                },
+                {
+                  "type": "transform",
+                  "matrix": [
+                    1,
+                    0,
+                    0,
+                    7,
+                    0,
+                    1,
+                    0,
+                    -12,
+                    0,
+                    0,
+                    1,
+                    2,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  "children": [
+                    {
+                      "type": "torus",
+                      "majorRadius": 18,
+                      "minorRadius": 5
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "original": {
+    "identity": true,
+    "parts": [
+      {
+        "name": "A",
+        "node": {
+          "type": "union",
+          "children": [
+            {
+              "type": "transform",
+              "matrix": [
+                0.5,
+                -0.866025,
+                0,
+                -8.108,
+                0.866025,
+                0.5,
+                0,
+                -1,
+                0,
+                0,
+                1,
+                5,
+                0,
+                0,
+                0,
+                1
+              ],
+              "children": [
+                {
+                  "type": "extrude",
+                  "profile": [
+                    {
+                      "type": "arc",
+                      "center": [
+                        0,
+                        0,
+                        0
+                      ],
+                      "axis": [
+                        0,
+                        0,
+                        1
+                      ],
+                      "reference": [
+                        1,
+                        0,
+                        0
+                      ],
+                      "radius": 11.365,
+                      "start": 0,
+                      "end": 6.283185307179586
+                    }
+                  ],
+                  "direction": [
+                    0,
+                    0,
+                    1
+                  ],
+                  "distance": 29
+                }
+              ]
+            },
+            {
+              "type": "transform",
+              "matrix": [
+                1,
+                0,
+                0,
+                -20.108,
+                0,
+                1,
+                0,
+                -12,
+                0,
+                0,
+                1,
+                13.512,
+                0,
+                0,
+                0,
+                1
+              ],
+              "children": [
+                {
+                  "type": "transform",
+                  "matrix": [
+                    0,
+                    0,
+                    1,
+                    12,
+                    0,
+                    1,
+                    0,
+                    11,
+                    -1,
+                    0,
+                    0,
+                    5.988,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  "children": [
+                    {
+                      "type": "sphere",
+                      "radius": 13
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "B",
+        "node": {
+          "type": "transform",
+          "matrix": [
+            1,
+            0,
+            0,
+            -14.732,
+            0,
+            1,
+            0,
+            11,
+            0,
+            0,
+            1,
+            14.426284,
+            0,
+            0,
+            0,
+            1
+          ],
+          "children": [
+            {
+              "type": "difference",
+              "children": [
+                {
+                  "type": "transform",
+                  "matrix": [
+                    1,
+                    0,
+                    0,
+                    6.624,
+                    0,
+                    1,
+                    0,
+                    -12,
+                    0,
+                    0,
+                    1,
+                    -1.439,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  "children": [
+                    {
+                      "type": "extrude",
+                      "profile": [
+                        {
+                          "type": "arc",
+                          "center": [
+                            0,
+                            0,
+                            0
+                          ],
+                          "axis": [
+                            0,
+                            0,
+                            1
+                          ],
+                          "reference": [
+                            1,
+                            0,
+                            0
+                          ],
+                          "radius": 19,
+                          "start": 0,
+                          "end": 6.283185307179586
+                        }
+                      ],
+                      "direction": [
+                        0,
+                        0,
+                        1
+                      ],
+                      "distance": 14.848,
+                      "draft": 0.134
+                    }
+                  ]
+                },
+                {
+                  "type": "transform",
+                  "matrix": [
+                    1,
+                    0,
+                    0,
+                    6.624,
+                    0,
+                    1,
+                    0,
+                    -12,
+                    0,
+                    0,
+                    1,
+                    2.035432,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  "children": [
+                    {
+                      "type": "torus",
+                      "majorRadius": 18.126,
+                      "minorRadius": 5.297
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

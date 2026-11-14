@@ -39,6 +39,27 @@ These have NOT been filed upstream.
 ## 6. Booleans are ~1 s per cut on the dev wasm
 - A plate with 24 slot holes: 18–21 s cut one by one, ~7 s as one `difference(outer, union(holes))`.
 
+## 7. Transforming a torus leaves a non-finite tolerance (confirmed on the raw ops API)
+- `solidcore_ops::make_torus([0;3], 20, 3)` then `Body::transform` with a pure translation
+  (row 3 = [5,0,0,1]): volume is still right, but `Body::to_record()` fails with "the body's
+  tolerance is not finite and positive", so the body can't be meshed, picked or exported.
+  Rotations fail the same way, and a rotated torus then fails tessellation
+  ("pcurve is 3.6 mm off the edge").
+- Repro: `crates/tscad-wasm/tests/fuzz_triage.rs`.
+
+## 8. Boolean of a rotated torus with itself is wrong
+- `difference(T, T)` with T = torus(20, 3) rotated 30° about X returns all of T (3553 mm³)
+  instead of nothing; union and intersection give the same volume. Unrotated, it is right.
+- Found by the fuzzer (docs/FUZZ.md has 31 distinct findings, minimal repros in fuzz/findings/).
+
+## 9. More fuzzer findings (see docs/FUZZ.md)
+- box − torus evaluates "ok" with a kernel volume of 0 (mesh says 1397 mm³);
+- torus ∪ cylinder: mesh volume 52% below the kernel volume;
+- side-by-side touching cylinders: union mesh not watertight; one extruded star polygon too;
+- solids booleaned with a copy moved by 1e-5..1e-3 mm: "not a closed solid" / status 1001;
+- ~10 boolean failures on revolves / rotated extrudes ("SmFace::PointClassify not supported yet",
+  "proto edge is deleted", "mass::enclosure", empty unions).
+
 ## Notes (tscad bugs found and fixed, not kernel bugs)
 - `solidcore_ops::blend` takes the kernel's *native* edge order, not record order (its
   `SetBack` docs say so; the function's own docs read as record indices). tscad now uses

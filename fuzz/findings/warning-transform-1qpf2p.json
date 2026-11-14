@@ -1,0 +1,170 @@
+{
+  "id": "warning-transform-1qpf2p",
+  "oracle": "warning",
+  "op": "transform",
+  "message": "record: record: the body's tolerance is not finite and positive",
+  "detail": "B",
+  "minimalDetail": "B",
+  "count": 179,
+  "seeds": [
+    106,
+    129,
+    159,
+    239,
+    440,
+    482,
+    592,
+    612
+  ],
+  "mode": "touch",
+  "replay": "bun scripts/fuzz/fuzz.ts --replay 106",
+  "minimal": {
+    "identity": true,
+    "parts": [
+      {
+        "name": "A",
+        "node": {
+          "type": "cylinder",
+          "radius": 16,
+          "height": 2,
+          "center": true
+        }
+      },
+      {
+        "name": "B",
+        "node": {
+          "type": "transform",
+          "matrix": [
+            1,
+            0,
+            0,
+            -21,
+            0,
+            1,
+            0,
+            38,
+            0,
+            0,
+            1,
+            -18,
+            0,
+            0,
+            0,
+            1
+          ],
+          "children": [
+            {
+              "type": "torus",
+              "majorRadius": 7,
+              "minorRadius": 3
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "original": {
+    "identity": true,
+    "parts": [
+      {
+        "name": "A",
+        "node": {
+          "type": "cylinder",
+          "radius": 16,
+          "height": 2.041,
+          "center": true
+        }
+      },
+      {
+        "name": "B",
+        "node": {
+          "type": "transform",
+          "matrix": [
+            1,
+            0,
+            0,
+            -21.5,
+            0,
+            1,
+            0,
+            38.2575,
+            0,
+            0,
+            1,
+            -18.46,
+            0,
+            0,
+            0,
+            1
+          ],
+          "children": [
+            {
+              "type": "intersection",
+              "children": [
+                {
+                  "type": "transform",
+                  "matrix": [
+                    1,
+                    0,
+                    0,
+                    12,
+                    0,
+                    0,
+                    -1,
+                    -8,
+                    0,
+                    1,
+                    0,
+                    -1,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  "children": [
+                    {
+                      "type": "box",
+                      "size": [
+                        19,
+                        38.92,
+                        5.5
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "transform",
+                  "matrix": [
+                    1,
+                    0,
+                    0,
+                    21.5,
+                    0,
+                    1,
+                    0,
+                    -12.7575,
+                    0,
+                    0,
+                    1,
+                    16.08588,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  "children": [
+                    {
+                      "type": "torus",
+                      "majorRadius": 7,
+                      "minorRadius": 2.5
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

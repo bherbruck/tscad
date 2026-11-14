@@ -1,0 +1,428 @@
+{
+  "id": "eval-error-difference-1fr1u1",
+  "oracle": "eval-error",
+  "op": "difference",
+  "message": "mass::enclosure: a face whose sides are not one material region and one void",
+  "count": 7,
+  "seeds": [
+    2644,
+    3254,
+    3543,
+    5547,
+    8480,
+    11217,
+    12063
+  ],
+  "replay": "bun scripts/fuzz/fuzz.ts --replay 2644",
+  "minimal": {
+    "parts": [
+      {
+        "name": "f",
+        "node": {
+          "type": "difference",
+          "children": [
+            {
+              "type": "cone",
+              "bottomRadius": 5,
+              "topRadius": 0,
+              "height": 30
+            },
+            {
+              "type": "transform",
+              "matrix": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                13,
+                0,
+                0,
+                1,
+                2,
+                0,
+                0,
+                0,
+                1
+              ],
+              "children": [
+                {
+                  "type": "difference",
+                  "children": [
+                    {
+                      "type": "transform",
+                      "matrix": [
+                        -0.694268,
+                        0.5978,
+                        -0.400783,
+                        -14,
+                        0.628563,
+                        0.774873,
+                        0.066939,
+                        -7,
+                        -0.350572,
+                        0.205444,
+                        0.913724,
+                        4,
+                        0,
+                        0,
+                        0,
+                        1
+                      ],
+                      "children": [
+                        {
+                          "type": "torus",
+                          "majorRadius": 7,
+                          "minorRadius": 1
+                        }
+                      ]
+                    },
+                    {
+                      "type": "transform",
+                      "matrix": [
+                        1,
+                        0,
+                        0,
+                        -0.000001,
+                        0,
+                        1,
+                        0,
+                        0,
+                        0,
+                        0,
+                        1,
+                        0,
+                        0,
+                        0,
+                        0,
+                        1
+                      ],
+                      "children": [
+                        {
+                          "type": "transform",
+                          "matrix": [
+                            -0.694268,
+                            0.5978,
+                            -0.400783,
+                            -14,
+                            0.628563,
+                            0.774873,
+                            0.066939,
+                            -7,
+                            -0.350572,
+                            0.205444,
+                            0.913724,
+                            4,
+                            0,
+                            0,
+                            0,
+                            1
+                          ],
+                          "children": [
+                            {
+                              "type": "torus",
+                              "majorRadius": 7,
+                              "minorRadius": 1
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "original": {
+    "parts": [
+      {
+        "name": "f",
+        "node": {
+          "type": "union",
+          "children": [
+            {
+              "type": "difference",
+              "children": [
+                {
+                  "type": "transform",
+                  "matrix": [
+                    1,
+                    0,
+                    0,
+                    4,
+                    0,
+                    1,
+                    0,
+                    13.75,
+                    0,
+                    0,
+                    1,
+                    9.5,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  "children": [
+                    {
+                      "type": "sphere",
+                      "radius": 4
+                    }
+                  ]
+                },
+                {
+                  "type": "transform",
+                  "matrix": [
+                    1,
+                    0,
+                    0,
+                    -1.425,
+                    0,
+                    1,
+                    0,
+                    27.19,
+                    0,
+                    0,
+                    1,
+                    4.8535,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  "children": [
+                    {
+                      "type": "transform",
+                      "matrix": [
+                        1,
+                        0,
+                        0,
+                        5.425,
+                        0,
+                        1,
+                        0,
+                        -13.44,
+                        0,
+                        0,
+                        1,
+                        -4.5,
+                        0,
+                        0,
+                        0,
+                        1
+                      ],
+                      "children": [
+                        {
+                          "type": "extrude",
+                          "profile": [
+                            {
+                              "type": "arc",
+                              "center": [
+                                0,
+                                0,
+                                0
+                              ],
+                              "axis": [
+                                0,
+                                0,
+                                1
+                              ],
+                              "reference": [
+                                1,
+                                0,
+                                0
+                              ],
+                              "radius": 15,
+                              "start": 0,
+                              "end": 6.283185307179586
+                            }
+                          ],
+                          "direction": [
+                            0,
+                            0,
+                            1
+                          ],
+                          "distance": 18.293
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "transform",
+              "matrix": [
+                1,
+                0,
+                0,
+                22.259999,
+                0,
+                1,
+                0,
+                1.42,
+                0,
+                0,
+                1,
+                -1.8535,
+                0,
+                0,
+                0,
+                1
+              ],
+              "children": [
+                {
+                  "type": "difference",
+                  "children": [
+                    {
+                      "type": "transform",
+                      "matrix": [
+                        1,
+                        0,
+                        0,
+                        -14,
+                        0,
+                        1,
+                        0,
+                        6,
+                        0,
+                        0,
+                        1,
+                        -9,
+                        0,
+                        0,
+                        0,
+                        1
+                      ],
+                      "children": [
+                        {
+                          "type": "cone",
+                          "bottomRadius": 5,
+                          "topRadius": 0,
+                          "height": 29.5
+                        }
+                      ]
+                    },
+                    {
+                      "type": "transform",
+                      "matrix": [
+                        1,
+                        0,
+                        0,
+                        0.000001,
+                        0,
+                        1,
+                        0,
+                        13,
+                        0,
+                        0,
+                        1,
+                        1.75,
+                        0,
+                        0,
+                        0,
+                        1
+                      ],
+                      "children": [
+                        {
+                          "type": "difference",
+                          "children": [
+                            {
+                              "type": "transform",
+                              "matrix": [
+                                -0.694268,
+                                0.5978,
+                                -0.400783,
+                                -14,
+                                0.628563,
+                                0.774873,
+                                0.066939,
+                                -7,
+                                -0.350572,
+                                0.205444,
+                                0.913724,
+                                4,
+                                0,
+                                0,
+                                0,
+                                1
+                              ],
+                              "children": [
+                                {
+                                  "type": "torus",
+                                  "majorRadius": 7,
+                                  "minorRadius": 1
+                                }
+                              ]
+                            },
+                            {
+                              "type": "transform",
+                              "matrix": [
+                                1,
+                                0,
+                                0,
+                                -0.000001,
+                                0,
+                                1,
+                                0,
+                                0,
+                                0,
+                                0,
+                                1,
+                                0,
+                                0,
+                                0,
+                                0,
+                                1
+                              ],
+                              "children": [
+                                {
+                                  "type": "transform",
+                                  "matrix": [
+                                    -0.694268,
+                                    0.5978,
+                                    -0.400783,
+                                    -14,
+                                    0.628563,
+                                    0.774873,
+                                    0.066939,
+                                    -7,
+                                    -0.350572,
+                                    0.205444,
+                                    0.913724,
+                                    4,
+                                    0,
+                                    0,
+                                    0,
+                                    1
+                                  ],
+                                  "children": [
+                                    {
+                                      "type": "torus",
+                                      "majorRadius": 7,
+                                      "minorRadius": 1
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

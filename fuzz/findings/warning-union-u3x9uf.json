@@ -1,0 +1,276 @@
+{
+  "id": "warning-union-u3x9uf",
+  "oracle": "warning",
+  "op": "union",
+  "message": "record: not supported yet: a face between two material regions or two empty ones",
+  "detail": "A",
+  "minimalDetail": "A",
+  "count": 1,
+  "seeds": [
+    1187
+  ],
+  "mode": "contain",
+  "replay": "bun scripts/fuzz/fuzz.ts --replay 1187",
+  "minimal": {
+    "identity": true,
+    "parts": [
+      {
+        "name": "A",
+        "node": {
+          "type": "union",
+          "children": [
+            {
+              "type": "box",
+              "size": [
+                4,
+                34,
+                20
+              ],
+              "center": true
+            },
+            {
+              "type": "transform",
+              "matrix": [
+                1,
+                0,
+                0,
+                4,
+                0,
+                1,
+                0,
+                -8,
+                0,
+                0,
+                1,
+                4,
+                0,
+                0,
+                0,
+                1
+              ],
+              "children": [
+                {
+                  "type": "transform",
+                  "matrix": [
+                    1,
+                    0,
+                    0,
+                    -4,
+                    0,
+                    1,
+                    0,
+                    9,
+                    0,
+                    0,
+                    1,
+                    -4,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  "children": [
+                    {
+                      "type": "torus",
+                      "majorRadius": 20,
+                      "minorRadius": 5
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "B",
+        "node": {
+          "type": "extrude",
+          "profile": [
+            {
+              "type": "arc",
+              "center": [
+                0,
+                0,
+                0
+              ],
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "reference": [
+                1,
+                0,
+                0
+              ],
+              "radius": 1,
+              "start": 0,
+              "end": 6.283185307179586
+            }
+          ],
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "distance": 29
+        }
+      }
+    ]
+  },
+  "original": {
+    "identity": true,
+    "parts": [
+      {
+        "name": "A",
+        "node": {
+          "type": "union",
+          "children": [
+            {
+              "type": "box",
+              "size": [
+                4,
+                34,
+                19.5
+              ],
+              "center": true
+            },
+            {
+              "type": "transform",
+              "matrix": [
+                1,
+                0,
+                0,
+                3.728,
+                0,
+                1,
+                0,
+                -8.5,
+                0,
+                0,
+                1,
+                4,
+                0,
+                0,
+                0,
+                1
+              ],
+              "children": [
+                {
+                  "type": "transform",
+                  "matrix": [
+                    1,
+                    0,
+                    0,
+                    -3.728,
+                    0,
+                    1,
+                    0,
+                    8.5,
+                    0,
+                    0,
+                    1,
+                    -4,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  "children": [
+                    {
+                      "type": "torus",
+                      "majorRadius": 20,
+                      "minorRadius": 4.5
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "B",
+        "node": {
+          "type": "transform",
+          "matrix": [
+            1,
+            0,
+            0,
+            12,
+            0,
+            1,
+            0,
+            -7,
+            0,
+            0,
+            1,
+            -18.492,
+            0,
+            0,
+            0,
+            1
+          ],
+          "children": [
+            {
+              "type": "transform",
+              "matrix": [
+                1,
+                0,
+                0,
+                -12,
+                0,
+                1,
+                0,
+                7,
+                0,
+                0,
+                1,
+                4,
+                0,
+                0,
+                0,
+                1
+              ],
+              "children": [
+                {
+                  "type": "extrude",
+                  "profile": [
+                    {
+                      "type": "arc",
+                      "center": [
+                        0,
+                        0,
+                        0
+                      ],
+                      "axis": [
+                        0,
+                        0,
+                        1
+                      ],
+                      "reference": [
+                        1,
+                        0,
+                        0
+                      ],
+                      "radius": 1,
+                      "start": 0,
+                      "end": 6.283185307179586
+                    }
+                  ],
+                  "direction": [
+                    0,
+                    0,
+                    1
+                  ],
+                  "distance": 28.984
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,184 @@
+{
+  "id": "bad-volume-difference-1iv3n4",
+  "oracle": "bad-volume",
+  "op": "difference",
+  "message": "volume -1647.2914644295222",
+  "detail": "A",
+  "count": 9,
+  "seeds": [
+    503,
+    881,
+    2015,
+    2707,
+    2792,
+    3642,
+    4333,
+    13212
+  ],
+  "mode": "nudge",
+  "replay": "bun scripts/fuzz/fuzz.ts --replay 503",
+  "minimal": {
+    "parts": [
+      {
+        "name": "f",
+        "node": {
+          "type": "difference",
+          "children": [
+            {
+              "type": "box",
+              "size": [
+                38,
+                1,
+                37
+              ]
+            },
+            {
+              "type": "transform",
+              "matrix": [
+                1,
+                0,
+                0,
+                15,
+                0,
+                1,
+                0,
+                1,
+                0,
+                0,
+                1,
+                13,
+                0,
+                0,
+                0,
+                1
+              ],
+              "children": [
+                {
+                  "type": "torus",
+                  "majorRadius": 20,
+                  "minorRadius": 3
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "original": {
+    "identity": true,
+    "parts": [
+      {
+        "name": "A",
+        "node": {
+          "type": "difference",
+          "children": [
+            {
+              "type": "box",
+              "size": [
+                37.679,
+                1.367,
+                37
+              ]
+            },
+            {
+              "type": "transform",
+              "matrix": [
+                1,
+                0,
+                0,
+                14.679,
+                0,
+                1,
+                0,
+                0.6835,
+                0,
+                0,
+                1,
+                13.431,
+                0,
+                0,
+                0,
+                1
+              ],
+              "children": [
+                {
+                  "type": "torus",
+                  "majorRadius": 20,
+                  "minorRadius": 3
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "B",
+        "node": {
+          "type": "transform",
+          "matrix": [
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0.001,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          "children": [
+            {
+              "type": "difference",
+              "children": [
+                {
+                  "type": "box",
+                  "size": [
+                    37.679,
+                    1.367,
+                    37
+                  ]
+                },
+                {
+                  "type": "transform",
+                  "matrix": [
+                    1,
+                    0,
+                    0,
+                    14.679,
+                    0,
+                    1,
+                    0,
+                    0.6835,
+                    0,
+                    0,
+                    1,
+                    13.431,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  "children": [
+                    {
+                      "type": "torus",
+                      "majorRadius": 20,
+                      "minorRadius": 3
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

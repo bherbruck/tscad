@@ -1,0 +1,209 @@
+{
+  "id": "eval-error-difference-45zuhc",
+  "oracle": "eval-error",
+  "op": "difference",
+  "message": "the result is not a closed solid",
+  "detail": "difference",
+  "count": 220,
+  "seeds": [
+    19,
+    45,
+    73,
+    90,
+    118,
+    272,
+    345,
+    369
+  ],
+  "mode": "tangent-cyl",
+  "replay": "bun scripts/fuzz/fuzz.ts --replay 19",
+  "minimal": {
+    "parts": [
+      {
+        "name": "f",
+        "node": {
+          "type": "difference",
+          "children": [
+            {
+              "type": "transform",
+              "matrix": [
+                -1,
+                0,
+                0,
+                -12.5,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                -1,
+                6.694,
+                0,
+                0,
+                0,
+                1
+              ],
+              "children": [
+                {
+                  "type": "extrude",
+                  "profile": [
+                    {
+                      "type": "arc",
+                      "center": [
+                        0,
+                        0,
+                        0
+                      ],
+                      "axis": [
+                        0,
+                        0,
+                        1
+                      ],
+                      "reference": [
+                        1,
+                        0,
+                        0
+                      ],
+                      "radius": 13,
+                      "start": 0,
+                      "end": 6.283185307179586
+                    }
+                  ],
+                  "direction": [
+                    0,
+                    0,
+                    1
+                  ],
+                  "distance": 17
+                }
+              ]
+            },
+            {
+              "type": "transform",
+              "matrix": [
+                1,
+                0,
+                0,
+                -4,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                -6,
+                0,
+                0,
+                0,
+                1
+              ],
+              "children": [
+                {
+                  "type": "cylinder",
+                  "radius": 4.5,
+                  "height": 16.5
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "original": {
+    "identity": true,
+    "parts": [
+      {
+        "name": "A",
+        "node": {
+          "type": "transform",
+          "matrix": [
+            -1,
+            0,
+            0,
+            -12.5,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            -1,
+            6.694,
+            0,
+            0,
+            0,
+            1
+          ],
+          "children": [
+            {
+              "type": "extrude",
+              "profile": [
+                {
+                  "type": "arc",
+                  "center": [
+                    0,
+                    0,
+                    0
+                  ],
+                  "axis": [
+                    0,
+                    0,
+                    1
+                  ],
+                  "reference": [
+                    1,
+                    0,
+                    0
+                  ],
+                  "radius": 13,
+                  "start": 0,
+                  "end": 6.283185307179586
+                }
+              ],
+              "direction": [
+                0,
+                0,
+                1
+              ],
+              "distance": 16.5
+            }
+          ]
+        }
+      },
+      {
+        "name": "B",
+        "node": {
+          "type": "transform",
+          "matrix": [
+            1,
+            0,
+            0,
+            -4,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            -5.681,
+            0,
+            0,
+            0,
+            1
+          ],
+          "children": [
+            {
+              "type": "cylinder",
+              "radius": 4.5,
+              "height": 16.5
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

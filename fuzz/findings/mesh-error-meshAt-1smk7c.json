@@ -1,0 +1,83 @@
+{
+  "id": "mesh-error-meshAt-1smk7c",
+  "oracle": "mesh-error",
+  "op": "meshAt",
+  "message": "tessellate: the operation failed: not supported yet: tessellation: face 0 (rational spline): edge 1: node 63: its pcurve is 3.6265076033760146 mm off the edge at t = 0.984375",
+  "count": 3,
+  "seeds": [
+    9554,
+    10517,
+    14445
+  ],
+  "replay": "bun scripts/fuzz/fuzz.ts --replay 9554",
+  "minimal": {
+    "parts": [
+      {
+        "name": "f",
+        "node": {
+          "type": "transform",
+          "matrix": [
+            0.866025,
+            -0.5,
+            0,
+            0,
+            0.5,
+            0.866025,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          "children": [
+            {
+              "type": "torus",
+              "majorRadius": 10,
+              "minorRadius": 5
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "original": {
+    "parts": [
+      {
+        "name": "f",
+        "node": {
+          "type": "transform",
+          "matrix": [
+            0.866025,
+            -0.5,
+            0,
+            -5.335,
+            0.5,
+            0.866025,
+            0,
+            10,
+            0,
+            0,
+            1,
+            5,
+            0,
+            0,
+            0,
+            1
+          ],
+          "children": [
+            {
+              "type": "torus",
+              "majorRadius": 10,
+              "minorRadius": 5
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

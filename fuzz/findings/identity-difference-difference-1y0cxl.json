@@ -1,0 +1,152 @@
+{
+  "id": "identity-difference-difference-1y0cxl",
+  "oracle": "identity-difference",
+  "op": "difference",
+  "message": "vol(A−B) ≠ vol(A) − vol(A∩B)",
+  "detail": "A=12053.5329 B=12053.5329 union=12053.5329 intersection=12053.5329 difference=12053.5329 (off by 100.00%)",
+  "minimalDetail": "A=12053.5329 B=12053.5329 union=12053.5329 intersection=12053.5329 difference=12053.5329 (off by 100.00%)",
+  "count": 5,
+  "seeds": [
+    5633,
+    6697,
+    9869,
+    11073,
+    13795
+  ],
+  "mode": "identical",
+  "replay": "bun scripts/fuzz/fuzz.ts --replay 5633",
+  "minimal": {
+    "identity": true,
+    "parts": [
+      {
+        "name": "A",
+        "node": {
+          "type": "transform",
+          "matrix": [
+            0.866025,
+            -0.5,
+            0,
+            1,
+            0.5,
+            0.866025,
+            0,
+            13.45,
+            0,
+            0,
+            1,
+            -6,
+            0,
+            0,
+            0,
+            1
+          ],
+          "children": [
+            {
+              "type": "torus",
+              "majorRadius": 13.701,
+              "minorRadius": 6.676
+            }
+          ]
+        }
+      },
+      {
+        "name": "B",
+        "node": {
+          "type": "transform",
+          "matrix": [
+            0.866025,
+            -0.5,
+            0,
+            1,
+            0.5,
+            0.866025,
+            0,
+            13.45,
+            0,
+            0,
+            1,
+            -6,
+            0,
+            0,
+            0,
+            1
+          ],
+          "children": [
+            {
+              "type": "torus",
+              "majorRadius": 13.701,
+              "minorRadius": 6.676
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "original": {
+    "identity": true,
+    "parts": [
+      {
+        "name": "A",
+        "node": {
+          "type": "transform",
+          "matrix": [
+            0.866025,
+            -0.5,
+            0,
+            1,
+            0.5,
+            0.866025,
+            0,
+            13.45,
+            0,
+            0,
+            1,
+            -6,
+            0,
+            0,
+            0,
+            1
+          ],
+          "children": [
+            {
+              "type": "torus",
+              "majorRadius": 13.701,
+              "minorRadius": 6.676
+            }
+          ]
+        }
+      },
+      {
+        "name": "B",
+        "node": {
+          "type": "transform",
+          "matrix": [
+            0.866025,
+            -0.5,
+            0,
+            1,
+            0.5,
+            0.866025,
+            0,
+            13.45,
+            0,
+            0,
+            1,
+            -6,
+            0,
+            0,
+            0,
+            1
+          ],
+          "children": [
+            {
+              "type": "torus",
+              "majorRadius": 13.701,
+              "minorRadius": 6.676
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

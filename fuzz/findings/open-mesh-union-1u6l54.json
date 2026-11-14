@@ -1,0 +1,112 @@
+{
+  "id": "open-mesh-union-1u6l54",
+  "oracle": "open-mesh",
+  "op": "union",
+  "message": "mesh has open edges",
+  "detail": "union: 2 open edges of 1208 triangles",
+  "minimalDetail": "2 open edges of 1208 triangles",
+  "count": 45,
+  "seeds": [
+    333,
+    426,
+    484,
+    1335,
+    1455,
+    2190,
+    3130,
+    3172
+  ],
+  "mode": "tangent-cyl",
+  "replay": "bun scripts/fuzz/fuzz.ts --replay 333",
+  "minimal": {
+    "parts": [
+      {
+        "name": "f",
+        "node": {
+          "type": "union",
+          "children": [
+            {
+              "type": "cylinder",
+              "radius": 7.5,
+              "height": 2.5,
+              "center": true
+            },
+            {
+              "type": "transform",
+              "matrix": [
+                1,
+                0,
+                0,
+                12.5,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                -1.25,
+                0,
+                0,
+                0,
+                1
+              ],
+              "children": [
+                {
+                  "type": "cylinder",
+                  "radius": 5,
+                  "height": 4
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "original": {
+    "identity": true,
+    "parts": [
+      {
+        "name": "A",
+        "node": {
+          "type": "cylinder",
+          "radius": 7.5,
+          "height": 2.5,
+          "center": true
+        }
+      },
+      {
+        "name": "B",
+        "node": {
+          "type": "transform",
+          "matrix": [
+            1,
+            0,
+            0,
+            12.5,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            -1.25,
+            0,
+            0,
+            0,
+            1
+          ],
+          "children": [
+            {
+              "type": "cylinder",
+              "radius": 5,
+              "height": 3.75
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

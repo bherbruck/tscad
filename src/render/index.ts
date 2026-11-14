@@ -14,7 +14,6 @@ import type { MeshArrays } from "../kernel";
 import { parseColor, srgbToLinear } from "../export/color";
 import { encodePNG } from "./png";
 
-export { encodePNG, crc32 } from "./png";
 
 /** One part to draw. Same shape as the exporters' `ExportPart`; only positions/normals/indices/edges are read. */
 export type RenderPart = {
