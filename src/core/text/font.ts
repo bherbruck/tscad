@@ -2,7 +2,7 @@
  * Text → 2D loops: font loading (opentype.js), layout (kerning, ligatures, alignment, lines),
  * and glyph outlines → sketch segments (TrueType quadratics / CFF cubics as NURBS).
  */
-import opentype, { type Font, type Glyph, type PathCommand } from "opentype.js";
+import { parse as parseFont, type Font, type Glyph, type PathCommand } from "opentype.js";
 import type { Vec2 } from "../math";
 import { line, type Loop2, type Seg2 } from "../sketch/seg";
 import { DEFAULT_FONT_BASE64 } from "./default-font";
@@ -19,7 +19,7 @@ export function getDefaultFont(): Font {
     const bin = atob(DEFAULT_FONT_BASE64);
     const bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    defaultFont = opentype.parse(bytes.buffer);
+    defaultFont = parseFont(bytes.buffer);
   }
   return defaultFont;
 }
@@ -32,7 +32,7 @@ export function loadFont(src: FontSource | undefined): Font {
   let f = parsed.get(key);
   if (!f) {
     const buf = src instanceof Uint8Array ? (src.buffer as ArrayBuffer).slice(src.byteOffset, src.byteOffset + src.byteLength) : src;
-    f = opentype.parse(buf);
+    f = parseFont(buf);
     parsed.set(key, f);
   }
   return f;
