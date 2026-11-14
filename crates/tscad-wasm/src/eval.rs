@@ -201,7 +201,12 @@ fn eval_uncached(node: &Node, path: &str, cache: &mut Cache) -> R<Solid> {
                 // (docs/KERNEL_ISSUES.md #15): the same loop traversed backwards
                 Err(first) => match run(&reversed(profile)) {
                     Ok(b) => Ok(Some(b)),
-                    Err(_) => Err(fail(path, "extrude", format!("{first}"))),
+                    // and the planar-region extrude, a different construction (#17)
+                    Err(_) => match (*draft == 0.0).then(|| planar_extrude(profile, *direction, *distance)).flatten() {
+                        Some(Ok(b)) => Ok(Some(b)),
+                        Some(Err(e)) => Err(fail(path, "extrude", format!("{first} (planar extrude: {e})"))),
+                        None => Err(fail(path, "extrude", format!("{first}"))),
+                    },
                 },
             }
         }
@@ -799,4 +804,118 @@ pub fn reversed(profile: &[Curve]) -> Vec<Curve> {
             }
         })
         .collect()
+}
+
+/// `profile` extruded by `solidcore_ops::prism::extrude_planar_regions`, when it is a planar loop
+/// square to `direction` made of lines, arcs about the direction and single-span Béziers;
+/// `None` when it is not.
+pub fn planar_extrude(profile: &[Curve], direction: [f64; 3], distance: f64) -> Option<ops::Result<Body>> {
+    use solidcore_record::profile::{Loop2, Region2, Seg2};
+    use solidcore_record::{Plane, Vec2, Vec3};
+    let n = norm(direction);
+    let first = match profile.first()? {
+        Curve::Line { start, .. } => *start,
+        Curve::Arc { center, .. } => *center,
+        Curve::Nurbs { points, .. } => {
+            let p = points.first()?;
+            [p[0] / p[3], p[1] / p[3], p[2] / p[3]]
+        }
+    };
+    let helper = if n[0].abs() < 0.9 { [1.0, 0.0, 0.0] } else { [0.0, 1.0, 0.0] };
+    let x = norm(cross(helper, n));
+    let y = cross(n, x);
+    let tol = 1e-7 * (1.0 + distance.abs());
+    let to2 = |p: [f64; 3]| -> Option<Vec2> {
+        let d = sub(p, first);
+        (dot(d, n).abs() <= tol).then(|| Vec2 { x: dot(d, x), y: dot(d, y) })
+    };
+    let mut segs = Vec::new();
+    for c in profile {
+        segs.push(match c {
+            Curve::Line { start, end } => Seg2::Line { a: to2(*start)?, b: to2(*end)? },
+            Curve::Arc { center, axis, reference, radius, start, end } => {
+                let s = dot(norm(*axis), n);
+                if (s.abs() - 1.0).abs() > 1e-9 {
+                    return None;
+                }
+                // angle of the reference in the plane, and the sweep's sense about +n
+                let r = [dot(*reference, x), dot(*reference, y)];
+                let base = r[1].atan2(r[0]);
+                let (a0, sweep) = if s > 0.0 { (base + start, end - start) } else { (base - start, -(end - start)) };
+                Seg2::Arc { center: to2(*center)?, radius: *radius, start: a0, sweep }
+            }
+            Curve::Nurbs { degree, points, knots } => {
+                if knots.len() != points.len() + degree + 1 || points.iter().any(|p| (p[3] - 1.0).abs() > 1e-12) {
+                    return None;
+                }
+                let pts: Vec<[f64; 3]> = points.iter().map(|p| [p[0], p[1], p[2]]).collect();
+                for span in bezier_spans(*degree, &pts, knots)? {
+                    let q: Option<Vec<Vec2>> = span.iter().map(|p| to2(*p)).collect();
+                    segs.push(match q?.as_slice() {
+                        [a, b] => Seg2::Line { a: *a, b: *b },
+                        [a, apex, b] => Seg2::Conic { a: *a, apex: *apex, b: *b, w: 1.0 },
+                        [p0, p1, p2, p3] => Seg2::Cubic { p0: *p0, p1: *p1, p2: *p2, p3: *p3 },
+                        _ => return None,
+                    });
+                }
+                continue;
+            }
+        });
+    }
+    let plane = Plane {
+        origin: Vec3 { x: first[0], y: first[1], z: first[2] },
+        x: Vec3 { x: x[0], y: x[1], z: x[2] },
+        y: Vec3 { x: y[0], y: y[1], z: y[2] },
+    };
+    let region = Region2 { outer: Loop2 { segs }, holes: Vec::new() };
+    Some(ops::prism::extrude_planar_regions(&plane, &[region], 0.0, distance))
+}
+
+/// The Bézier spans of a clamped, non-rational B-spline: every interior knot raised to
+/// multiplicity `degree` by Boehm insertion, then the control points cut into runs of
+/// `degree + 1` sharing their ends. `None` for an unclamped or malformed spline.
+pub fn bezier_spans(degree: usize, points: &[[f64; 3]], knots: &[f64]) -> Option<Vec<Vec<[f64; 3]>>> {
+    let p = degree;
+    if p == 0 || points.len() <= p || knots.len() != points.len() + p + 1 {
+        return None;
+    }
+    let (a, b) = (knots[0], knots[knots.len() - 1]);
+    if knots[..=p].iter().any(|k| *k != a) || knots[knots.len() - p - 1..].iter().any(|k| *k != b) {
+        return None;
+    }
+    let mut kv = knots.to_vec();
+    let mut cp = points.to_vec();
+    // distinct interior knots and their multiplicities
+    let mut interior: Vec<(f64, usize)> = Vec::new();
+    for &k in &knots[p + 1..knots.len() - p - 1] {
+        match interior.last_mut() {
+            Some((v, m)) if *v == k => *m += 1,
+            _ => interior.push((k, 1)),
+        }
+    }
+    for (u, m) in interior {
+        for _ in m..p {
+            // insert u once (Boehm)
+            let k = kv.iter().rposition(|&x| x <= u)?;
+            let mut next = Vec::with_capacity(cp.len() + 1);
+            for i in 0..=cp.len() {
+                if i + p <= k {
+                    next.push(cp[i]);
+                } else if i > k {
+                    next.push(cp[i - 1]);
+                } else {
+                    let den = kv[i + p] - kv[i];
+                    let al = if den == 0.0 { 0.0 } else { (u - kv[i]) / den };
+                    let (q0, q1) = (cp[i - 1], cp[i]);
+                    next.push([0, 1, 2].map(|j| (1.0 - al) * q0[j] + al * q1[j]));
+                }
+            }
+            cp = next;
+            kv.insert(k + 1, u);
+        }
+    }
+    if (cp.len() - 1) % p != 0 {
+        return None;
+    }
+    Some((0..(cp.len() - 1) / p).map(|s| cp[s * p..=s * p + p].to_vec()).collect())
 }

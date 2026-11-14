@@ -34,3 +34,18 @@ fn kernel_regressions() {
     }
     println!("{passing}/{} evaluate cleanly (volume oracles are checked by the fuzzer's replay)", list.len());
 }
+
+#[test]
+fn sweep_regressions() {
+    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../fuzz/sweep-regressions.json");
+    let Ok(text) = std::fs::read_to_string(path) else { return };
+    let all: serde_json::Value = serde_json::from_str(&text).expect("json");
+    let list = all["regressions"].as_array().cloned().unwrap_or_default();
+    for r in &list {
+        let Ok(doc) = serde_json::from_value::<Document>(r["ir"].clone()) else { continue };
+        let mut e = Engine::new(None);
+        let res = e.evaluate(&doc, &EvalOptions::default());
+        let why = res.parts.iter().find_map(|p| p.error.as_ref().map(|e| e.message.clone())).unwrap_or_default();
+        println!("{} {:<30} vol={:?} {}", if res.ok { "PASS" } else { "FAIL" }, r["id"].as_str().unwrap_or("?"), res.parts.first().and_then(|p| p.volume), why);
+    }
+}

@@ -132,6 +132,14 @@ These have NOT been filed upstream.
   other letters of "tscad" extrude at every size. 16 edges: lines and two quadratic B-splines.
 - Hit by `examples/cookbook/name-tag.tsx` on small tags. Repro: `sweep-extrude-glyph-t`.
 
+## Note on #15, #17, #18, #19: two constructions, same refusal
+- tscad now retries a refused extrude reversed, then through `ops::prism::extrude_planar_regions`
+  (a separate construction). That rescued #18 (tiny arcs). The gear root (#17) and glyph "t"
+  (#19) are refused by **both** constructions with the same "the result is not a closed solid",
+  which comes from ops' closed-solid check (`mass::enclosure`, also ~61% of kernel time in
+  docs/PERF.md). That check may be returning false negatives on these bodies; worth checking it
+  first.
+
 ## Notes (tscad bugs found and fixed, not kernel bugs)
 - `solidcore_ops::blend` takes the kernel's *native* edge order, not record order (its
   `SetBack` docs say so; the function's own docs read as record indices). tscad now uses

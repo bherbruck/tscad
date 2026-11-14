@@ -118,3 +118,24 @@ fn reversed_arc_loop_extrudes_same() {
     let vol = |s: &str| s.split("vol=Some(").nth(1).and_then(|r| r.split(')').next()).and_then(|v| v.parse::<f64>().ok()).unwrap();
     assert!((vol(&a) - pi * 25.0 / 2.0 * 3.0).abs() < 1e-6 && (vol(&a) - vol(&b)).abs() < 1e-6);
 }
+
+#[test]
+fn planar_fallback_matches_sweep_extrude() {
+    use tscad_wasm::ir::Curve;
+    // a closed loop: a 3-span quadratic B-spline from (0,0) over the top to (10,0), then a line back
+    let spline = Curve::Nurbs {
+        degree: 2,
+        points: vec![[0.0, 0.0, 0.0, 1.0], [0.0, 6.0, 0.0, 1.0], [5.0, 8.0, 0.0, 1.0], [10.0, 6.0, 0.0, 1.0], [10.0, 0.0, 0.0, 1.0]],
+        knots: vec![0.0, 0.0, 0.0, 1.0, 2.0, 3.0, 3.0, 3.0],
+    };
+    let profile = vec![spline, Curve::Line { start: [10.0, 0.0, 0.0], end: [0.0, 0.0, 0.0] }];
+    let spans = tscad_wasm::eval::bezier_spans(2, &[[0.0, 0.0, 0.0], [0.0, 6.0, 0.0], [5.0, 8.0, 0.0], [10.0, 6.0, 0.0], [10.0, 0.0, 0.0]], &[0.0, 0.0, 0.0, 1.0, 2.0, 3.0, 3.0, 3.0]).unwrap();
+    assert_eq!(spans.len(), 3);
+    assert_eq!(spans[0][0], [0.0, 0.0, 0.0]);
+    assert_eq!(spans[2][2], [10.0, 0.0, 0.0]);
+    let planar = tscad_wasm::eval::planar_extrude(&profile, [0.0, 0.0, 1.0], 2.0).unwrap().unwrap().volume(1e-9).unwrap();
+    let node = format!(r#"{{"type":"extrude","direction":[0,0,1],"distance":2,"profile":{}}}"#, serde_json::to_string(&profile).unwrap());
+    let out = run(&node);
+    let sweep: f64 = out.split("vol=Some(").nth(1).and_then(|r| r.split(')').next()).unwrap().parse().unwrap();
+    assert!((planar - sweep).abs() < 1e-6 * sweep, "{planar} {sweep}");
+}
