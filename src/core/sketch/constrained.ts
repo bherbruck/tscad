@@ -975,6 +975,8 @@ function layout(m: Model): void {
     return true;
   };
 
+  layoutLoops(m, { known, get, set, lineDirs, isTangent, lengthOf, radiusOf, sweepOf, L0 });
+
   let seeds = 0;
   for (let pass = 0; pass < 10 * (m.points.length + 1); pass++) {
     let progress = false;
@@ -1033,6 +1035,224 @@ function layout(m: Model): void {
     else if (c.kind === "circle") x[c.ir] = radiusOf.get(c) ?? L0 / 4;
   }
   for (const s of m.specs) if (s.k === "fix" && !s.at) s.at = get(s.p);
+}
+
+interface LoopTools {
+  known(p: Pt): boolean;
+  get(p: Pt): Vec2;
+  set(p: Pt, v: Vec2): void;
+  lineDirs(l: LineE): Vec2[] | undefined;
+  isTangent(a: Curve, b: Curve): boolean;
+  lengthOf: Map<LineE, number>;
+  radiusOf: Map<Round, number>;
+  sweepOf: Map<ArcE, number>;
+  L0: number;
+}
+
+/**
+ * Starting layout for closed loops of lines and arcs whose points have no guesses: walk the
+ * loop deciding every direction (fixed line directions, tangent joints carry the direction,
+ * unknown corners and arc sweeps share the turning a CCW loop needs, 2π in all), size unknown
+ * line lengths so the loop closes (least squares from a typical length), then place the
+ * points and arc centres. The solver refines from there.
+ */
+function layoutLoops(m: Model, t: LoopTools): void {
+  const curves = m.curves.filter((c): c is LineE | ArcE => !c.construction && (c.kind === "line" || c.kind === "arc"));
+  const ends = (c: LineE | ArcE): [Pt, Pt] => (c.kind === "line" ? [c.a, c.b] : [c.s, c.e]);
+  const at = new Map<Pt, (LineE | ArcE)[]>();
+  for (const c of curves) for (const p of ends(c)) at.set(p, [...(at.get(p) ?? []), c]);
+  const seen = new Set<Curve>();
+  for (const first of curves) {
+    if (seen.has(first)) continue;
+    // walk the cycle through degree-2 points
+    const walk: { c: LineE | ArcE; fwd: boolean }[] = [];
+    let c: LineE | ArcE = first, fwd = true, ok = true;
+    for (let guard = 0; guard <= curves.length; guard++) {
+      walk.push({ c, fwd });
+      seen.add(c);
+      const tail: Pt = fwd ? ends(c)[1] : ends(c)[0];
+      const nexts: (LineE | ArcE)[] = (at.get(tail) ?? []).filter((x) => x !== c);
+      if (nexts.length !== 1) {
+        ok = false;
+        break;
+      }
+      const n: LineE | ArcE = nexts[0]!;
+      if (n === first) break;
+      if (seen.has(n)) {
+        ok = false;
+        break;
+      }
+      fwd = ends(n)[0] === tail;
+      c = n;
+    }
+    if (!ok || walk.length < 2 || walk[walk.length - 1]!.c === first && walk.length === 1) continue;
+    // loops with at most one placed point (a fixed start, a fixed centre): the layout is
+    // built freely and then moved onto that point
+    const pts = [...new Set(walk.flatMap(({ c }) => (c.kind === "arc" ? [...ends(c), c.c] : ends(c))))];
+    const anchors = pts.filter((p) => t.known(p));
+    if (anchors.length > 1) continue;
+
+    // 1. turning plan. slot = an unknown amount of turn: a corner (non-tangent joint) or an
+    //    arc of unknown sweep; arcs turn by their (signed) sweep, lines keep the direction.
+    const n = walk.length;
+    const sign = (w: { c: LineE | ArcE; fwd: boolean }) => (w.c.kind === "arc" ? (w.c.ccw === w.fwd ? 1 : -1) : 1);
+    const turnAfter: number[] = new Array(n).fill(NaN); // turn at the joint after curve i
+    const sweep: number[] = walk.map((w) => (w.c.kind === "arc" ? (t.sweepOf.has(w.c) ? sign(w) * t.sweepOf.get(w.c)! : NaN) : 0));
+    for (let i = 0; i < n; i++) if (t.isTangent(walk[i]!.c, walk[(i + 1) % n]!.c)) turnAfter[i] = 0;
+    const dirOf = (w: { c: LineE | ArcE; fwd: boolean }): number[] | undefined => {
+      if (w.c.kind !== "line") return undefined;
+      const ds = t.lineDirs(w.c);
+      return ds?.map((d) => Math.atan2(w.fwd ? d[1] : -d[1], w.fwd ? d[0] : -d[0]));
+    };
+    // slots in walk order: arc i (its sweep) then joint i
+    type Slot = { kind: "sweep" | "joint"; i: number; sign: number };
+    const slotsBetween = (from: number, to: number): Slot[] => {
+      // slots strictly after the direction at the end of curve `from` up to the start of curve `to`
+      const out: Slot[] = [];
+      for (let k = from; ; k = (k + 1) % n) {
+        if (k !== from && walk[k]!.c.kind === "arc" && Number.isNaN(sweep[k]!)) out.push({ kind: "sweep", i: k, sign: sign(walk[k]!) });
+        if ((k + 1) % n === to) {
+          if (Number.isNaN(turnAfter[k]!)) out.push({ kind: "joint", i: k, sign: 1 });
+          break;
+        }
+        if (Number.isNaN(turnAfter[k]!)) out.push({ kind: "joint", i: k, sign: 1 });
+      }
+      return out;
+    };
+    const fill = (slots: Slot[], total: number) => {
+      // concave (cw) unknown arcs take a modest share first; the rest is split evenly
+      let rest = total;
+      const neg = slots.filter((x) => x.sign < 0), pos = slots.filter((x) => x.sign > 0);
+      for (const x of neg) {
+        const v = pos.length ? -Math.PI / 3 : total / neg.length;
+        if (x.kind === "sweep") sweep[x.i] = v;
+        else turnAfter[x.i] = v;
+        rest -= v;
+      }
+      for (const x of pos) {
+        if (x.kind === "sweep") sweep[x.i] = rest / pos.length;
+        else turnAfter[x.i] = rest / pos.length;
+      }
+    };
+    const fixedLines = walk.map((w, i) => ({ i, dirs: dirOf(w) })).filter((f) => f.dirs);
+    const theta: number[] = new Array(n).fill(NaN); // start direction of each curve
+    const wrapTurn = (a: number) => {
+      // smallest positive (CCW) turn, in (−0.01, 2π − 0.01]
+      let v = a % (2 * Math.PI);
+      if (v <= -0.01) v += 2 * Math.PI;
+      if (v > 2 * Math.PI - 0.01) v -= 2 * Math.PI;
+      return v;
+    };
+    if (fixedLines.length) {
+      const f0 = fixedLines[0]!;
+      theta[f0.i] = f0.dirs![0]!;
+      for (let j = 1; j <= fixedLines.length; j++) {
+        const prev = fixedLines[j - 1]!, next = fixedLines[j % fixedLines.length]!;
+        const slots = slotsBetween(prev.i, next.i);
+        const known = slots.length ? 0 : 0;
+        // the direction after prev (+ known sweeps in between) must turn to one of next's dirs
+        let th = theta[prev.i]!;
+        for (let k = (prev.i + 1) % n; k !== next.i; k = (k + 1) % n) if (!Number.isNaN(sweep[k]!)) th += sweep[k]!;
+        const target = j === fixedLines.length ? theta[f0.i]! + 2 * Math.PI : th + Math.min(...next.dirs!.map((d) => wrapTurn(d - th)));
+        if (j < fixedLines.length) theta[next.i] = target;
+        if (slots.length) fill(slots, target - th + known);
+      }
+    } else {
+      theta[0] = 0;
+      const slots = slotsBetween(0, 0);
+      let known = 0;
+      for (let k = 0; k < n; k++) if (!Number.isNaN(sweep[k]!)) known += sweep[k]!;
+      if (slots.length) fill(slots, 2 * Math.PI - known);
+    }
+    for (let i = 0; i < n; i++) {
+      if (Number.isNaN(sweep[i]!)) sweep[i] = 0;
+      if (Number.isNaN(turnAfter[i]!)) turnAfter[i] = 0;
+    }
+    // absolute start directions
+    let th = Number.isNaN(theta[0]!) ? 0 : theta[0]!;
+    if (Number.isNaN(theta[0]!)) {
+      // derive from the first fixed line
+      const f = fixedLines[0];
+      if (f) {
+        let back = theta[f.i]!;
+        for (let k = f.i - 1; k >= 0; k--) back -= turnAfter[k]! + sweep[k]!;
+        th = back;
+      }
+    }
+    const dirs: number[] = [];
+    for (let i = 0; i < n; i++) {
+      dirs.push(th);
+      th += sweep[i]! + turnAfter[i]!;
+    }
+
+    // 2. lengths: unknown line lengths close the loop (least squares around L0)
+    const radius = (a: ArcE) => t.radiusOf.get(a) ?? t.L0 / 2;
+    const chord = (i: number): Vec2 => {
+      const w = walk[i]!, a = w.c as ArcE, r = radius(a), s = sweep[i]!, d = dirs[i]!;
+      // start at origin heading d, turning s on radius r
+      if (Math.abs(s) < 1e-12) return [0, 0];
+      const nrm = s > 0 ? d + Math.PI / 2 : d - Math.PI / 2;
+      const cx = r * Math.cos(nrm), cy = r * Math.sin(nrm);
+      const a0 = Math.atan2(-cy, -cx);
+      return [cx + r * Math.cos(a0 + s), cy + r * Math.sin(a0 + s)];
+    };
+    const free: number[] = [];
+    let C: Vec2 = [0, 0];
+    const len: number[] = new Array(n).fill(0);
+    for (let i = 0; i < n; i++) {
+      const w = walk[i]!;
+      if (w.c.kind === "arc") C = vadd(C, chord(i));
+      else if (t.lengthOf.has(w.c)) {
+        len[i] = t.lengthOf.get(w.c)!;
+        C = vadd(C, vsc([Math.cos(dirs[i]!), Math.sin(dirs[i]!)], len[i]!));
+      } else {
+        free.push(i);
+        len[i] = t.L0;
+        C = vadd(C, vsc([Math.cos(dirs[i]!), Math.sin(dirs[i]!)], t.L0));
+      }
+    }
+    if (free.length) {
+      // L = L0 + Uᵀλ with U Uᵀ λ = −C (U: 2 × free directions)
+      const U = free.map((i) => [Math.cos(dirs[i]!), Math.sin(dirs[i]!)] as Vec2);
+      const a11 = U.reduce((s2, u) => s2 + u[0] * u[0], 0), a12 = U.reduce((s2, u) => s2 + u[0] * u[1], 0), a22 = U.reduce((s2, u) => s2 + u[1] * u[1], 0);
+      const det = a11 * a22 - a12 * a12;
+      if (Math.abs(det) > 1e-12) {
+        const l1 = (-C[0] * a22 + C[1] * a12) / det, l2 = (C[0] * a12 - C[1] * a11) / det;
+        free.forEach((i, k) => (len[i] = Math.max(0.2 * t.L0, t.L0 + U[k]![0] * l1 + U[k]![1] * l2)));
+      }
+    }
+
+    // 3. place (provisionally), then move onto the anchor or centre on what's placed
+    const pos = new Map<Pt, Vec2>();
+    let P: Vec2 = [0, 0];
+    for (let i = 0; i < n; i++) {
+      const w = walk[i]!, [p0, p1] = w.fwd ? ends(w.c) : [ends(w.c)[1], ends(w.c)[0]];
+      if (!pos.has(p0)) pos.set(p0, P);
+      if (w.c.kind === "line") P = vadd(P, vsc([Math.cos(dirs[i]!), Math.sin(dirs[i]!)], len[i]!));
+      else {
+        const a = w.c, r = radius(a), s2 = sweep[i]!;
+        const nrm = s2 >= 0 ? dirs[i]! + Math.PI / 2 : dirs[i]! - Math.PI / 2;
+        const ctr = vadd(P, [r * Math.cos(nrm), r * Math.sin(nrm)]);
+        pos.set(a.c, ctr);
+        const a0 = Math.atan2(P[1] - ctr[1], P[0] - ctr[0]);
+        P = [ctr[0] + r * Math.cos(a0 + s2), ctr[1] + r * Math.sin(a0 + s2)];
+        if (!a.ccwExplicit) a.ccw = (s2 >= 0) === w.fwd;
+      }
+      if (i < n - 1 && !pos.has(p1)) pos.set(p1, P);
+    }
+    let shift: Vec2 = [0, 0];
+    if (anchors.length) shift = vsub(t.get(anchors[0]!), pos.get(anchors[0]!)!);
+    else {
+      const others = m.points.filter((p) => t.known(p) && !pts.includes(p)).map(t.get);
+      if (others.length) {
+        const cx = others.reduce((s2, p) => s2 + p[0], 0) / others.length, cy = others.reduce((s2, p) => s2 + p[1], 0) / others.length;
+        const vs = [...pos.values()];
+        const mx = vs.reduce((s2, p) => s2 + p[0], 0) / vs.length, my = vs.reduce((s2, p) => s2 + p[1], 0) / vs.length;
+        shift = [cx - mx, cy - my];
+      }
+    }
+    for (const [p, v] of pos) if (!t.known(p)) t.set(p, vadd(v, shift));
+  }
 }
 
 // ---------------------------------------------------------------------------------------------

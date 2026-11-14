@@ -83,6 +83,11 @@ These have NOT been filed upstream.
   vs 1.9 s alone). The kernel crate itself is "one Kernel per thread"; the ops layer is not.
 - Workaround: parallelism across processes (or wasm instances), not threads.
 
+## 13. An oversized fillet is accepted instead of refused
+- `fillet radius 8` on all edges of a 10 mm cube returns ok with volume 962 mm³; a radius above
+  half the edge length cannot be built, so a refusal (`TooLarge` / `NoRoom`) is expected.
+- Found by MCP dogfooding (docs/mcp-dogfood.md).
+
 ## Notes (tscad bugs found and fixed, not kernel bugs)
 - `solidcore_ops::blend` takes the kernel's *native* edge order, not record order (its
   `SetBack` docs say so; the function's own docs read as record indices). tscad now uses

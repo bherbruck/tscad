@@ -59,9 +59,12 @@ Several children of \`<part>\`/\`<group>\` are unioned.
 2D shapes live only inside \`<extrude>\`, \`<revolve>\`, \`<loft>\`, \`<sweep>\`, \`<drawing>\`:
 \`<rect w h>\` (centred), \`<roundedRect w h r>\`, \`<circle r|d>\`, \`<ellipse rx ry>\`, \`<polygon points>\`,
 \`<regularPolygon sides r|flats>\`, \`<slot length width>\`, \`<path d="M.. Z">\` (SVG subset, y up),
-\`<star>\`, \`<text size align valign>label</text>\`, \`<offset distance>\` (grow/shrink), \`<sketch>\` group.
-Each takes 2D placement \`x y rotate mirror\`.
+\`<star>\`, \`<text size align valign>label</text>\`, \`<offset distance>\` (grow/shrink), \`<hull>\` (convex hull of
+its children), \`<sketch>\` group. Each takes 2D placement \`x y rotate mirror\`.
 
+- **There are no 2D booleans**: loops inside loops are holes, other loops are unioned. To cut a shape
+  that *crosses* an outline (a D-shaft bore, flutes around a rim), use 3D: \`<difference>\` with
+  \`<intersection><cylinder/><box/></intersection>\` for a D, or a \`<polarPattern>\` of cylinders.
 - **Nested loops become holes automatically**: \`<extrude height={5}><rect w={40} h={30}/><circle r={5}/></extrude>\`
   is a plate with a hole. Disjoint loops are unioned.
 - \`<extrude height plane="XY"|"XZ"|"YZ" offset center draft>\`: XY extrudes +Z from z = offset.
@@ -81,6 +84,25 @@ Selectors: strings \`">Z"\` (top), \`"<Z"\` (bottom), \`"|Z"\` (edges parallel t
 their normals; \`<split plane="XY" offset={5} keep="above">\` cuts with a plane and keeps one side.
 Use the \`tscad_pick_selectors\` tool with a point near an edge to get a selector for it.
 
+## Assemblies: anchors and mates
+
+Model each part at its own origin, put \`<anchor id at axis>\` frames on it, and join parts with
+\`<mate a="part.anchor" b="part.anchor" type>\` inside an \`<assembly>\`; the solver moves them into place.
+Types: \`fastened\` (default), \`revolute\` (\`angle\`), \`slider\` (\`offset\`), \`cylindrical\`, \`planar\`, \`ball\`;
+\`limits={[min, max]}\`; \`<gear a="mateId" b="mateId" ratio>\` couples two joints. Mark one part \`fixed\`.
+
+\`\`\`tsx
+<assembly>
+  <part name="base" fixed><box size={[40, 40, 10]} /><anchor id="pivot" at={[0, 0, 10]} axis="z" /></part>
+  <part name="arm"><box size={[60, 8, 4]} x={30} /><anchor id="root" at={[0, 0, 0]} axis="z" /></part>
+  <mate a="base.pivot" b="arm.root" type="revolute" angle={p.angle} />
+</assembly>
+\`\`\`
+
+A simpler alternative for fixed layouts: place parts with \`x y z rotate\` directly. Check fits with
+\`tscad_check\` (it reports the volume where parts overlap). Constraint-solved 2D sketches
+(\`<sketch>\` with \`<point> <line> <arc>\` + constraints) are documented under \`{"element": "line"}\` etc.
+
 ## Patterns
 
 \`<linearPattern count dx dy dz>\`, \`<gridPattern nx ny dx dy>\` (centred), \`<polarPattern count radius angle>\`,
@@ -95,8 +117,11 @@ inside a \`<difference>\`: \`<Hole size="M3" depth={6} z={6}/>\`, \`<Counterbore
 
 ## Flat parts (laser/CNC)
 
-\`<drawing name thickness?>{2D shapes}</drawing>\` compiles to exact 2D loops (export DXF/SVG); with
-\`thickness\` it is also a 3D part.
+\`<drawing name layer? thickness?>{2D shapes}</drawing>\` compiles to exact 2D loops (export DXF/SVG);
+\`layer="cut"\` / \`"engrave"\` become DXF layers; with \`thickness\` it is also a 3D part. For kerf, wrap the
+shapes in \`<offset distance={kerf / 2} round={false}>\`. Generators: \`<FingerJointBox>\` (finger-jointed box,
+flat or \`assembled\`) and \`<LivingHinge>\` from tscad/parts. To preview the assembled product, add
+\`<part>\`s that extrude the same shape components (reuse one component for the 2D and the 3D).
 
 ## Kernel limits (avoid)
 
@@ -106,6 +131,21 @@ inside a \`<difference>\`: \`<Hole size="M3" depth={6} z={6}/>\`, \`<Counterbore
 - Inward shell of rounded-rect extrusions can fail; shell a box then fillet, or extrude walls.
 - Keep models simple and evaluate often: \`tscad_evaluate\` reports every failing node with its
   TSX line.
+
+## Printing
+
+\`tscad_check\` reports overhangs, thin walls and bed fit, and suggests a better \`buildDir\` when the part
+would print with fewer overhangs another way up (lids upside down, profiles on their side).
+Horizontal holes print cleanly as teardrops (a circle plus a 45° roof); a flat ceiling is an overhang.
+
+## Common mistakes
+
+- \`rotate={90}\` → \`rotateZ={90}\` or \`rotate={[0, 0, 90]}\`. \`size={[w, d]}\` on a box needs three numbers.
+- Parts-library components are capitalised and must be imported: \`import { Hole } from "tscad/parts"\`.
+- Holes from tscad/parts point down from z = 0: place them at the *top* face (\`z={thickness}\`).
+- A cut that only touches a face leaves a skin: make tools a little longer than the solid.
+- \`<split plane="XZ" keep="below">\` keeps −Y (keep follows the plane's normal: XY +Z, XZ +Y, YZ +X).
+- Fillet before cutting many holes/patterns and keep radii below half the shortest edge.
 
 ## Workflow
 

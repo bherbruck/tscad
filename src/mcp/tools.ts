@@ -9,6 +9,7 @@ import { PKG_ROOT } from "../cli/bundle";
 import { describeError, runModel, type ModelRun } from "../cli/model";
 import { parseView } from "../cli/render";
 import { codeFrame } from "../cli/ui";
+import type { Selector } from "../ir";
 import { checkInterference, checkPrintability, checkWatertight } from "../check";
 import { massOf } from "../core/materials";
 import { section, toDXF, toSVG } from "../drawing";
@@ -112,11 +113,44 @@ async function run(m: ModelCtx, args: Record<string, any>, opts: { noMesh?: bool
     const r = await runModel(m.file, params(args), opts);
     return { run: r, logs };
   } catch (e) {
-    return { error: m.rewrite(stripAnsi(describeError(e, m.file))), logs };
+    return { error: m.rewrite(explain(stripAnsi(describeError(e, m.file)), m.file)), logs };
   } finally {
     Object.assign(console, saved);
   }
 }
+
+/** Add what an agent needs to fix common errors: a missing import, a location for errors without one. */
+function explain(text: string, file: string): string {
+  let out = text;
+  // `X is not defined` for a tscad / tscad/parts export: say what to import
+  const undef = text.match(/ReferenceError: (\w+) is not defined/);
+  if (undef) {
+    const name = undef[1]!;
+    const from = (PARTS_EXPORTS as readonly string[]).includes(name) ? "tscad/parts" : (TSCAD_EXPORTS as readonly string[]).includes(name) ? "tscad" : undefined;
+    if (from) out += `\n  hint: import { ${name} } from "${from}"`;
+  }
+  // no `at file:line`: find the element by its tag in the source
+  const tag = text.match(/\(in <(\w+)[ >]/);
+  if (tag && !/\n\s+at /.test(text)) {
+    try {
+      const lines = readFileSync(file, "utf8").split("\n");
+      const hits: [number, number][] = [];
+      lines.forEach((l, i) => {
+        for (const mm of l.matchAll(new RegExp(`<${tag[1]}\\b`, "g"))) hits.push([i + 1, mm.index! + 1]);
+      });
+      if (hits.length) {
+        const [line, col] = hits[0]!;
+        out += `\n  at model.tsx:${line}:${col}${hits.length > 1 ? ` (first of ${hits.length} <${tag[1]}> elements)` : ""}\n${stripAnsi(codeFrame(lines.join("\n"), line, col)).split("\n").map((x) => `  ${x}`).join("\n")}`;
+      }
+    } catch {
+      /* no source */
+    }
+  }
+  return out;
+}
+
+const PARTS_EXPORTS = ["Hole", "CounterboreHole", "CountersinkHole", "TapHole", "NutTrap", "HeatSetInsert", "Standoff", "BoltPattern", "MountHoles", "Extrusion2020", "HexPrism", "FingerJointBox", "LivingHinge", "metric", "mountPatterns", "metricData"] as const;
+const TSCAD_EXPORTS = ["defineParams", "edges", "faces", "helix", "polyline3", "arc3", "bezier3", "inch", "range", "linspace", "materials", "createContext", "useContext", "sketchRefs", "sketchRef", "sketchPath", "assemblyRefs", "anchorRef"] as const;
 
 // ---------------------------------------------------------------------------------------------
 // Evaluate
@@ -309,11 +343,14 @@ async function exportTool(args: Record<string, any>): Promise<ToolResult> {
       if (!docParts.length) throw new ToolInputError("no parts to export");
       data = await exportModel(kernel, docParts, fmt as ExportFormat, typeof args.tolerance === "number" ? { tolerance: args.tolerance } : {});
     }
+    const flat = fmt === "dxf" || fmt === "svg";
+    const usedDrawings = flat ? rendered.drawings.filter((d) => !only || only.includes(d.name)).map((d) => d.name) : [];
+    const what = flat && usedDrawings.length ? `drawings: ${usedDrawings.join(", ")}` : `parts: ${docParts.map((p) => p.name).join(", ") || "—"}`;
     mkdirSync(dirname(out), { recursive: true });
     writeFileSync(out, data);
     const bytes = statSync(out).size;
     return {
-      content: [{ type: "text", text: `${note}wrote ${out} (${fmt.toUpperCase()}, ${bytes} bytes, parts: ${docParts.map((p) => p.name).join(", ") || "—"})` }],
+      content: [{ type: "text", text: `${note}wrote ${out} (${fmt.toUpperCase()}, ${bytes} bytes, ${what})` }],
       structuredContent: { path: out, format: fmt, bytes, parts: docParts.map((p) => p.name) },
     };
   });
@@ -399,7 +436,16 @@ async function pickTool(args: Record<string, any>): Promise<ToolResult> {
     }
     const info = kind === "edge" ? await r.run.kernel.pickEdge(name, index) : await r.run.kernel.pickFace(name, index);
     const root = kind === "edge" ? "edges" : "faces";
-    const suggestions = info.suggestions.map((s) => ({ count: s.count, string: selectorString(s.selector), code: selectorCode(s.selector, root), selector: s.selector }));
+    const suggestions: { count: number | null; string?: string | undefined; code: string; selector: Selector }[] = info.suggestions.map((s) => ({ count: s.count, string: selectorString(s.selector), code: selectorCode(s.selector, root), selector: s.selector }));
+    // when no geometric selector picks it alone, offer a box around it (robust to edits elsewhere)
+    if (!suggestions.some((s) => s.count === 1 && s.selector.type !== "index") && info.points.length) {
+      const pad = 0.01;
+      const lo = [0, 1, 2].map((k) => Math.min(...info.points.map((p) => p[k]!)) - pad) as [number, number, number];
+      const hi = [0, 1, 2].map((k) => Math.max(...info.points.map((p) => p[k]!)) + pad) as [number, number, number];
+      const within: Selector = { type: "within", min: lo.map(r3) as [number, number, number], max: hi.map(r3) as [number, number, number] };
+      const idx = suggestions.findIndex((s) => s.selector.type === "index");
+      suggestions.splice(idx < 0 ? suggestions.length : idx, 0, { count: null, code: selectorCode(within, root), selector: within });
+    }
     const structured = {
       part: name,
       kind,
@@ -413,7 +459,7 @@ async function pickTool(args: Record<string, any>): Promise<ToolResult> {
     const text = [
       `${kind} ${index} of ${name}: ${info.kind}${info.radius !== undefined ? ` r=${r3(info.radius)}` : ""}${info.direction ? ` dir=[${info.direction.map(r3).join(", ")}]` : ""}${dist !== undefined ? ` (${r3(dist)} mm from the point)` : ""}`,
       "selectors (most specific first; count = how many it selects):",
-      ...suggestions.map((s) => `- ${s.string ? `"${s.string}"  ` : ""}${s.code}  → ${s.count}`),
+      ...suggestions.map((s) => `- ${s.string ? `"${s.string}"  ` : ""}${s.code}  → ${s.count ?? "probably 1 (a box around it; anything else wholly inside also matches)"}`),
     ].join("\n");
     return { content: [{ type: "text", text }], structuredContent: structured };
   });
@@ -439,6 +485,9 @@ function trianglesBox(mesh: MeshArrays, tris: Iterable<number>): B3 {
   return [lo, hi];
 }
 
+const orientName = (d: [number, number, number]) =>
+  d[2] === -1 ? "upside down" : d[0] !== 0 ? `on its ${d[0] > 0 ? "−X" : "+X"} side` : `on its ${d[1] > 0 ? "−Y" : "+Y"} side`;
+const pct = (f: number) => (f > 0 && f < 0.001 ? "< 0.1 %" : `${r1(f * 100)} %`);
 const r1 = (v: number) => Math.round(v * 10) / 10;
 const fmtBox = (b: B3) => `x ${r1(b[0][0])}..${r1(b[1][0])}, y ${r1(b[0][1])}..${r1(b[1][1])}, z ${r1(b[0][2])}..${r1(b[1][2])}`;
 const fmtPt = (p: number[]) => `(${p.map(r1).join(", ")})`;
@@ -469,6 +518,14 @@ async function checkTool(args: Record<string, any>): Promise<ToolResult> {
       const mesh = await kernel.mesh(p.name);
       if (!mesh) continue;
       const pr = checkPrintability(mesh, opts);
+      // would another orientation print with fewer overhangs?
+      let better: { dir: [number, number, number]; area: number } | undefined;
+      if (pr.overhang.area > 1 && !opts.buildDir) {
+        for (const dir of [[0, 0, -1], [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0]] as [number, number, number][]) {
+          const a = checkPrintability(mesh, { ...opts, buildDir: dir, skipThickness: true }).overhang.area;
+          if (a < (better?.area ?? pr.overhang.area * 0.5)) better = { dir, area: a };
+        }
+      }
       const wt = checkWatertight(mesh);
       // overhang faces with where they are and a selector naming them
       const faceTris = new Map<number, number[]>();
@@ -508,6 +565,7 @@ async function checkTool(args: Record<string, any>): Promise<ToolResult> {
         overhang: { area: r3(pr.overhang.area), fraction: r3(pr.overhang.fraction), faces },
         ...(thin ? { thickness: thin } : {}),
         ...(pr.bed ? { bed: pr.bed } : {}),
+        ...(better ? { betterOrientation: { buildDir: better.dir, overhangArea: r3(better.area) } } : {}),
         watertight: wt.watertight,
         ...(wt.watertight ? {} : { mesh: { boundaryEdges: wt.boundaryEdges, nonManifoldEdges: wt.nonManifoldEdges, flippedEdges: wt.flippedEdges } }),
       });
@@ -516,8 +574,9 @@ async function checkTool(args: Record<string, any>): Promise<ToolResult> {
         lines.push(`  - overhangs > ${maxDeg}°: ${pr.overhang.faces.length} face(s), ${r1(pr.overhang.area)} mm² (${r1(pr.overhang.fraction * 100)} % of the surface)`);
         for (const f of faces) lines.push(`      face ${f.faceId}: ${f.area} mm² at ${f.angle}° from vertical, ${fmtBox(f.bbox as B3)}${f.selector ? `, selector ${f.selector}` : ""}`);
       } else lines.push(`  - overhangs > ${maxDeg}°: none`);
-      if (thin) lines.push(`  - thinnest wall ${thin.min} mm near ${fmtPt(thin.at as number[])}${(thin.thinArea as number) > 0 ? `; ${r1((thin.thinFraction as number) * 100)} % of the surface is thinner than ${minWall} mm` : ` (≥ ${minWall} mm everywhere)`}`);
+      if (thin) lines.push(`  - thinnest wall ${thin.min} mm near ${fmtPt(thin.at as number[])}${(thin.thinArea as number) > 0 ? `; ${pct(thin.thinFraction as number)} of the surface is thinner than ${minWall} mm` : ` (≥ ${minWall} mm everywhere)`}`);
       if (pr.bed) lines.push(`  - bed ${opts.bed!.join(" × ")}: ${pr.bed.fits ? (pr.bed.rotated ? "fits turned 90°" : "fits") : "DOES NOT FIT"}`);
+      if (better) lines.push(`  - print it with buildDir [${better.dir.join(", ")}] (${orientName(better.dir)}): overhangs drop to ${r1(better.area)} mm²`);
       lines.push(`  - mesh: ${wt.watertight ? "watertight" : `NOT watertight (${wt.boundaryEdges} open, ${wt.nonManifoldEdges} non-manifold, ${wt.flippedEdges} flipped edges)`}`);
     }
     let interference: Record<string, unknown> | undefined;
@@ -580,7 +639,8 @@ async function docsTool(args: Record<string, any>): Promise<ToolResult> {
   }
   const topic = String(args.topic ?? "guide");
   const n = referenceNames();
-  const index = `\n## Element index\nIntrinsic: ${n.elements.map((e) => `<${e}>`).join(" ")}\nParts library: ${n.components.map((e) => `<${e}>`).join(" ")}\nCall tscad_docs with {"element": "<name>"} (or a list) for exact props, or {"topic": "elements"} for all.`;
+  const constraint = new Set(["point", "line", "arc", "spline", "dimension", "distance", "angle", "coincident", "equal", "parallel", "perpendicular", "tangent", "collinear", "concentric", "horizontal", "vertical", "symmetric", "midpoint", "onCurve", "fix"]);
+  const index = `\n## Element index\nModelling: ${n.elements.filter((e) => !constraint.has(e)).map((e) => `<${e}>`).join(" ")}\nConstraint sketch (inside <sketch>): ${n.elements.filter((e) => constraint.has(e)).map((e) => `<${e}>`).join(" ")}\nParts library (import from "tscad/parts"): ${n.components.map((e) => `<${e}>`).join(" ")}\nCall tscad_docs with {"element": "<name>"} (or a list) for exact props, or {"topic": "elements"} for all.`;
   const text =
     topic === "elements" ? elementsMarkdown() : topic === "parts" ? partsMarkdown() : topic === "all" ? `${GUIDE}\n${elementsMarkdown()}\n\n${partsMarkdown()}` : GUIDE + index;
   return { content: [{ type: "text", text }] };

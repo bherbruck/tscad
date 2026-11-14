@@ -47,6 +47,15 @@ export const mountPatterns = {
     outline: [85, 56],
     outlineOffset: [-32.5, -28],
   },
+  /** Raspberry Pi 5: the same 58 × 49 mm M2.5 pattern and 85 × 56 mm board as the Pi 4. */
+  raspberryPi5: {
+    name: "Raspberry Pi 5",
+    points: [[-29, -24.5], [29, -24.5], [29, 24.5], [-29, 24.5]],
+    size: "M2.5",
+    holeDiameter: 2.7,
+    outline: [85, 56],
+    outlineOffset: [-32.5, -28],
+  },
   /** Raspberry Pi Zero / Zero 2 W: 58 × 23 mm, M2.5, board 65 × 30 mm. */
   raspberryPiZero: {
     name: "Raspberry Pi Zero",

@@ -4,6 +4,7 @@
  */
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { mountPatterns } from "../parts/patterns";
 
 /** One documented prop. */
 export interface Member {
@@ -61,6 +62,31 @@ export function parseInterfaces(src: string): { ifaces: Map<string, Iface>; fnDo
 }
 
 const here = (p: string) => fileURLToPath(new URL(p, import.meta.url));
+
+type PatternData = { points: readonly (readonly [number, number])[]; size: string; outline?: readonly [number, number]; outlineOffset?: readonly [number, number]; pilot?: number };
+function mountPatternsData(): Record<string, PatternData> {
+  return mountPatterns as unknown as Record<string, PatternData>;
+}
+function span(points: readonly (readonly [number, number])[]): string {
+  const xs = points.map((p) => p[0]), ys = points.map((p) => p[1]);
+  const w = Math.max(...xs) - Math.min(...xs), h = Math.max(...ys) - Math.min(...ys);
+  return `${+w.toFixed(2)} × ${+h.toFixed(2)}`;
+}
+
+/** Plain-language meaning of type names that appear in prop tables. */
+export const TYPE_NOTES: Record<string, string> = {
+  Vec3: "`[x, y, z]`",
+  Vec2: "`[x, y]`",
+  Axis: '`"x" | "y" | "z"`',
+  CenterSpec: "`true` (centre every axis), `false` (corner at the origin) or `[bx, by, bz]` per axis",
+  PlaneSpec: '`"XY"` (normal +Z), `"XZ"` (normal +Y), `"YZ"` (normal +X), or `{ origin?: [x, y, z], normal: [x, y, z] | "x" | "y" | "z" }`',
+  SelectorLike: 'a string such as `">Z"`, `"|Z or <Z"`, or a builder such as `edges.top()`, `faces.parallel("z")`',
+  MetricSize: '`"M2" | "M2.5" | "M3" | "M4" | "M5" | "M6" | "M8" | "M10" | "M12"`',
+  MaterialName: '`"pla" | "petg" | "abs" | "asa" | "tpu" | "nylon" | "resin" | "aluminum" | "steel" | "stainless" | "brass" | "copper" | "titanium" | "wood" | "acrylic"`',
+  HoleFit: '`"close" | "normal" | "loose"` (ISO 273)',
+  MountPattern: "an entry of `mountPatterns` (see Data below)",
+  Path3: "`helix({...})`, `polyline3([...])`, `arc3({...})` or `bezier3([...])`",
+};
 /** One documented element or component, for the docs site. */
 export interface Entry {
   name: string;
@@ -104,7 +130,8 @@ function propsOf(name: string, ifaces: Map<string, Iface>, seen = new Set<string
 
 function memberLine(m: Member): string {
   if (m.name === "key" || m.name === "children") return "";
-  return `- \`${m.name}${m.optional ? "?" : ""}: ${m.type}\`${m.doc ? ` — ${m.doc.replace(/\n/g, " ")}` : ""}`;
+  const notes = Object.entries(TYPE_NOTES).filter(([t]) => new RegExp(`\\b${t}\\b`).test(m.type)).map(([t, n]) => `${t} = ${n}`);
+  return `- \`${m.name}${m.optional ? "?" : ""}: ${m.type}\`${m.doc ? ` — ${m.doc.replace(/\n/g, " ")}` : ""}${notes.length ? ` (${notes.join("; ")})` : ""}`;
 }
 
 function sharedSection(ifaces: Map<string, Iface>): string {
@@ -165,7 +192,11 @@ function build() {
   partSections.push(
     "### Data",
     "- `metric.M3.clearance.normal` (3.4), `.tapDrill`, `.socketHead {diameter,height}`, `.counterbore`, `.countersunk`, `.nut {af,height}`, `.insert`; sizes M2 M2.5 M3 M4 M5 M6 M8 M10 M12",
-    "- `mountPatterns.raspberryPi4 | raspberryPiZero | arduinoUno | nema17 | nema23`: `{ points, size, holeDiameter, outline, outlineOffset, pilot? }` (points centred)",
+    "- `mountPatterns.<name>`: `{ points, size, holeDiameter, outline, outlineOffset, pilot? }`. `points` are centred on the hole pattern; the board/face outline's lower-left corner is at `outlineOffset` from that centre, so the board centre is `outlineOffset + outline / 2`.",
+    "",
+    "| pattern | holes (span) | screw | outline | outline offset | pilot |",
+    "|---|---|---|---|---|---|",
+    ...Object.entries(mountPatternsData()).map(([k, v]) => `| \`${k}\` | ${span(v.points)} | ${v.size} | ${v.outline ? `${v.outline[0]} × ${v.outline[1]}` : "—"} | ${v.outlineOffset ? `[${v.outlineOffset.join(", ")}]` : "—"} | ${v.pilot ?? "—"} |`),
   );
   cache = {
     elements: sections.join("\n"),

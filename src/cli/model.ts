@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { basename, join, relative, resolve } from "node:path";
 import type { BunPlugin } from "bun";
 import { BundleError, PKG_ROOT, RUNTIME_ENTRIES, SRC } from "./bundle";
-import { loadKernel, type KernelHost } from "../kernel";
+import { loadKernel, type KernelHost, WasmKernelHost } from "../kernel";
 import { renderModule, type RenderResult } from "../index";
 import type { EvalResult, PartResult } from "../ir";
 import { c, codeFrame } from "./ui";
@@ -89,7 +89,14 @@ export interface ModelRun {
   timings: { import: number; render: number; kernel: number };
 }
 
-export async function runModel(file: string, overrides: Record<string, unknown>, opts: { tolerance?: number; noMesh?: boolean } = {}): Promise<ModelRun> {
+/** The parallel kernel when it pays off: native kernel, ≥ 2 parts, `TSCAD_PARALLEL` not "0". */
+async function useParallel(base: KernelHost, parts: number): Promise<KernelHost | undefined> {
+  if (parts < 2 || process.env.TSCAD_PARALLEL === "0" || base instanceof WasmKernelHost) return undefined;
+  const { createParallelKernel } = await import("./parallel");
+  return createParallelKernel();
+}
+
+export async function runModel(file: string, overrides: Record<string, unknown>, opts: { tolerance?: number; noMesh?: boolean; /** Spread ≥ 2 parts over kernel processes (default true). */ parallel?: boolean } = {}): Promise<ModelRun> {
   const t0 = performance.now();
   const [mod, kernel] = await Promise.all([importModel(file), loadKernel()]);
   const t1 = performance.now();
@@ -98,9 +105,11 @@ export async function runModel(file: string, overrides: Record<string, unknown>,
   const options: { tolerance?: number; noMesh?: boolean } = {};
   if (opts.tolerance !== undefined) options.tolerance = opts.tolerance;
   if (opts.noMesh) options.noMesh = true;
-  const result = await kernel.evaluate(rendered.document, options);
+  // Two or more parts with the native kernel: spread them over kernel processes.
+  const k = (opts.parallel !== false ? await useParallel(kernel, rendered.document.parts?.length ?? 0) : undefined) ?? kernel;
+  const result = await k.evaluate(rendered.document, options);
   const t3 = performance.now();
-  return { rendered, result, kernel, timings: { import: t1 - t0, render: t2 - t1, kernel: t3 - t2 } };
+  return { rendered, result, kernel: k, timings: { import: t1 - t0, render: t2 - t1, kernel: t3 - t2 } };
 }
 
 /** A kernel part error with the TSX location and a code frame. */
