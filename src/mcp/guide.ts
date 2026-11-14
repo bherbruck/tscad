@@ -77,6 +77,8 @@ Selectors: strings \`">Z"\` (top), \`"<Z"\` (bottom), \`"|Z"\` (edges parallel t
 \`edges.top()\`, \`edges.bottom()\`, \`edges.vertical()\`, \`edges.circles()\`, \`edges.radius(r)\`,
 \`edges.within(min,max)\`, \`.and() .or() .not()\`; \`faces.top()\` etc. Omit \`edges\` for all edges.
 \`<shell thickness={2} open={faces.top()}>\` hollows inward (walls 2 mm) with the top open.
+\`<draft angle={3}>\` tilts the walls for moulding; \`<pushPull distance={2} faces=">Z">\` moves faces along
+their normals; \`<split plane="XY" offset={5} keep="above">\` cuts with a plane and keeps one side.
 Use the \`tscad_pick_selectors\` tool with a point near an edge to get a selector for it.
 
 ## Patterns

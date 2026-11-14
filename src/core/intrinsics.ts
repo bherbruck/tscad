@@ -644,8 +644,8 @@ export interface DraftProps extends Placement, SolidChildren {
  * @example <pushPull distance={2} faces=">Z"><box size={10} /></pushPull> // 10 × 10 × 12
  */
 export interface PushPullProps extends Placement, SolidChildren {
-  /** How far to move the faces, mm (negative: into the solid). */
-  distance: number;
+  /** How far to move the faces, mm (negative: into the solid). Give this or `d`. */
+  distance?: number;
   /** Alias of `distance`. */
   d?: number;
   /** Faces to move: `faces.top()`, `">Z"`, ... */
