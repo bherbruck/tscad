@@ -27,6 +27,8 @@ jobs:
         run: cargo test -p tscad-wasm
       - name: Build wasm
         run: bun scripts/build-wasm.ts --ci
+      - name: Build native kernel (bun:ffi)
+        run: bun scripts/build-native.ts
       - name: Typecheck
         run: bun run typecheck
       - name: Tests
