@@ -476,6 +476,92 @@ export interface OffsetProps extends Placement2D, SketchChildren {
  * inside, it is a **constraint sketch**: solved, then its closed loops become profiles.
  */
 /**
+ * A sheet-metal part: a base `<flange>` (a closed 2D outline) with `<edgeFlange>`, `<hem>` and
+ * `<jog>` children hanging from its edges, nested to any depth. Bends are exact cylindrical
+ * sections. Besides the folded part, the **flat pattern** comes out as drawings named
+ * `<name>-flat` (layer `cut`), `<name>-bends` (layer `bend`, the bend centre lines) and
+ * `<name>-notes` (layer `engrave`, "UP 90° R2" labels), so `tscad build -o part.dxf` gives a
+ * cut-and-bend-ready flat. Bend allowance: BA = θ·(R + K·T).
+ * @example
+ * <sheetMetal name="bracket" thickness={2} bendRadius={2}>
+ *   <flange>
+ *     <rect w={60} h={40} />
+ *     <edgeFlange edge="+y" length={30} />
+ *   </flange>
+ * </sheetMetal>
+ */
+export interface SheetMetalProps extends Placement {
+  /** Sheet thickness, mm. */
+  thickness: number;
+  /** Inside bend radius, mm. Default: the thickness. */
+  bendRadius?: number;
+  /** Neutral-axis position as a fraction of the thickness from the inside. Default 0.44. */
+  kFactor?: number;
+  /** Name of the flat-pattern drawings (`<name>-flat`...). Default `"sheet"`. */
+  name?: string;
+  /** Show the flat pattern (extruded) instead of the folded part. */
+  flat?: boolean;
+  /** One base `<flange>`. */
+  children?: Children;
+}
+
+/** The base flange: a closed 2D outline (holes allowed) on z = 0, plus edge flanges as children. */
+export interface FlangeProps extends Placement2D {
+  /** The outline (2D shapes, sketches, constraint sketches whose line ids name edges) and the edge flanges. */
+  children?: Children;
+}
+
+/** Which edge: `"+x" | "-x" | "+y" | "-y"` (outward normal; also right/left/back/front), a constraint-sketch line id, an outline index; on an edge flange `"end" | "left" | "right"`. */
+export type SheetEdge = "+x" | "-x" | "+y" | "-y" | "right" | "left" | "back" | "front" | "top" | "bottom" | "end" | (string & {}) | number;
+
+interface SheetChild extends Placement2D {
+  /** The edge of the parent flange it hangs from. */
+  edge: SheetEdge;
+  /** Fold toward the sheet's +Z side (`"up"`, default) or the other way. */
+  direction?: "up" | "down";
+  /** Shorten the flange from the edge's start, mm (reliefs are cut into the parent). */
+  inset?: number;
+  /** Shorten the flange from the edge's end, mm. Default: `inset`. */
+  insetEnd?: number;
+  /** Cut bend reliefs into the parent where the flange is inset. Default true. */
+  reliefs?: boolean;
+  /** Relief width, mm. Default: the thickness. */
+  reliefWidth?: number;
+  /** Holes (2D, in the flange's coordinates: x along the edge, y away from the bend) and further flanges. */
+  children?: Children;
+}
+
+/** A flange folded from an edge: `length` of flat beyond the bend. */
+export interface EdgeFlangeProps extends SheetChild {
+  /** Flat length beyond the bend, mm. */
+  length: number;
+  /** Bend angle, degrees (0, 180]. Default 90. */
+  angle?: number;
+  /** Inside bend radius, mm. Default: the sheet's. */
+  bendRadius?: number;
+}
+
+/** A hem: folded right back (180°) over the sheet. */
+export interface HemProps extends SheetChild {
+  /** Flat length of the folded-back part, mm. */
+  length: number;
+  /** Gap between the sheet and the hem, mm (bend radius = gap / 2). Default: the thickness. */
+  gap?: number;
+}
+
+/** A jog (Z-bend): up by `angle`, a web, back down, so the flange continues `offset` higher. */
+export interface JogProps extends SheetChild {
+  /** Rise of the jogged flange's bottom face above the parent's, mm. */
+  offset: number;
+  /** Flat length of the jogged flange, mm. */
+  length: number;
+  /** Bend angle of both bends, degrees. Default 90. */
+  angle?: number;
+  /** Inside bend radius, mm. Default: the sheet's. */
+  bendRadius?: number;
+}
+
+/**
  * Model on a face of another solid ("sketch on face"). The **first child is the base**; the
  * other children are tools modelled in the face's frame — origin at the centre of the face's
  * bounding box, +Z pointing out of the material, +X along model X projected onto the face (Y
@@ -943,6 +1029,16 @@ export interface IntrinsicElements extends ConstraintSketchElements, AssemblyEle
   /** Hollow out. */
   shell: ShellProps;
 
+  /** A sheet-metal part (folded + flat pattern). */
+  sheetMetal: SheetMetalProps;
+  /** Sheet metal: the base flange. */
+  flange: FlangeProps;
+  /** Sheet metal: a flange folded from an edge. */
+  edgeFlange: EdgeFlangeProps;
+  /** Sheet metal: a 180° hem. */
+  hem: HemProps;
+  /** Sheet metal: a jog (Z-bend). */
+  jog: JogProps;
   /** Model on a face of the first child (sketch on face). */
   onFace: OnFaceProps;
   /** Cut a 2D profile `depth` into a face of the base. */

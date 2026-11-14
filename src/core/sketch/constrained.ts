@@ -2479,6 +2479,14 @@ export class SketchRecorder {
     return transformLoop(loops[0]!, affine);
   }
 
+  /** The lines with ids of `parent`'s pending constraint sketches, in the parent's sketch coordinates. */
+  linesOf(parent: Host): { id: string; from: Vec2; to: Vec2 }[] {
+    const ap = (m: Affine2, q: Vec2): Vec2 => [m[0] * q[0] + m[1] * q[1] + m[4], m[2] * q[0] + m[3] * q[1] + m[5]];
+    return this.pending
+      .filter((p) => p.parent === parent)
+      .flatMap((p) => p.info.entities.flatMap((e) => (e.kind === "line" && e.id ? [{ id: e.id, from: ap(p.affine, e.from), to: ap(p.affine, e.to) }] : [])));
+  }
+
   /**
    * Bind `parent`'s pending sketches: give unframed ones `frame`; with a node (or `null`:
    * nothing was built), bind them to it and stop tracking them.

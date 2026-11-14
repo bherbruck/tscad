@@ -21,6 +21,7 @@ import { hullLoops, HullError } from "./sketch/hull";
 import { booleanLoops, BooleanError, loopsOverlap, normalizeLoops, type BooleanOp } from "./sketch/boolean";
 import { sweepPathOf } from "./sketch/sweep-path";
 import { importDxf, importSvg, ImportError } from "./sketch/import";
+import { buildSheet, SHEET_TAGS } from "../sheet";
 import { CONSTRAINT_TAGS, isConstrainedSketch, SketchRecorder, type SketchInfo } from "./sketch/constrained";
 import { AssemblyRecorder, ASSEMBLY_TAGS, type AssemblyInfo } from "./assembly";
 import { parsePath, PathSyntaxError } from "./sketch/path";
@@ -139,7 +140,7 @@ const SOLID_TAGS = new Set([
   "group", "step", "translate", "rotate", "scale", "mirror", "transform", "box", "cylinder", "cone", "sphere", "torus",
   "union", "difference", "subtract", "intersection", "intersect", "extrude", "revolve", "loft", "sweep",
   "linearPattern", "gridPattern", "polarPattern", "fillet", "chamfer", "shell", "draft", "pushPull", "offsetFaces", "split",
-  "onFace", "pocket", "boss", "cutThrough",
+  "onFace", "pocket", "boss", "cutThrough", "sheetMetal",
 ]);
 const SHAPE_TAGS = new Set(["text", "rect", "roundedRect", "circle", "ellipse", "polygon", "regularPolygon", "slot", "path", "star", "dxf", "svg"]);
 /** 2D booleans (and their short aliases) → the operation. */
@@ -153,7 +154,7 @@ const SKETCH_BOOLEANS: Record<string, BooleanOp> = {
 };
 const SKETCH_TAGS = new Set([...SHAPE_TAGS, "sketch", "section", "offset", "hull", "sweepPath", ...Object.keys(SKETCH_BOOLEANS)]);
 const CONTAINER_TAGS = new Set(["part", "assembly", "drawing"]);
-const ALL_TAGS = [...SOLID_TAGS, ...SKETCH_TAGS, ...CONTAINER_TAGS, ...CONSTRAINT_TAGS, ...ASSEMBLY_TAGS];
+const ALL_TAGS = [...SOLID_TAGS, ...SKETCH_TAGS, ...CONTAINER_TAGS, ...CONSTRAINT_TAGS, ...ASSEMBLY_TAGS, ...SHEET_TAGS];
 /** Tags whose x/y/z mean something else (no universal placement). */
 const OWN_TRANSFORM = new Set(["translate", "rotate", "scale", "mirror", "transform", "onFace", "pocket", "boss", "cutThrough"]);
 
@@ -168,6 +169,8 @@ class Compiler {
   readonly soft = new WeakSet<Node>();
   /** Solved constraint sketches, bound to the nodes built from them. */
   readonly sketchRec = new SketchRecorder();
+  /** Flat-pattern drawings of `<sheetMetal>` parts. */
+  readonly sheetDrawings: Drawing[] = [];
   /** Anchors and mates, solved once every part is built. */
   readonly asm = new AssemblyRecorder({ placement: (h) => this.placement(h), warn: (h, msg) => this.warn(h, msg), emit: (n, h) => this.emit(n, h) });
 
@@ -351,6 +354,8 @@ class Compiler {
       if ("children" in node) node.children.forEach((c, i) => walk(c, `${path}/${i}`, loc, inner, face));
     };
     doc.forEach((p, i) => walk(p.node, `parts/${i}`, infos.find((x) => x.index === i)?.loc, identity()));
+    // flat patterns of sheet-metal parts
+    drawings.push(...this.sheetDrawings);
     const names = new Set<string>();
     for (const d of drawings) {
       let n = d.name, k = 2;
@@ -438,6 +443,7 @@ class Compiler {
       this.fail(h, `<${h.tag}> is a 2D sketch shape and can't stand alone as a solid`, `put it inside <extrude height={...}>, <revolve>, <loft> or <sweep>`);
     }
     if (h.tag === "anchor") return null;
+    if (SHEET_TAGS.has(h.tag)) this.fail(h, `<${h.tag}> belongs inside a <sheetMetal>`, `<sheetMetal thickness={1.5}><flange><rect w={100} h={60} /><edgeFlange edge="+y" length={20} /></flange></sheetMetal>`);
     if (h.tag === "mate" || h.tag === "gear") this.fail(h, `<${h.tag}> belongs directly inside an <assembly>`, `<assembly><part name="a">...</part><part name="b">...</part><mate a="a.x" b="b.y" /></assembly>`);
     if (CONSTRAINT_TAGS.has(h.tag)) {
       this.fail(h, `<${h.tag}> belongs in a constraint <sketch>`, `<extrude height={5}><sketch>...points, lines, arcs, constraints...</sketch></extrude>`);
@@ -703,6 +709,20 @@ class Compiler {
         if (d === 0) return [kids.length === 1 ? kids[0]! : this.soften(this.emit({ type: "union", children: kids }, h))];
         if (p.faces === undefined) this.fail(h, "missing faces", `<${h.tag} distance={2} faces=">Z">`);
         return [this.emit({ type: "offsetFaces", distance: d, faces: this.selector(h, "faces", p.faces), children: kids } as Node, h)];
+      }
+      case "sheetMetal": {
+        const r = buildSheet(h, {
+          sketch: (kids, m, parent) => this.sketch(kids, m, parent),
+          place2: (x) => this.place2(x),
+          warn: (x, msg) => this.warn(x, msg),
+          fail: (x, msg, hint) => this.fail(x, msg, hint),
+          emit: (n, x) => this.emit(n, x),
+          sketchLines: (parent) => this.sketchRec.linesOf(parent),
+        });
+        this.sheetDrawings.push(...r.drawings);
+        // the base flange's sketches lie on z = 0 (edge-flange profiles live in their own panels)
+        for (const c of h.children) this.sketchRec.claim(c, r.node, PLANES.XY);
+        return r.node ? [r.node] : null;
       }
       case "onFace":
       case "pocket":
