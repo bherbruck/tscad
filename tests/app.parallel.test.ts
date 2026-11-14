@@ -41,10 +41,13 @@ describe("parallel kernel processes", () => {
   }, 60_000);
 
   test("dispose leaves no kernel processes behind", async () => {
-    expect(children().length).toBeGreaterThan(0);
+    // Only this pool's children: other test files may be running their own kernel processes.
+    const pids = k.pool.evaluators.filter((e) => e instanceof ProcessEvaluator).map((e) => (e as ProcessEvaluator).pid).filter((p): p is number => !!p);
+    expect(pids.length).toBeGreaterThan(0);
     k.dispose();
     disposeKernelProcesses();
-    for (let i = 0; i < 50 && children().length; i++) await Bun.sleep(100);
-    expect(children()).toEqual([]);
+    const alive = () => pids.filter((p) => children().includes(p));
+    for (let i = 0; i < 50 && alive().length; i++) await Bun.sleep(100);
+    expect(alive()).toEqual([]);
   }, 30_000);
 });
