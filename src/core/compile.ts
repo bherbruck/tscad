@@ -16,9 +16,12 @@ import { polyline3 } from "./paths";
 import { render, type Host } from "./render";
 import { layoutText, loadFont } from "./text/font";
 import { toSelector, type SelectorLike } from "./select";
+import { offsetLoops, OffsetError } from "./sketch/offset";
+import { CONSTRAINT_TAGS, isConstrainedSketch, SketchRecorder, type SketchInfo } from "./sketch/constrained";
 import { parsePath, PathSyntaxError } from "./sketch/path";
 import { ccw, frame, frameAcross, pathStart, PLANES, regions, toCurves, type Frame, type PlaneName } from "./sketch/place";
-import { closureGap, ID2, loopSize, mul2, polyline, rot2, tr2, transformLoop, type Affine2, type Loop2 } from "./sketch/seg";
+export type { Loop2, Seg2 } from "./sketch/seg";
+import { reverseLoop, closureGap, ID2, loopSize, mul2, polyline, rot2, tr2, transformLoop, type Affine2, type Loop2 } from "./sketch/seg";
 import {
   circleLoop, ellipseLoop, polygonLoop, rectLoop, regularPolygonPoints, roundedRectLoop, slotLoop, starPoints,
 } from "./sketch/shapes";
@@ -47,6 +50,23 @@ export interface CompileResult {
   warnings: string[];
   /** Per-part metadata (material, density, visibility). */
   parts: PartInfo[];
+  /** Flat 2D drawings (`<drawing>`), for DXF/SVG export (see `tscad/drawing`). */
+  drawings: Drawing[];
+  /** Solved constraint sketches (`<sketch>` with `<line>`, `<arc>`, constraints...), for overlays. */
+  sketches: SketchInfo[];
+}
+
+/**
+ * A flat 2D drawing: closed loops in mm, sketch coordinates (y up). Outer loops are
+ * counter-clockwise and holes clockwise (even-odd nesting), ready for DXF/SVG.
+ */
+export interface Drawing {
+  name: string;
+  loops: Loop2[];
+  /** Sheet thickness when given (the drawing is then also a part, extruded on z = 0). */
+  thickness?: number;
+  color?: string;
+  loc?: SourceLoc;
 }
 
 export interface CompileOptions {
@@ -109,8 +129,8 @@ const SOLID_TAGS = new Set([
   "linearPattern", "gridPattern", "polarPattern", "fillet", "chamfer", "shell",
 ]);
 const SHAPE_TAGS = new Set(["text", "rect", "roundedRect", "circle", "ellipse", "polygon", "regularPolygon", "slot", "path", "star"]);
-const SKETCH_TAGS = new Set([...SHAPE_TAGS, "sketch", "section"]);
-const CONTAINER_TAGS = new Set(["part", "assembly"]);
+const SKETCH_TAGS = new Set([...SHAPE_TAGS, "sketch", "section", "offset"]);
+const CONTAINER_TAGS = new Set(["part", "assembly", "drawing"]);
 const ALL_TAGS = [...SOLID_TAGS, ...SKETCH_TAGS, ...CONTAINER_TAGS];
 /** Tags whose x/y/z mean something else (no universal placement). */
 const OWN_TRANSFORM = new Set(["translate", "rotate", "scale", "mirror"]);
@@ -124,6 +144,8 @@ class Compiler {
   readonly locs = new WeakMap<object, SourceLoc>();
   /** Unions made only to group children: a transform may take their children directly. */
   readonly soft = new WeakSet<Node>();
+  /** Solved constraint sketches, bound to the nodes built from them. */
+  readonly sketchRec = new SketchRecorder();
 
   constructor(
     readonly warnings: string[],
@@ -197,7 +219,21 @@ class Compiler {
     const parts: { part: Part; info: PartInfo; host: Host }[] = [];
     const loose: Node[] = [];
     const looseHosts: Host[] = [];
+    const drawings: Drawing[] = [];
     const visit = (h: Host, m: Mat4): void => {
+      if (h.tag === "drawing") {
+        const d = this.drawing(h);
+        drawings.push(d);
+        if (d.thickness !== undefined && d.loops.length) {
+          const node = this.extrudeLoops(h, d.loops.map((loop) => ({ loop: ccw(loop), host: h })), d.thickness, PLANES.XY, 0, 0);
+          if (node) {
+            const info = this.partInfo(h);
+            info.name = d.name;
+            parts.push({ part: { name: "", node: this.wrap(h, node, m) }, info, host: h });
+          }
+        }
+        return;
+      }
       if (h.tag === "part") {
         const body = this.group(h.children, h);
         const node = body && this.wrap(h, body, mul(m, this.placement(h)));
@@ -256,13 +292,23 @@ class Compiler {
     }
 
     const sourceMap: Record<string, SourceLoc> = {};
-    const walk = (node: Node, path: string, inherited: SourceLoc | undefined) => {
+    const walk = (node: Node, path: string, inherited: SourceLoc | undefined, acc: Mat4) => {
       const loc = this.locs.get(node) ?? inherited;
       if (loc) sourceMap[path] = loc;
-      if ("children" in node) node.children.forEach((c, i) => walk(c, `${path}/${i}`, loc));
+      this.sketchRec.visit(node, path, acc);
+      const inner = node.type === "transform" ? mul(acc, node.matrix as Mat4) : acc;
+      if ("children" in node) node.children.forEach((c, i) => walk(c, `${path}/${i}`, loc, inner));
     };
-    doc.forEach((p, i) => walk(p.node, `parts/${i}`, infos.find((x) => x.index === i)?.loc));
-    return { document: { parts: doc }, sourceMap, warnings: this.warnings, parts: infos };
+    doc.forEach((p, i) => walk(p.node, `parts/${i}`, infos.find((x) => x.index === i)?.loc, identity()));
+    const names = new Set<string>();
+    for (const d of drawings) {
+      let n = d.name, k = 2;
+      while (names.has(n)) n = `${d.name}-${k++}`;
+      if (n !== d.name) this.warnings.push(`duplicate drawing name ${JSON.stringify(d.name)}; renamed to ${JSON.stringify(n)}`);
+      d.name = n;
+      names.add(n);
+    }
+    return { document: { parts: doc }, sourceMap, warnings: this.warnings, parts: infos, drawings, sketches: this.sketchRec.sketches };
   }
 
   partInfo(h: Host): PartInfo {
@@ -337,7 +383,7 @@ class Compiler {
   }
 
   solid(h: Host): Node | null {
-    if (SHAPE_TAGS.has(h.tag) || h.tag === "sketch" || h.tag === "section") {
+    if (SHAPE_TAGS.has(h.tag) || h.tag === "sketch" || h.tag === "section" || h.tag === "offset") {
       this.fail(h, `<${h.tag}> is a 2D sketch shape and can't stand alone as a solid`, `put it inside <extrude height={...}>, <revolve>, <loft> or <sweep>`);
     }
     if (CONTAINER_TAGS.has(h.tag)) {
@@ -613,7 +659,27 @@ class Compiler {
     const out: SketchLoop[] = [];
     for (const c of children) {
       if (c.tag === "sketch") {
-        out.push(...this.sketch(c.children, mul2(m, this.place2(c)), parent));
+        const mm = mul2(m, this.place2(c));
+        if (isConstrainedSketch(c)) {
+          // constraint sketch: solved, then its leftover plain shapes as usual
+          const { loops, rest } = this.sketchRec.solve(c, mm, parent, { warn: (h, msg) => this.warn(h, msg) });
+          out.push(...loops, ...this.sketch(rest, mm, parent));
+        } else out.push(...this.sketch(c.children, mm, parent));
+        continue;
+      }
+      if (c.tag === "offset") {
+        const d = this.req(c, "distance", this.alias(c, ["distance", "d"]));
+        const inner = this.sketch(c.children, mul2(m, this.place2(c)), parent);
+        for (const l of inner) this.checkClosed(l);
+        let loops: Loop2[];
+        try {
+          loops = offsetLoops(inner.map((l) => l.loop), d, c.props.round !== false);
+        } catch (e) {
+          if (e instanceof OffsetError) this.fail(c, e.message, "use a smaller distance, or round the shape's corners first", e);
+          throw e;
+        }
+        if (inner.length && !loops.length) this.warn(c, `offsetting by ${d} removed every loop`);
+        out.push(...loops.map((loop) => ({ loop, host: c })));
         continue;
       }
       if (c.tag === "section") {
@@ -625,6 +691,7 @@ class Compiler {
         if (SOLID_TAGS.has(c.tag) || CONTAINER_TAGS.has(c.tag)) {
           this.fail(c, `<${c.tag}> is a solid; <${parent.tag}> takes 2D shapes`, "use <rect>, <circle>, <polygon>, <path>... (wrap solids in <union>/<difference> instead)");
         }
+        if (CONSTRAINT_TAGS.has(c.tag)) this.fail(c, `<${c.tag}> belongs in a constraint <sketch>`, `wrap the points, lines, arcs and constraints in <sketch>...</sketch>`);
         const guess = closest(c.tag, ALL_TAGS);
         this.fail(c, `unknown element <${c.tag}>`, guess ? `did you mean <${guess}>?` : undefined);
       }
@@ -767,11 +834,15 @@ class Compiler {
       this.warn(h, "its 2D shapes draw nothing (empty text?); skipped");
     }
     for (const l of loops) {
-      const { gap } = closureGap(l.loop);
-      if (gap > 1e-7 * Math.max(1, loopSize(l.loop))) this.fail(l.host, `open sketch loop (gap ${gap.toPrecision(3)} mm)`);
+      this.checkClosed(l);
       l.loop = ccw(l.loop);
     }
     return loops;
+  }
+
+  checkClosed(l: SketchLoop): void {
+    const { gap } = closureGap(l.loop);
+    if (gap > 1e-7 * Math.max(1, loopSize(l.loop))) this.fail(l.host, `open sketch loop (gap ${gap.toPrecision(3)} mm)`);
   }
 
   /** Build each region (outer minus holes) with `make`, unioning disjoint regions. */
@@ -789,6 +860,38 @@ class Compiler {
     return nodes.length === 1 ? nodes[0]! : this.emit({ type: "union", children: nodes } as Node, h);
   }
 
+  drawing(h: Host): Drawing {
+    const name = h.props.name ?? "drawing";
+    if (typeof name !== "string" || !name) this.fail(h, `name must be a non-empty string (got ${show(name)})`);
+    const thickness = this.num(h, "thickness", h.props.thickness, { positive: true });
+    const loops = this.sketch(h.children, this.place2(h), h);
+    for (const l of loops) this.checkClosed(l);
+    if (!loops.length) this.warn(h, "is empty");
+    // outer loops CCW, holes CW
+    const out: Loop2[] = [];
+    for (const r of regions(loops.map((l) => l.loop), (l) => l)) {
+      out.push(ccw(r.outer));
+      for (const hole of r.holes) out.push(reverseLoop(ccw(hole)));
+    }
+    const d: Drawing = { name, loops: out };
+    if (thickness !== undefined) d.thickness = thickness;
+    const color = h.props.color ?? (h.props.material ? (materials as Record<string, Material>)[String(h.props.material).toLowerCase()]?.color : undefined);
+    if (color) d.color = String(color);
+    if (h.loc) d.loc = h.loc;
+    return d;
+  }
+
+  /** Extrude placed, CCW loops (holes by nesting) from frame `base` + `start` along its normal. */
+  extrudeLoops(h: Host, loops: SketchLoop[], height: number, base: Frame, start: number, draft: number): Node | null {
+    const f: Frame = { ...base, origin: [base.n[0] * start, base.n[1] * start, base.n[2] * start] };
+    const dir: Vec3 = height > 0 ? [...base.n] : [-base.n[0], -base.n[1], -base.n[2]];
+    return this.regionsOf(h, loops, (l, hole) => {
+      const node: Node = { type: "extrude", profile: toCurves(l.loop, f), direction: dir.map((v) => v + 0) as Vec3, distance: Math.abs(height) };
+      if (draft) (node as { draft?: number }).draft = (hole ? -draft : draft) * DEG;
+      return this.emit(node, l.host);
+    });
+  }
+
   extrude(h: Host): Node | null {
     const p = h.props;
     const height = this.alias(h, ["height", "h", "distance"], { nonZero: true });
@@ -798,16 +901,7 @@ class Compiler {
     const draft = this.num(h, "draft", p.draft) ?? 0;
     if (Math.abs(draft) >= 90) this.fail(h, `draft must be between -90 and 90 degrees (got ${draft})`);
     const offset = this.num(h, "offset", p.offset) ?? 0;
-    const base = PLANES[plane];
-    const start = offset - (p.center ? height / 2 : 0);
-    const f: Frame = { ...base, origin: [base.n[0] * start, base.n[1] * start, base.n[2] * start] };
-    const dir: Vec3 = height > 0 ? [...base.n] : [-base.n[0], -base.n[1], -base.n[2]];
-    const loops = this.loops(h);
-    return this.regionsOf(h, loops, (l, hole) => {
-      const node: Node = { type: "extrude", profile: toCurves(l.loop, f), direction: dir.map((v) => v + 0) as Vec3, distance: Math.abs(height) };
-      if (draft) (node as { draft?: number }).draft = (hole ? -draft : draft) * DEG;
-      return this.emit(node, l.host);
-    });
+    return this.extrudeLoops(h, this.loops(h), height, PLANES[plane], offset - (p.center ? height / 2 : 0), draft);
   }
 
   revolve(h: Host): Node | null {

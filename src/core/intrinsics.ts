@@ -85,6 +85,25 @@ export interface PartProps extends Placement, SolidChildren {
   visible?: boolean;
 }
 
+/**
+ * A flat 2D part for laser cutting / CNC: its 2D shapes compile straight to loops (no kernel)
+ * and export to DXF/SVG with `tscad/drawing`. Give it a `thickness` to also get a 3D part
+ * (the sheet, extruded up from z = 0) for the viewer and STEP/STL.
+ * @example <drawing name="gasket" thickness={1.5}><rect w={50} h={30} /><circle r={8} /></drawing>
+ */
+export interface DrawingProps extends Placement2D, SketchChildren {
+  /** Drawing (and part) name; unique. Default `"drawing"`. */
+  name?: string;
+  /** Sheet thickness, mm: also emit the drawing as an extruded part. */
+  thickness?: number;
+  /** Display colour of the part. */
+  color?: string;
+  /** Material preset of the part (see `<part material>`). */
+  material?: MaterialName | (string & {});
+  /** Density override, g/cm³. */
+  density?: number;
+}
+
 export interface GroupProps extends Placement, SolidChildren {
   /** Optional label (diagnostics only). */
   name?: string;
@@ -408,6 +427,22 @@ export interface TextProps extends Placement2D {
   ligatures?: boolean;
 }
 
+/**
+ * Offsets its 2D children: positive `distance` grows the shapes (clearance outlines,
+ * gaskets), negative shrinks them (insets, pockets). Holes move the other way, so the material
+ * grows/shrinks consistently. Lines and arcs stay exact; NURBS (ellipses, text, Béziers) are
+ * flattened to lines first. Holes that close up and islands that shrink away are removed.
+ * @example <extrude height={2}><offset distance={1.5}><path d={outline} /></offset></extrude>
+ */
+export interface OffsetProps extends Placement2D, SketchChildren {
+  /** Offset distance, mm: positive outward, negative inward. */
+  distance?: number;
+  /** Alias of `distance`. */
+  d?: number;
+  /** Round convex corners with exact arcs (default true); `false` mitres them. */
+  round?: boolean;
+}
+
 /** Groups 2D shapes to place them together. */
 export interface SketchProps extends Placement2D, SketchChildren {}
 
@@ -576,6 +611,8 @@ export interface IntrinsicElements {
   part: PartProps;
   /** Groups solids (unioned) so they can be placed together. */
   group: GroupProps;
+  /** A flat 2D part (laser / CNC): exports to DXF/SVG; `thickness` also makes it a 3D part. */
+  drawing: DrawingProps;
 
   /** Translate children. */
   translate: TranslateProps;
@@ -632,6 +669,8 @@ export interface IntrinsicElements {
   text: TextProps;
   /** 2D: groups shapes to place them together. */
   sketch: SketchProps;
+  /** 2D: offsets its shapes outward (+) or inward (−). */
+  offset: OffsetProps;
   /** 2D: one loft section at height `z`. */
   section: SectionProps;
 

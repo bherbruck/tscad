@@ -27,7 +27,7 @@ export {
 export { TscadError, formatLoc, type SourceLoc } from "./core/errors";
 
 // compile
-export { compile, renderModule, type CompileOptions, type CompileResult, type PartInfo, type RenderResult, type TscadModule } from "./core/compile";
+export { compile, renderModule, type CompileOptions, type CompileResult, type Drawing, type Loop2, type PartInfo, type RenderResult, type Seg2, type TscadModule } from "./core/compile";
 
 // params
 export {

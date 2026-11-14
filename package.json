@@ -31,7 +31,8 @@
     "./export": "./src/export/index.ts",
     "./ir": "./src/ir.ts",
     "./parts": "./src/parts/index.ts",
-    "./render": "./src/render/index.ts"
+    "./render": "./src/render/index.ts",
+    "./drawing": "./src/drawing/index.ts"
   },
   "files": [
     "src",
@@ -57,8 +58,19 @@
     "three": "^0.187.0"
   },
   "devDependencies": {
+    "@codemirror/autocomplete": "^6.20.4",
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/lang-javascript": "^6.2.5",
+    "@codemirror/language": "^6.13.1",
+    "@codemirror/lint": "^6.9.8",
+    "@codemirror/search": "^6.7.2",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.15",
+    "@lezer/highlight": "^1.2.5",
     "@types/three": "^0.187.0",
     "bun-types": "^1.4.4",
+    "codemirror": "^6.0.2",
+    "sucrase": "^3.35.1",
     "typescript": "^7.0.2"
   }
 }
