@@ -21,3 +21,7 @@ wasm-bindgen = "=0.2.130"
 tsify = { version = "0.5.8", default-features = false, features = ["js"] }
 serde-wasm-bindgen = "0.6.5"
 console_error_panic_hook = "0.1.7"
+
+[features]
+# solidcore's profiler (scopes and counters, JSON Lines) for kernel performance work.
+profile = ["solidcore/profile"]
