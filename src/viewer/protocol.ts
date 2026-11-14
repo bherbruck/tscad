@@ -76,6 +76,26 @@ export interface SketchDimensionData {
   loc?: Loc;
 }
 
+/** A pattern copy: which entity it copies, in which pattern, which copy (1, 2...). */
+export interface CopyOf {
+  index: number;
+  pattern: number;
+  copy: number;
+}
+
+export interface SketchPatternData {
+  kind: "mirror" | "circular" | "linear" | (string & {});
+  of: number[];
+  copies: number[][];
+  center?: [number, number];
+  /** Degrees between copies (circular). */
+  angle?: number;
+  /** Mirror line. */
+  axis?: [[number, number], [number, number]];
+  step?: [number, number];
+  loc?: Loc;
+}
+
 /** A solved constraint sketch (core's `SketchInfo`, locations mapped to the TSX). */
 export interface SketchData {
   path: string;
@@ -88,12 +108,14 @@ export interface SketchData {
   residual: number;
   points: { id: string; x: number; y: number; free: boolean }[];
   entities: (
-    | { kind: "line"; id?: string; from: [number, number]; to: [number, number]; construction: boolean }
-    | { kind: "arc"; id?: string; center: [number, number]; from: [number, number]; to: [number, number]; radius: number; ccw: boolean; construction: boolean }
-    | { kind: "circle"; id?: string; center: [number, number]; radius: number; construction: boolean }
-    | { kind: "spline"; id?: string; points: [number, number][]; degree: number; construction: boolean }
+    | { kind: "line"; id?: string; from: [number, number]; to: [number, number]; construction: boolean; copyOf?: CopyOf }
+    | { kind: "arc"; id?: string; center: [number, number]; from: [number, number]; to: [number, number]; radius: number; ccw: boolean; construction: boolean; copyOf?: CopyOf }
+    | { kind: "circle"; id?: string; center: [number, number]; radius: number; construction: boolean; copyOf?: CopyOf }
+    | { kind: "spline"; id?: string; points: [number, number][]; degree: number; construction: boolean; copyOf?: CopyOf }
   )[];
   dimensions: SketchDimensionData[];
+  /** In-sketch patterns: entity indices of the originals and of each copy. */
+  patterns?: SketchPatternData[];
   /** The part it belongs to (from `path`). */
   part?: string;
 }
@@ -165,6 +187,10 @@ export type ToWorker =
   | { type: "params"; values: ParamValuesData }
   /** Free the kernels (server-side: stop the kernel processes). */
   | { type: "dispose" }
+  /** Geometry diff mode: after each evaluation, diff against the previous one (or the pinned one). */
+  | { type: "diff"; on: boolean }
+  /** Pin the current evaluation as the diff baseline (or unpin: back to "previous"). */
+  | { type: "diff-pin"; pin: boolean }
   | { type: "pick"; id: number; kind: "edge" | "face"; part: string; index: number }
   | { type: "export"; id: number; format: ExportFormat; parts: { name: string; color?: string }[]; tolerance?: number }
   | { type: "check"; id: number; kind: "printability"; parts: CheckMeshData[]; maxOverhangDeg: number; minWall: number; thickness: boolean }
@@ -205,4 +231,17 @@ export type FromWorker =
   | { type: "error"; error: StageError; schema?: ParamSchemaData; values?: ParamValuesData }
   | { type: "pick"; id: number; info?: PickInfo; error?: string }
   | { type: "export"; id: number; data?: Uint8Array | string; error?: string }
-  | { type: "check"; id: number; printability?: PrintabilityData[]; interference?: InterferenceData; error?: string };
+  | { type: "check"; id: number; printability?: PrintabilityData[]; interference?: InterferenceData; error?: string }
+  | { type: "diff"; data: DiffData };
+
+export interface DiffData {
+  /** The evaluation (`EvalData.seq`) this diff is for. */
+  seq: number;
+  baseline: "previous" | "pinned" | "none";
+  /** What the baseline was (pinned params, for the panel). */
+  baselineValues?: ParamValuesData;
+  parts: import("./diff").DiffPartData[];
+  /** Added / removed solids per part, for drawing. */
+  meshes: { part: string; added?: MeshArrays; removed?: MeshArrays }[];
+  millis: number;
+}

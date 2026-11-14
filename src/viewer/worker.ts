@@ -13,7 +13,8 @@ import type { InterferenceData, PrintabilityData } from "./protocol";
 import type { Document, PartResult } from "../ir";
 import type { EvalData, FromWorker, Loc, ParamSchemaData, ParamValuesData, PartData, StageError, ToWorker } from "./protocol";
 import { codeFrame, parseStack, SourceMap, stripQuery } from "./sourcemap";
-import type { AssemblyData, DrawingData, MateData, SketchData } from "./protocol";
+import type { AssemblyData, DiffData, DrawingData, MateData, SketchData } from "./protocol";
+import { diffDocument, summarize, type PartStats } from "./diff";
 import { flattenNurbs } from "../drawing/common";
 import { polylineLoops, section, toDXF, toSVG } from "../drawing";
 
@@ -32,6 +33,53 @@ let running = false;
 let seq = 0;
 let lastDrawings: any[] = [];
 let lastBoxes = new Map<string, PartData["bbox"]>();
+
+// ── geometry diff (only computed while the viewer's diff mode is on)
+interface Snapshot {
+  doc: Document;
+  stats: Map<string, PartStats>;
+  values: ParamValuesData;
+  seq: number;
+}
+let diffOn = false;
+let pinned: Snapshot | undefined;
+let previous: Snapshot | undefined;
+let current: Snapshot | undefined;
+
+/** Diff `current` against the pinned snapshot or the previous one; dropped if a newer run is queued. */
+async function runDiff() {
+  if (!diffOn || !current || !pool) return;
+  const base = pinned ?? previous;
+  const cur = current;
+  const t0 = performance.now();
+  if (!base) return post({ type: "diff", data: { seq: cur.seq, baseline: "none", parts: [], meshes: [], millis: 0 } });
+  const { document, entries } = diffDocument(base.doc, cur.doc);
+  let results = new Map<string, any>();
+  let meshes = new Map<string, import("../kernel").MeshArrays>();
+  if (document.parts?.length) {
+    if (pending) return; // a newer evaluation is coming: this diff would be stale
+    try {
+      const r = await pool.evaluate(document);
+      results = new Map(r.result.parts.map((p) => [p.name, p]));
+      meshes = r.meshes;
+    } finally {
+      // The kernels now hold the diff solids: give them the model back (cached, so cheap).
+      if (lastDoc) await pool.evaluate(lastDoc);
+    }
+    if (pending || current !== cur) return;
+  }
+  const parts = summarize(entries, results, base.stats, cur.stats);
+  const out: DiffData["meshes"] = [];
+  const transfer: Transferable[] = [];
+  for (const e of entries) {
+    const added = e.added ? meshes.get(e.added) : undefined;
+    const removed = e.removed ? meshes.get(e.removed) : undefined;
+    if (!added && !removed) continue;
+    out.push({ part: e.part, added, removed });
+    for (const m of [added, removed]) if (m) for (const a of Object.values(m)) transfer.push((a as ArrayBufferView).buffer as ArrayBuffer);
+  }
+  post({ type: "diff", data: { seq: cur.seq, baseline: pinned ? "pinned" : "previous", baselineValues: pinned?.values, parts, meshes: out, millis: performance.now() - t0 } }, transfer);
+}
 
 /** DXF/SVG: the model's `<drawing>`s, else the parts cut at mid-height. */
 async function export2D(k: Pool, parts: { name: string }[], format: "dxf" | "svg"): Promise<string> {
@@ -113,6 +161,14 @@ self.onmessage = async (e: MessageEvent<ToWorker | { type: "child-init"; module?
       case "params":
         values = msg.values;
         schedule();
+        break;
+      case "diff":
+        diffOn = msg.on;
+        if (diffOn) void runDiff();
+        break;
+      case "diff-pin":
+        pinned = msg.pin ? current : undefined;
+        if (diffOn) void runDiff();
         break;
       case "dispose":
         pool?.dispose();
@@ -313,7 +369,15 @@ async function run() {
     workers: Math.min(pool!.size, docParts.length || 1),
     seq: ++seq,
   };
+  previous = current;
+  current = {
+    doc: rendered.document,
+    stats: new Map(parts.map((p) => [p.name, { volume: p.volume, bbox: p.bbox }])),
+    values: { ...(rendered.values ?? values) },
+    seq: data.seq,
+  };
   post({ type: "result", data }, transfer);
+  if (diffOn) await runDiff();
 }
 
 /** 2D loops (lines, arcs, NURBS) → line segments on z = 0. */
@@ -409,6 +473,7 @@ async function sketchesOf(rendered: any, docParts: { name?: string }[]): Promise
       points: s.points ?? [],
       entities: s.entities ?? [],
       dimensions: dims,
+      patterns: await Promise.all(((s.patterns ?? []) as any[]).map(async (p) => ({ ...p, loc: (await locate(normalizeLoc(p.loc))).loc }))),
       part: docParts[partIndex]?.name,
     });
   }

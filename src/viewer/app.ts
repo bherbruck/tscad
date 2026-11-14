@@ -10,6 +10,8 @@ import { SketchOverlay } from "./sketch-overlay";
 import { AssemblyOverlay } from "./assembly-overlay";
 import { RemoteWorker } from "./remote";
 import { CheckOverlay, type CheckMode } from "./check-overlay";
+import { DiffOverlay } from "./diff-overlay";
+import type { DiffData } from "./protocol";
 import type { InterferenceData, PrintabilityData } from "./protocol";
 import type { MateData, SketchData, SketchDimensionData } from "./protocol";
 import { describe, selectorAttr } from "./selectors";
@@ -116,6 +118,8 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
   const stage = h("div", { class: "stage" });
   const viewport = new Viewport(stage);
   const sketches = new SketchOverlay(viewport);
+  const diffView = new DiffOverlay(viewport);
+  const diffState = { on: false, pinned: false, data: undefined as DiffData | undefined };
   const assembly = new AssemblyOverlay(viewport);
   assembly.setShowAnchors(localStorage.getItem("tscad.anchors") !== "0");
   assembly.onDrag = (u) => {
@@ -131,6 +135,10 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
     const v = localStorage.getItem("tscad.sketches");
     return v === null ? undefined : v === "1";
   })();
+  sketches.onPatternClick = (sk, pat) => {
+    const loc = pat.loc ?? sk.loc;
+    if (loc) sourceClick(loc, { kind: "sketch", sketch: sk });
+  };
   sketches.onDimensionClick = (sk, dim) => {
     if (dim.loc) sourceClick(dim.loc, { kind: "dimension", sketch: sk, dimension: dim });
     else toast(`${dim.text} (${dim.kind}) — no source location`);
@@ -180,7 +188,11 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
     statsCard.classList.toggle("expanded");
     queueMicrotask(updateInsets);
   });
-  const right = h("aside", { class: "side right" }, inspectorCard, statsCard);
+  const diffBody = h("div", { class: "diff" });
+  const pinBtn = h("button", { class: "icon-btn sm", title: "Pin this version as the baseline (A/B compare)", onclick: () => togglePin() }, icon("pin", 14));
+  const diffCard = card("Diff", "diff", diffBody, [pinBtn, h("button", { class: "icon-btn sm", title: "Close (D)", onclick: () => toggleDiff() }, icon("x", 14))]);
+  diffCard.classList.add("hidden");
+  const right = h("aside", { class: "side right" }, inspectorCard, diffCard, statsCard);
 
   /** Tell the viewport which screen edges the floating panels cover, so models centre in the gap. */
   function updateInsets() {
@@ -216,6 +228,7 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
     measure: tool("ruler", "Measure (M)", () => toggleMeasure()),
     sketch: tool("sketch", "Sketch overlay (K)", () => toggleSketches()),
     anchors: tool("anchor", "Anchors & joints (A)", () => toggleAnchors()),
+    diff: tool("diff", "Diff: what the last change added / removed (D)", () => toggleDiff()),
     checks: tool("shield", "Checks: overhangs, thin walls, interference (C)", () => checksPop.classList.toggle("hidden")),
   };
   tb.edges.classList.add("active");
@@ -231,7 +244,7 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
     h("div", { class: "tool-sep" }),
     h("div", { class: "tool-group" }, tb.fit, tb.ortho),
     h("div", { class: "tool-sep" }),
-    h("div", { class: "tool-group" }, tb.edges, tb.wire, tb.xray, tb.section, tb.measure, tb.sketch, tb.anchors, tb.checks),
+    h("div", { class: "tool-group" }, tb.edges, tb.wire, tb.xray, tb.section, tb.measure, tb.sketch, tb.anchors, tb.diff, tb.checks),
   );
   const exportMenu = buildExportMenu();
   const helpPop = buildHelp();
@@ -309,6 +322,13 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
         renderStatus();
         viewport.setParts([...viewport.parts.keys()].map((name) => ({ name, failed: true })));
         settle();
+        break;
+      case "diff":
+        if (diffState.on && m.data.seq === state.data?.seq) {
+          diffState.data = m.data;
+          diffView.show(m.data);
+          renderDiff();
+        }
         break;
       case "pick":
       case "export":
@@ -401,6 +421,10 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
       data.parts.map((p, i) => ({ name: p.name, color: state.colors[p.name] ?? p.color ?? PALETTE[i % PALETTE.length], mesh: p.mesh, failed: !p.ok })),
     );
     if (checkState.mode !== "none") queueMicrotask(runChecks);
+    if (diffState.on) {
+      diffView.clear(false);
+      renderDiff();
+    }
     assembly.values = data.values;
     assembly.set(data.assembly);
     assembly.refresh();
@@ -995,6 +1019,72 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
     toast(`${target.kind === "dimension" ? `${target.dimension.text} — ` : ""}${where} (copied)`);
   }
 
+  function toggleDiff() {
+    diffState.on = !diffState.on;
+    send({ type: "diff", on: diffState.on });
+    tb.diff.classList.toggle("active", diffState.on);
+    diffCard.classList.toggle("hidden", !diffState.on);
+    if (!diffState.on) {
+      diffView.clear();
+      diffState.data = undefined;
+      if (diffState.pinned) togglePin();
+    } else renderDiff();
+    queueMicrotask(updateInsets);
+  }
+
+  function togglePin() {
+    diffState.pinned = !diffState.pinned;
+    send({ type: "diff-pin", pin: diffState.pinned });
+    pinBtn.classList.toggle("active", diffState.pinned);
+    toast(diffState.pinned ? "Pinned: later changes are compared with this version" : "Comparing with the previous version");
+  }
+
+  function renderDiff() {
+    diffBody.replaceChildren();
+    const d = diffState.data;
+    if (!d || d.seq !== state.data?.seq) {
+      diffBody.append(h("div", { class: "empty" }, diffState.pinned ? "Pinned. Change a param or the code to compare." : "Change a param or the code: what it adds shows green, what it removes red."));
+      return;
+    }
+    if (d.baseline === "none") {
+      diffBody.append(h("div", { class: "empty" }, "Change a param or the code to see what it adds (green) and removes (red)."));
+      return;
+    }
+    const vs = d.baseline === "pinned" ? `vs pinned${d.baselineValues ? ` (${changedParams(d.baselineValues)})` : ""}` : "vs previous";
+    diffBody.append(h("div", { class: "diff-head muted" }, `${vs} · ${fmtMs(d.millis)}`));
+    const changed = d.parts.filter((p) => p.status !== "same");
+    if (!changed.length) {
+      diffBody.append(h("div", { class: "empty" }, "No geometry changed."));
+      return;
+    }
+    for (const p of d.parts) {
+      if (p.status === "same") continue;
+      const size = p.deltaSize?.some((v) => Math.abs(v) > 1e-6) ? `Δ ${p.deltaSize.map((v) => (v > 0 ? "+" : "") + fmtNum(v)).join(" × ")} mm` : "";
+      diffBody.append(
+        h(
+          "div",
+          { class: "diff-row" },
+          h("div", { class: "diff-name" }, p.part, p.status !== "changed" ? h("span", { class: `chip ${p.status}` }, p.status) : null),
+          h(
+            "div",
+            { class: "diff-nums" },
+            h("span", { class: "add" }, `+${fmtVol(p.addedVolume)}`),
+            h("span", { class: "rem" }, `−${fmtVol(p.removedVolume)}`),
+            h("span", { class: "net" }, `net ${p.deltaVolume >= 0 ? "+" : "−"}${fmtVol(Math.abs(p.deltaVolume))}`),
+          ),
+          size ? h("div", { class: "diff-size muted" }, size) : null,
+          p.error ? h("div", { class: "warning" }, icon("alert", 12), p.error) : null,
+        ),
+      );
+    }
+  }
+
+  /** "width 60, holes 3": the pinned values that differ from the current ones. */
+  function changedParams(base: ParamValuesData): string {
+    const diffs = Object.entries(base).filter(([k, v]) => state.values[k] !== v).map(([k, v]) => `${k} ${String(v)}`);
+    return diffs.length ? diffs.join(", ") : "same params";
+  }
+
   function toggleOrtho() {
     viewport.setOrtho(!viewport.isOrtho);
     tb.ortho.classList.toggle("active", viewport.isOrtho);
@@ -1222,6 +1312,7 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
       ["X", "Section plane"],
       ["M", "Measure"],
       ["K", "Sketch overlay"],
+      ["D", "Diff with the previous / pinned version"],
       ["A", "Anchors & joints (drag a joint to drive it)"],
       ["C", "Checks: overhang, thin walls, interference"],
       ["Click", "Select face / edge → selectors"],
@@ -1267,6 +1358,8 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
         return toggleSection();
       case "k":
         return toggleSketches();
+      case "d":
+        return toggleDiff();
       case "a":
         return toggleAnchors();
       case "c":
