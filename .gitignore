@@ -7,3 +7,7 @@ dist/
 /out/
 native/
 *.vsix
+
+# agent scratch
+.tmp/
+tests/_tmp/
