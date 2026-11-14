@@ -10,7 +10,8 @@ All lengths are **millimetres**, all angles **degrees**, and **Z is up**.
 ## Try it without installing
 
 The [playground](../play/) runs everything in your browser: editor, kernel and viewer. Pick an
-example, change a number, and the model rebuilds. Share links carry the source in the URL.
+example, change a number, and the model rebuilds. Share links carry the source in the URL. The
+viewer navigates the same way as `tscad dev` (below).
 
 ## Install
 
@@ -25,8 +26,11 @@ bunx tscad dev --open
 
 `tscad init` writes `index.tsx`, `package.json`, `tsconfig.json`, `.gitignore` and a
 `README.md`. `tscad dev` serves a live viewer at http://localhost:3333 that rebuilds on every
-save: orbit the model, drag parameter sliders, click an edge to get a selector for it, and
-export from the **Export** button (top right).
+save: drag parameter sliders, click an edge to get a selector for it, and export from the
+**Export** button (top right).
+
+In the viewer, right-drag to orbit, middle-drag to pan and scroll to zoom; left-click selects.
+If you prefer left-drag orbiting, switch to **Classic** in the **?** panel.
 
 `tscad dev` evaluates models in the dev server with the native kernel when one is built for
 your platform, and otherwise in the browser with WebAssembly (parts evaluate in parallel

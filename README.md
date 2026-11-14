@@ -41,7 +41,7 @@ export default function MotorMount({ thickness: t, corner }: ParamValues<typeof 
 
 ```sh
 bunx tscad init my-part && cd my-part
-bunx tscad dev --open                      # live viewer: orbit, param sliders, hot reload, click-to-selector
+bunx tscad dev --open                      # live viewer: param sliders, hot reload, click-to-selector
 bunx tscad build -o part.step -o part.3mf  # exact STEP for CAD, 3MF for the slicer
 ```
 
@@ -237,7 +237,9 @@ in this README.
 
 The [playground](https://tscad.io/play/) runs the editor, the kernel and the
 viewer entirely in your browser, and share links carry the source. **Import .scad** converts
-an OpenSCAD model you paste or open. `tscad dev` gives you the same viewer locally, with:
+an OpenSCAD model you paste or open. In the viewer, right-drag to orbit, middle-drag to pan and
+scroll to zoom; left-click selects (switch to Classic in the **?** panel for left-drag orbit).
+`tscad dev` gives you the same viewer locally, with:
 - hot reload and param sliders;
 - section and measure tools;
 - sketch and assembly overlays, including dragging joints;
