@@ -7,7 +7,7 @@ use solidcore_ops as ops;
 use solidcore_ops::{Blend, BooleanOp, Body, Corners};
 use solidcore_record::brep::{self as rec, Brep as Record};
 
-use crate::ir::{Axis, Curve, Node, Selector, SplitKeep, SweepFrame};
+use crate::ir::{Axis, Curve, FaceOp, Node, Selector, SplitKeep, SweepFrame};
 
 /// An evaluation failure: what failed, at which node path.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, tsify::Tsify)]
@@ -302,6 +302,23 @@ fn eval_uncached(node: &Node, path: &str, cache: &mut Cache) -> R<Solid> {
                 // the plane misses the body: all of it, or none of it
                 None => Ok(if (side(&b)? > 0.0) == want_above { Some(b) } else { None }),
             }
+        }
+        Node::OnFace { base, faces, index, op, children } => {
+            let Some(b) = eval(base, &format!("{path}/base"), cache)? else {
+                return Err(fail(path, "onFace", "the base is empty"));
+            };
+            let frame = face_frame(&b, faces, *index, path)?;
+            let placed = Node::Transform { matrix: frame, children: children.clone() };
+            let Some(tool) = eval_uncached(&placed, path, cache)? else {
+                return Ok(if matches!(op, FaceOp::None) { None } else { Some(b) });
+            };
+            let kind = match op {
+                FaceOp::None => return Ok(Some(tool)),
+                FaceOp::Union => BooleanOp::Union,
+                FaceOp::Difference => BooleanOp::Subtract,
+                FaceOp::Intersection => BooleanOp::Intersect,
+            };
+            kernel(path, "onFace", ops::boolean::boolean(b, tool, kind))
         }
         Node::Shell { thickness, faces, children } => {
             let Some(b) = union(children, path, cache)? else { return Ok(None) };
@@ -692,4 +709,51 @@ fn torus_in_place(m: &[f64; 16], r_major: f64, r_minor: f64) -> Option<Node> {
         axis: zu,
         angle: tau,
     })
+}
+
+/// The frame of the `index`-th selected planar face of `body` as a column-vector matrix: origin
+/// at the centre of the face's boundary box, +Z out of the material, +X the model X axis
+/// projected onto the face (else model Y).
+fn face_frame(body: &Body, faces: &Selector, index: usize, path: &str) -> R<crate::ir::Matrix> {
+    let (record, _) = kernel(path, "onFace", body.to_record())?;
+    let picked = select_faces(&record, faces);
+    let Some(&fi) = picked.get(index) else {
+        return Err(fail(path, "onFace", format!("the face selector matched {} faces (index {index})", picked.len())));
+    };
+    let face = &record.faces[fi];
+    let (u, v) = match &face.surface {
+        rec::Surface::Plane { u_axis, v_axis, .. } => (*u_axis, *v_axis),
+        rec::Surface::PlaneThrough { origin, u_point, v_point } => (sub(*u_point, *origin), sub(*v_point, *origin)),
+        _ => return Err(fail(path, "onFace", "the selected face is not planar")),
+    };
+    let mut n = norm(cross(u, v));
+    let pts = face_item(&record, face).points;
+    if pts.is_empty() {
+        return Err(fail(path, "onFace", "the selected face has no boundary"));
+    }
+    let mut lo = [f64::INFINITY; 3];
+    let mut hi = [f64::NEG_INFINITY; 3];
+    for p in &pts {
+        for i in 0..3 {
+            lo[i] = lo[i].min(p[i]);
+            hi[i] = hi[i].max(p[i]);
+        }
+    }
+    let c = [(lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0, (lo[2] + hi[2]) / 2.0];
+    // outward: a step along +n from the face must leave the material
+    let (blo, bhi) = kernel(path, "onFace", body.bounds())?;
+    let size = dot(sub(bhi, blo), sub(bhi, blo)).sqrt().max(1e-6);
+    let step = 1e-4 * size;
+    let probe = [c[0] + step * n[0], c[1] + step * n[1], c[2] + step * n[2]];
+    if matches!(kernel(path, "onFace", body.classify_point(probe))?, ops::PointClass::Inside) {
+        n = [-n[0], -n[1], -n[2]];
+    }
+    let pick = |a: [f64; 3]| sub(a, [dot(a, n) * n[0], dot(a, n) * n[1], dot(a, n) * n[2]]);
+    let mut x = pick([1.0, 0.0, 0.0]);
+    if dot(x, x) < 1e-12 {
+        x = pick([0.0, 1.0, 0.0]);
+    }
+    let x = norm(x);
+    let y = cross(n, x);
+    Ok([x[0], y[0], n[0], c[0], x[1], y[1], n[1], c[1], x[2], y[2], n[2], c[2], 0.0, 0.0, 0.0, 1.0])
 }

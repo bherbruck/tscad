@@ -120,3 +120,14 @@ fn draft_offset_split() {
     println!("draft: {r:?}");
     assert!(r.is_ok());
 }
+
+#[test]
+fn on_face() {
+    // a 10 mm boss on the top of a box, a pocket in its +X side, and a hole through a rotated face
+    let boss = vol(r#"{"type":"onFace","base":{"type":"box","size":[40,30,10],"center":true},"faces":{"type":"max","axis":"z"},"children":[{"type":"cylinder","radius":5,"height":10}]}"#).unwrap();
+    let e = 40.0 * 30.0 * 10.0 + std::f64::consts::PI * 25.0 * 10.0;
+    assert!((boss - e).abs() < 1e-3, "{boss} {e}");
+    // the tool's +Z points out of the face: a centred 6x6x4 box moved 2 inward is a 4 deep pocket
+    let pocket = vol(r#"{"type":"onFace","op":"difference","base":{"type":"box","size":[40,30,10],"center":true},"faces":{"type":"max","axis":"x"},"children":[{"type":"transform","matrix":[1,0,0,0, 0,1,0,0, 0,0,1,-2, 0,0,0,1],"children":[{"type":"box","size":[6,6,4],"center":true}]}]}"#).unwrap();
+    assert!((pocket - (12000.0 - 144.0)).abs() < 1e-3, "{pocket}");
+}

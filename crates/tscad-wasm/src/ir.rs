@@ -152,6 +152,19 @@ pub enum Node {
         keep: SplitKeep,
         children: Vec<Node>,
     },
+    /// Sketch on a face: the children, modelled in a frame on a planar face of `base` (origin at
+    /// the face's centre, +Z out of the material, +X along the model X axis projected onto the
+    /// face, else model Y), placed there and combined with `base` by `op` (`none`: only the
+    /// placed children, without the base). `faces` picks the face; `index` the n-th match.
+    OnFace {
+        base: Box<Node>,
+        faces: Selector,
+        #[serde(default)]
+        index: usize,
+        #[serde(default)]
+        op: FaceOp,
+        children: Vec<Node>,
+    },
     /// The children (unioned) hollowed to `thickness`, the selected faces left open.
     Shell {
         thickness: f64,
@@ -159,6 +172,21 @@ pub enum Node {
         faces: Selector,
         children: Vec<Node>,
     },
+}
+
+/// How [`Node::OnFace`] combines the placed children with the base.
+#[derive(Debug, Default, Serialize, Deserialize, Clone, Copy, Tsify)]
+#[serde(rename_all = "camelCase")]
+pub enum FaceOp {
+    /// Base plus the placed children (a boss).
+    #[default]
+    Union,
+    /// Base less the placed children (a pocket or a hole).
+    Difference,
+    /// What base and the children share.
+    Intersection,
+    /// The placed children alone.
+    None,
 }
 
 /// Which side of a split plane is kept.
