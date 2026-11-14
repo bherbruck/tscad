@@ -7,7 +7,7 @@ import * as THREE from "three";
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
 import type { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
-import type { SketchData, SketchDimensionData } from "./protocol";
+import type { SketchData, SketchDimensionData, SketchPatternData } from "./protocol";
 import type { Viewport } from "./scene";
 
 type V2 = [number, number];
@@ -18,6 +18,8 @@ const COLORS = {
   point: "#e2e8f0",
   free: "#ff9f1c",
   dim: "#93b4ff",
+  copy: "#a7f3e7",
+  pattern: "#ffb020",
 };
 
 interface SketchView {
@@ -57,6 +59,8 @@ export class SketchOverlay {
   #tmp = new THREE.Vector3();
   /** A dimension label was clicked. */
   onDimensionClick: (sketch: SketchData, dim: SketchDimensionData) => void = () => {};
+  /** A pattern label (×6, mirror) was clicked. */
+  onPatternClick: (sketch: SketchData, pattern: SketchPatternData) => void = () => {};
 
   constructor(readonly viewport: Viewport) {
     this.root.renderOrder = 50;
@@ -124,20 +128,83 @@ export class SketchOverlay {
     view.center.set(centroid[0], centroid[1], 0).applyMatrix4(group.matrix);
 
     // Curves.
-    const solid: number[] = [], dashed: number[] = [];
+    const solid: number[] = [], dashed: number[] = [], copies: number[] = [];
     for (const e of s.entities) {
       const pts = entityPoints(e);
-      const out = e.construction ? dashed : solid;
+      // Pattern copies are tinted lighter than their originals.
+      const out = e.construction ? dashed : e.copyOf ? copies : solid;
       for (let i = 0; i + 1 < pts.length; i++) out.push(pts[i]![0], pts[i]![1], 0, pts[i + 1]![0], pts[i + 1]![1], 0);
     }
     if (solid.length) group.add(this.#lines(view, solid, COLORS.curve, 2));
+    if (copies.length) {
+      const l = this.#lines(view, copies, COLORS.copy, 1.6);
+      l.material.userData.base = 0.6;
+      group.add(l);
+    }
     if (dashed.length) {
       const l = this.#lines(view, dashed, COLORS.construction, 1.4);
       const mat = l.material as LineMaterial;
       mat.dashed = true;
       mat.dashSize = size * 0.018;
       mat.gapSize = size * 0.014;
-      mat.opacity = 0.75;
+      mat.userData.base = 0.75;
+      l.computeLineDistances();
+      group.add(l);
+    }
+
+    // Patterns: a dashed mirror axis; an arc with the count at a circular pattern's centre; an
+    // arrow along a linear pattern's step. Their labels go to the pattern's source.
+    const patDashed: number[] = [], patSolid: number[] = [];
+    (s.patterns ?? []).forEach((p) => {
+      const n = p.copies.length + 1;
+      let label: V2 | undefined;
+      if (p.kind === "mirror" && p.axis) {
+        const [a, b] = p.axis;
+        const u = unit(sub(b, a));
+        const half = size * 0.6;
+        const mid = mul(add(a, b), 0.5);
+        const e0 = sub(mid, mul(u, half)), e1 = add(mid, mul(u, half));
+        patDashed.push(e0[0], e0[1], 0, e1[0], e1[1], 0);
+        label = add(e1, mul(u, size * 0.04));
+      } else if (p.kind === "circular" && p.center) {
+        const r0 = size * 0.08;
+        const sweep = THREE.MathUtils.degToRad(Math.abs(p.angle ?? 360 / n) * Math.max(1, n - 1));
+        const pts = arcPts(p.center, r0, 0, Math.min(sweep, Math.PI * 1.9));
+        for (let i = 0; i + 1 < pts.length; i++) patSolid.push(pts[i]![0], pts[i]![1], 0, pts[i + 1]![0], pts[i + 1]![1], 0);
+        const end = pts[pts.length - 1]!, prev = pts[pts.length - 2]!;
+        const u = unit(sub(end, prev)), nrm = perp(u), k = size * 0.02;
+        for (const sgn of [1, -1]) {
+          const w = add(sub(end, mul(u, k)), mul(nrm, sgn * k * 0.5));
+          patSolid.push(end[0], end[1], 0, w[0], w[1], 0);
+        }
+        label = add(p.center, [r0 * 0.7, -r0 * 0.7]);
+      } else if (p.kind === "linear" && p.step) {
+        const firstEnt = s.entities[p.of[0] ?? -1];
+        const from = firstEnt ? centroidOf(entityPoints(firstEnt)) : [0, 0];
+        const to = add(from as V2, mul(p.step, n - 1));
+        patSolid.push(from[0]!, from[1]!, 0, to[0], to[1], 0);
+        label = add(mul(add(from as V2, to), 0.5), mul(unit(perp(p.step)), size * 0.04));
+      }
+      if (!label) return;
+      const el = document.createElement("button");
+      el.className = "dim-label pattern-label";
+      el.textContent = p.kind === "mirror" ? "mirror" : `×${n}${p.kind === "circular" && p.angle ? ` · ${+p.angle.toFixed(2)}°` : ""}`;
+      el.title = `${p.kind} pattern of ${p.of.length} entit${p.of.length === 1 ? "y" : "ies"}${p.loc ? ` · ${shortFile(p.loc.file)}:${p.loc.line}` : ""} — click to find in code`;
+      el.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        this.onPatternClick(s, p);
+      });
+      el.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+      this.viewport.labelLayer.appendChild(el);
+      view.labels.push({ el, world: new THREE.Vector3(label[0], label[1], 0).applyMatrix4(group.matrix) });
+    });
+    if (patSolid.length) group.add(this.#lines(view, patSolid, COLORS.pattern, 1.4));
+    if (patDashed.length) {
+      const l = this.#lines(view, patDashed, COLORS.pattern, 1.4);
+      l.material.dashed = true;
+      l.material.dashSize = size * 0.025;
+      l.material.gapSize = size * 0.018;
+      l.material.userData.base = 0.85;
       l.computeLineDistances();
       group.add(l);
     }
@@ -203,7 +270,7 @@ export class SketchOverlay {
       const o = Math.min(1, Math.max(0, (f - 0.08) / 0.32));
       v.opacity = o;
       v.group.visible = o > 0.02;
-      for (const m of v.mats) m.opacity = o * (m.dashed ? 0.75 : 1);
+      for (const m of v.mats) m.opacity = o * (m.userData.base ?? 1);
       for (const m of v.pointMats) m.opacity = o;
     }
   }
@@ -425,4 +492,9 @@ function stackLevels(dims: SketchDimensionData[], centroid: V2): number[] {
 
 function shortFile(f: string) {
   return f.replace(/^.*\//, "");
+}
+
+function centroidOf(pts: V2[]): V2 {
+  const n = pts.length || 1;
+  return [pts.reduce((a, p) => a + p[0], 0) / n, pts.reduce((a, p) => a + p[1], 0) / n];
 }

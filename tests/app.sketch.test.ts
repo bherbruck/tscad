@@ -78,3 +78,19 @@ describe("sketch data contract", () => {
     });
   }
 });
+
+describe("sketch patterns contract", () => {
+  test("sketch-flange: copies point at their originals and patterns carry what the overlay draws", async () => {
+    const r = renderModule(await import("../examples/sketch-flange.tsx"));
+    const s = r.sketches.find((x: any) => x.patterns?.length) as any;
+    expect(s).toBeDefined();
+    for (const p of s.patterns) {
+      for (const copy of p.copies) expect(copy.length).toBe(p.of.length);
+      if (p.kind === "mirror") expect(p.axis.length).toBe(2);
+      if (p.kind === "circular") expect(p.center.length).toBe(2);
+    }
+    const copies = s.entities.filter((e: any) => e.copyOf);
+    expect(copies.length).toBeGreaterThan(0);
+    for (const e of copies) expect(s.patterns[e.copyOf.pattern].of).toContain(e.copyOf.index);
+  });
+});
