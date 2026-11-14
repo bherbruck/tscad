@@ -98,6 +98,17 @@ fn eval_uncached(node: &Node, path: &str, cache: &mut Cache) -> R<Solid> {
         Node::Sphere { radius } => kernel(path, "sphere", ops::make_sphere([0.0; 3], *radius)).map(Some),
         Node::Cone { bottom_radius, top_radius, height, center } => {
             let z = if *center { -height / 2.0 } else { 0.0 };
+            // make_cone refuses equal radii (a cylinder) and a zero base radius (apex down)
+            if (bottom_radius - top_radius).abs() <= 1e-12 * bottom_radius.abs().max(1.0) {
+                return kernel(path, "cone", ops::make_cylinder([0.0, 0.0, z], *bottom_radius, *height)).map(Some);
+            }
+            if *bottom_radius == 0.0 {
+                // build it apex up and turn it over about the cone's mid-height
+                let b = kernel(path, "cone", ops::make_cone([0.0, 0.0, z], *top_radius, 0.0, *height))?;
+                let flip = [[1.0, 0.0, 0.0, 0.0], [0.0, -1.0, 0.0, 0.0], [0.0, 0.0, -1.0, 0.0], [0.0, 0.0, 2.0 * z + height, 1.0]];
+                kernel(path, "cone", b.transform(&flip))?;
+                return Ok(Some(b));
+            }
             kernel(path, "cone", ops::make_cone([0.0, 0.0, z], *bottom_radius, *top_radius, *height)).map(Some)
         }
         Node::Torus { major_radius, minor_radius } => {

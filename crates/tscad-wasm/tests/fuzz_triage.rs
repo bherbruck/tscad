@@ -78,3 +78,13 @@ fn rounded_rotation_torus() {
     let out = run(&format!(r#"{{"type":"difference","children":[{rot},{rot}]}}"#));
     assert!(out.contains("vol=None"), "{out}");
 }
+
+#[test]
+fn cone_special_cases() {
+    let pi = std::f64::consts::PI;
+    let v = |n: &str| run(n);
+    let eq = v(r#"{"type":"cone","bottomRadius":3,"topRadius":3,"height":15}"#);
+    assert!(eq.contains(&format!("{:.4}", pi * 9.0 * 15.0)[..8]), "{eq}");
+    let down = v(r#"{"type":"cone","bottomRadius":0,"topRadius":5,"height":10}"#);
+    assert!(down.contains("ok=true") && down.contains("warn=[]"), "{down}");
+}
