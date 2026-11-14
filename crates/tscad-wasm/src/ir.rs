@@ -99,6 +99,13 @@ pub enum Node {
         #[serde(default)]
         frame: SweepFrame,
     },
+    /// The solids of a STEP file (its text), each read into an exact B-rep and unioned; `solid`
+    /// picks one of them by index instead. Assembly placements are not applied.
+    Step {
+        data: String,
+        #[serde(default)]
+        solid: Option<usize>,
+    },
     /// The selected edges of the children (unioned) rounded.
     Fillet {
         radius: f64,

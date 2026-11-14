@@ -229,7 +229,8 @@ impl Engine {
             preprocessor_version: format!("tscad {}", env!("CARGO_PKG_VERSION")),
             ..Default::default()
         };
-        solidcore_step::write::product::solidcore_bodies(&bodies, &header).map_err(|e| format!("step: {e}"))
+        let text = solidcore_step::write::product::solidcore_bodies(&bodies, &header).map_err(|e| format!("step: {e}"))?;
+        Ok(cones_to_cylinders(&text))
     }
 
     /// What edge `index` of `part` is, and selectors that name it.
@@ -287,6 +288,31 @@ impl Engine {
     fn record(&self, part: &str) -> Result<&Record, String> {
         self.parts.get(part).and_then(|p| p.record.as_ref()).ok_or_else(|| format!("no part named {part}"))
     }
+}
+
+/// solidcore (e7627f7) writes some cylinders (fillet rounds) as `CONICAL_SURFACE` with a zero
+/// semi-angle, which STEP readers (solidcore's own included) refuse: write them as the
+/// `CYLINDRICAL_SURFACE` they are. See docs/KERNEL_ISSUES.md.
+pub fn cones_to_cylinders(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for line in text.split_inclusive('\n') {
+        if let Some(at) = line.find("CONICAL_SURFACE(") {
+            let args_at = at + "CONICAL_SURFACE(".len();
+            if let Some(close) = line[args_at..].rfind(')') {
+                let args: Vec<&str> = line[args_at..args_at + close].split(',').collect();
+                if let [name, frame, radius, angle] = args.as_slice() {
+                    if angle.trim().parse::<f64>().is_ok_and(|a| a == 0.0) {
+                        out.push_str(&line[..at]);
+                        out.push_str(&format!("CYLINDRICAL_SURFACE({name},{frame},{radius})"));
+                        out.push_str(&line[args_at + close + 1..]);
+                        continue;
+                    }
+                }
+            }
+        }
+        out.push_str(line);
+    }
+    out
 }
 
 /// The candidates that select the item, by how few others they also select; then by index.

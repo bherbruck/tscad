@@ -70,3 +70,35 @@ fn fillet_all_with_hole_skips_seams() {
         {"type":"box","size":[40,30,10],"center":true},{"type":"cylinder","radius":5,"height":20,"center":true}]}]}}]}"#);
     assert!(r.ok, "{:?}", r.parts[0].error);
 }
+
+#[test]
+fn step_round_trip() {
+    let cases = [
+        ("box", r#"{"type":"box","size":[20,20,10]}"#, true),
+        ("holed", r#"{"type":"difference","children":[{"type":"box","size":[40,30,10],"center":true},{"type":"cylinder","radius":5,"height":20,"center":true}]}"#, true),
+        ("sphere", r#"{"type":"sphere","radius":3}"#, false),
+        ("cone", r#"{"type":"cone","bottomRadius":5,"topRadius":2,"height":6}"#, false),
+        ("filletVert", r#"{"type":"fillet","radius":2,"edges":{"type":"parallel","axis":"z"},"children":[{"type":"box","size":[20,20,10]}]}"#, false),
+        ("filletTop", r#"{"type":"fillet","radius":2,"edges":{"type":"max","axis":"z"},"children":[{"type":"box","size":[20,20,10]}]}"#, false),
+    ];
+    for (name, node, must) in cases {
+        let (e, r) = run(&format!(r#"{{"parts":[{{"name":"{name}","node":{node}}}]}}"#));
+        assert!(r.ok);
+        let step = e.step(&[]).expect("step");
+        let doc = serde_json::json!({"parts":[{"name":"back","node":{"type":"step","data":step}}]}).to_string();
+        let (_, r2) = run(&doc);
+        let ok = r2.ok && {
+            let (a, b) = (r.parts[0].volume.unwrap(), r2.parts[0].volume.unwrap());
+            (a - b).abs() / a < 1e-6
+        };
+        println!("ROUNDTRIP {name}: {}", if ok { "ok".to_string() } else { format!("{:?}", r2.parts[0].error) });
+        if !ok && name == "filletTop" {
+            for l in step.lines().filter(|l| l.contains("CONICAL_SURFACE")) {
+                println!("  {l}");
+            }
+        }
+        // fillet corners: solidcore has no pcurve of a NURBS edge on a spline surface yet
+        // (docs/KERNEL_ISSUES.md), so their STEP files do not read back.
+        assert!(ok || !must, "{name}");
+    }
+}

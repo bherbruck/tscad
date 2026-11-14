@@ -170,6 +170,27 @@ fn eval_uncached(node: &Node, path: &str, cache: &mut Cache) -> R<Solid> {
             kernel(path, "sweep", ops::sweep::sweep_placed(&curves(profile), &curves(route), frame, true))
                 .map(|(b, _, _)| Some(b))
         }
+        Node::Step { data, solid } => {
+            let ex = solidcore_record::step::p21::parse(data).map_err(|e| fail(path, "step", format!("parse: {e:?}")))?;
+            let read = solidcore_step::topology::read_solids_with(&ex, &KernelTrims);
+            if read.solids.is_empty() {
+                let why = read.failures.first().map(|f| format!("{f:?}")).unwrap_or_else(|| "no solids in the file".into());
+                return Err(fail(path, "step", why));
+            }
+            let mut bodies = Vec::new();
+            for (i, s) in read.solids.iter().enumerate() {
+                if solid.is_some_and(|k| k != i) {
+                    continue;
+                }
+                let (b, _) = kernel(path, "step", Body::from_record(&s.brep, false))?;
+                bodies.push(b);
+            }
+            match bodies.len() {
+                0 => Err(fail(path, "step", format!("the file has {} solids", read.solids.len()))),
+                1 => Ok(bodies.pop()),
+                _ => kernel(path, "step", ops::boolean::union_all(bodies)).map(Some),
+            }
+        }
         Node::Fillet { radius, edges, children } => blend(children, path, cache, "fillet", Blend::Round, *radius, edges),
         Node::Chamfer { distance, edges, children } => {
             blend(children, path, cache, "chamfer", Blend::Chamfer, *distance, edges)
@@ -406,4 +427,34 @@ pub fn select_faces(record: &Record, s: &Selector) -> Vec<usize> {
         .filter(|(i, f)| matches(&face_item(record, f), s, lo, hi, *i, true))
         .map(|(i, _)| i)
         .collect()
+}
+
+/// Pcurves for STEP faces whose edge uses have no closed form, fitted by solidcore
+/// (`solidcore_ops::pcurve::pcurves_within`) on the face's own parameterisation.
+struct KernelTrims;
+
+impl ops::pcurve::Trims for KernelTrims {
+    fn trims(&self, face: &ops::pcurve::TrimFace<'_>) -> std::result::Result<Vec<Vec<rec::Curve2>>, String> {
+        let surface = face.nurbs.unwrap_or(face.surface);
+        let loops: Vec<Vec<ops::pcurve::EdgeUse<'_>>> = face
+            .loops
+            .iter()
+            .map(|l| {
+                l.iter()
+                    .map(|u| {
+                        let e = face.edges.get(u.edge as usize).ok_or("a use past the face's edges")?;
+                        Ok(ops::pcurve::EdgeUse {
+                            edge: u.edge,
+                            curve: e.nurbs.unwrap_or(e.curve),
+                            interval: e.interval,
+                            forward: u.forward,
+                            tolerance: e.tolerance,
+                            given: u.pcurve.as_ref(),
+                        })
+                    })
+                    .collect::<std::result::Result<Vec<_>, &str>>()
+            })
+            .collect::<std::result::Result<_, _>>()?;
+        ops::pcurve::pcurves_within(surface, &loops, face.tolerance, Some(face.domain)).map_err(|e| format!("pcurves: {e}"))
+    }
 }
