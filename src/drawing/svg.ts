@@ -18,6 +18,11 @@ export interface SvgOptions {
   margin?: number;
   /** Chordal tolerance for flattened NURBS, mm. Default 0.01. */
   tolerance?: number;
+  /**
+   * Stroke colour per drawing `layer`. Default `{ engrave: "#0000ff", score: "#00a0ff" }`
+   * (the usual laser convention: black/red cut, blue engrave).
+   */
+  layerStrokes?: Record<string, string>;
 }
 
 /** SVG path data for loops (y flipped: pass the result through a viewBox with negated y). */
@@ -60,9 +65,13 @@ export function toSVG(input: DrawingInput, o: SvgOptions = {}): string {
   const m = o.margin ?? 1;
   const [x0, y0, x1, y1] = bounds(ls);
   const w = x1 - x0 + 2 * m, h = y1 - y0 + 2 * m;
+  const strokes = o.layerStrokes ?? { engrave: "#0000ff", score: "#00a0ff" };
   const esc = (s: string) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
   const groups = ls.map(
-    (l) => `  <g id="${esc(l.name)}">\n    <path fill-rule="evenodd" d="${svgPathData(l.loops, o.tolerance)}"/>\n  </g>`,
+    (l) => {
+      const stroke = l.layer ? strokes[l.layer] : undefined;
+      return `  <g id="${esc(l.name)}"${l.layer ? ` data-layer="${esc(l.layer)}"` : ""}${stroke ? ` stroke="${esc(stroke)}"` : ""}>\n    <path fill-rule="evenodd" d="${svgPathData(l.loops, o.tolerance)}"/>\n  </g>`;
+    },
   );
   return [
     `<?xml version="1.0" encoding="UTF-8"?>`,

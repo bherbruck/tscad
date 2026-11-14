@@ -146,6 +146,11 @@ countersink, tap), nut traps, heat-set insert pockets, standoffs, published moun
 (Raspberry Pi 4 and Zero, Arduino Uno, NEMA 17/23) and 2020 extrusion. It also exports the
 `metric` table (`metric.M3.clearance.normal` → 3.4).
 
+It has laser-cut generators too. `<FingerJointBox>` produces finger-jointed panels with kerf
+compensation and engraved labels, on separate CUT and ENGRAVE DXF layers. It can also show the
+box folded up, so you can check the joints with interference. `<LivingHinge>` makes bendable
+sheet. See [examples/laser-box.tsx](examples/laser-box.tsx).
+
 <br clear="right">
 
 ### Checks and model tests
@@ -177,6 +182,36 @@ tools to evaluate, render (PNG), check (overhangs, walls, interference), pick se
 export. Ask for "a NEMA 17 mount plate with counterbored M3 holes, exported to STEP" and it
 iterates until the model builds clean. See [docs/mcp.md](docs/mcp.md).
 
+### Export and render
+
+| Format | What you get |
+|---|---|
+| **STEP** (AP242) | exact B-rep, for CAD, CAM and manufacturing |
+| **STL** | binary or ASCII, all parts in one file |
+| **3MF** | one closed mesh per part, with colours, in mm, ready for slicers |
+| **GLB** | glTF 2.0, one mesh per part with PBR colour, Y-up, in metres |
+| **OBJ** | one `o` group per part, with normals |
+| **DXF / SVG** | `<drawing>` parts, with real arcs, or a section of a solid |
+
+```ts
+import { renderModule } from "tscad"
+import { loadKernel } from "tscad/kernel"
+import { exportModel } from "tscad/export"
+import { renderPNG } from "tscad/render"
+
+const { document } = renderModule(await import("./plate.tsx"), { holes: 6 })
+const kernel = await loadKernel()
+await kernel.evaluate(document)
+const parts = document.parts!.map((p) => ({ name: p.name!, color: p.color }))
+await Bun.write("plate.step", await exportModel(kernel, parts, "step"))
+const meshes = await Promise.all(parts.map(async (p) => ({ ...p, mesh: await kernel.meshAt(p.name, 0.02) })))
+await Bun.write("plate.png", renderPNG(meshes, { view: "iso", background: "dark" }))
+```
+
+`tscad/render` is a software renderer in pure TypeScript, with no GPU or DOM needed. It gives
+you studio lighting, a soft shadow, crisp B-rep edges and supersampling. It made every image
+in this README.
+
 ### Playground and viewer
 
 The [playground](https://bherbruck.github.io/tscad/play/) runs the editor, the kernel and the
@@ -200,7 +235,7 @@ overlays, and pick-to-selector.
 <tr>
 <td valign="top"><a href="examples/coaster.tsx"><img src="docs/images/coaster.png" alt="Coaster"></a><br><b>Coaster</b>: honeycomb as one sketch</td>
 <td valign="top"><a href="examples/phone-stand.tsx"><img src="docs/images/phone-stand.png" alt="Phone stand"></a><br><b>Phone stand</b>: angle-driven profile</td>
-<td valign="top"><a href="examples/component-library.tsx"><img src="docs/images/component-library.png" alt="Component library"></a><br><b>Component library</b>: reusable typed components</td>
+<td valign="top"><a href="examples/laser-box.tsx"><img src="docs/images/laser-box.png" alt="Laser-cut box"></a><br><b>Laser-cut box</b>: finger joints, exported to DXF</td>
 </tr>
 </table>
 
@@ -242,12 +277,14 @@ kernel; [docs/KERNEL_ISSUES.md](docs/KERNEL_ISSUES.md) has repros and
 [docs/FUZZ.md](docs/FUZZ.md) has fuzzing results.
 
 - **Speed.** A boolean takes on the order of a second on the first build (the examples take
-  0.5–10 s); after that the subtree cache keeps parameter tweaks quick. Prefer one cut with
-  many shapes over many separate cuts.
-- **Sweeps** along a `helix()` are slow and not always closed, and polyline paths with sharp
+  roughly 1–8 s); after that the subtree cache keeps parameter tweaks quick. Prefer one cut
+  with many shapes over many separate cuts.
+- **Sweeps** along a `helix()` don't produce a closed solid yet, and polyline paths with sharp
   corners fail, so threads are cosmetic for now.
 - **Shell** fails inward across tangent walls, such as an extruded `roundedRect`. Use `outward`
   or a `<difference>`.
+- **Tori** that are rotated, or used in booleans, can give wrong results. The kernel fuzzer
+  found these; see [docs/FUZZ.md](docs/FUZZ.md).
 - **STEP import** (`<step>`) reads analytic models; files with blended corners fail.
 - **Fillets** need radii the neighbouring faces allow, and filleting hundreds of edges is slow.
 

@@ -7,7 +7,7 @@ import { makeElement, type Children, type Component } from "./element";
 import { TscadError, type SourceLoc } from "./errors";
 import { materials, type Material } from "./materials";
 import {
-  axisVector, chain, DEG, identity, isIdentity, mul, normalize, reflection, rotationAxis, rotationXYZ,
+  axisVector, chain, DEG, identity, isIdentity, mul, normalize, reflection, rotationAxis, rotationX, rotationXYZ,
   scaling, tidy, translation, type Mat4, type Vec3,
 } from "./math";
 import { resolveParams, type ParamIssue, type ParamSchema, type ParamValues } from "./params";
@@ -69,6 +69,8 @@ export interface Drawing {
   loops: Loop2[];
   /** Sheet thickness when given (the drawing is then also a part, extruded on z = 0). */
   thickness?: number;
+  /** Output layer for DXF/SVG (e.g. `"cut"`, `"engrave"`); default the name. */
+  layer?: string;
   color?: string;
   loc?: SourceLoc;
 }
@@ -529,8 +531,15 @@ class Compiler {
         const ht = this.req(h, "h", this.alias(h, ["h", "height"], { positive: true }), "height (h or height)");
         const c = this.center(h, [true, true, false]);
         const R = Math.max(r1, r2);
-        const node: Node = { type: "cone", bottomRadius: r1, topRadius: r2, height: ht, ...(c[2] ? { center: true } : {}) };
-        return [this.emit(node, h), translation(c[0] ? 0 : R, c[1] ? 0 : R, 0)];
+        // equal radii: the kernel's cone refuses them — it's a cylinder
+        const xy = translation(c[0] ? 0 : R, c[1] ? 0 : R, 0);
+        if (r1 === r2) return [this.emit({ type: "cylinder", radius: r1, height: ht, ...(c[2] ? { center: true } : {}) }, h), xy];
+        if (r1 === 0) {
+          // the kernel refuses a cone whose apex is at the bottom: build it point-up and turn it over
+          const flipped: Node = { type: "cone", bottomRadius: r2, topRadius: 0, height: ht, ...(c[2] ? { center: true } : {}) };
+          return [this.emit(flipped, h), mul(xy, mul(translation(0, 0, c[2] ? 0 : ht), rotationX(180)))];
+        }
+        return [this.emit({ type: "cone", bottomRadius: r1, topRadius: r2, height: ht, ...(c[2] ? { center: true } : {}) }, h), xy];
       }
       case "sphere": {
         noKids();
@@ -977,6 +986,10 @@ class Compiler {
       for (const hole of r.holes) out.push(reverseLoop(ccw(hole)));
     }
     const d: Drawing = { name, loops: out };
+    if (h.props.layer !== undefined) {
+      if (typeof h.props.layer !== "string" || !h.props.layer) this.fail(h, `layer must be a non-empty string (got ${show(h.props.layer)})`);
+      d.layer = h.props.layer;
+    }
     if (thickness !== undefined) d.thickness = thickness;
     const color = h.props.color ?? (h.props.material ? (materials as Record<string, Material>)[String(h.props.material).toLowerCase()]?.color : undefined);
     if (color) d.color = String(color);

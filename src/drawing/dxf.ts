@@ -26,7 +26,7 @@ const deg = (r: number) => {
 };
 const layerName = (s: string) => s.replace(/[^A-Za-z0-9_\-$]/g, "_").toUpperCase() || "0";
 
-/** DXF R12 text (mm) for drawings or loops; one layer per drawing. */
+/** DXF R12 text (mm) for drawings or loops; one DXF layer per drawing (its `layer`, else its name). */
 export function toDXF(input: DrawingInput, o: DxfOptions = {}): string {
   const tol = o.tolerance ?? 0.01;
   const ls = layers(input, o.layer ?? "0");
@@ -42,7 +42,7 @@ export function toDXF(input: DrawingInput, o: DxfOptions = {}): string {
   g(9, "$EXTMAX"); g(10, x1); g(20, y1); g(30, 0);
   g(0, "ENDSEC");
 
-  const names = [...new Set(ls.map((l) => layerName(l.name)))];
+  const names = [...new Set(ls.map((l) => layerName(l.layer ?? l.name)))];
   g(0, "SECTION"); g(2, "TABLES");
   g(0, "TABLE"); g(2, "LTYPE"); g(70, 1);
   g(0, "LTYPE"); g(2, "CONTINUOUS"); g(70, 0); g(3, "Solid line"); g(72, 65); g(73, 0); g(40, 0);
@@ -56,7 +56,7 @@ export function toDXF(input: DrawingInput, o: DxfOptions = {}): string {
 
   g(0, "SECTION"); g(2, "ENTITIES");
   for (const l of ls) {
-    const layer = layerName(l.name);
+    const layer = layerName(l.layer ?? l.name);
     for (const loop of l.loops) {
       if (o.entities === "polyline") polyline(loop, layer, g, tol);
       else primitives(loop, layer, g, tol);

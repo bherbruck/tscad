@@ -50,6 +50,19 @@ describe("draft / pushPull / split in the kernel", () => {
     if (!p.ok) throw new Error(JSON.stringify(p.error));
     return p;
   }
+  test("cones: equal radii compile to a cylinder; apex (r2 = 0) and inverted apex work", async () => {
+    expect(ir(<cone r1={5} r2={5} h={10} />)).toEqual({ type: "cylinder", radius: 5, height: 10 });
+    expect(ir(<cone d1={4} d2={4} h={10} center />)).toEqual({ type: "cylinder", radius: 2, height: 10, center: true });
+    expect((await part(<cone r1={5} r2={5} h={10} />)).volume!).toBeCloseTo(Math.PI * 250, 6);
+    expect((await part(<cone r1={5} r2={0} h={10} />)).volume!).toBeCloseTo((Math.PI * 250) / 3, 6);
+    const inv = await part(<cone r1={0} r2={5} h={10} />);
+    expect(inv.volume!).toBeCloseTo((Math.PI * 250) / 3, 6);
+    expect(inv.bbox![0][2]).toBeCloseTo(0, 6);
+    expect(inv.bbox![1][2]).toBeCloseTo(10, 6);
+    expect((await part(<cone r1={0} r2={5} h={10} center />)).bbox![0][2]).toBeCloseTo(-5, 6);
+    expect((await part(<cone r1={2} r2={5} h={10} center />)).bbox![0][2]).toBeCloseTo(-5, 6);
+  }, 30_000);
+
   test("split a sphere: half the volume", async () => {
     const p = await part(<split><sphere r={10} /></split>);
     expect(p.volume!).toBeCloseTo(((4 / 3) * Math.PI * 1000) / 2, 3);

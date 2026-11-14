@@ -1,3 +1,4 @@
+/** @jsxImportSource tscad */
 /**
  * Pockets and bosses for hardware: nut traps, heat-set insert pockets, standoffs.
  * Pockets are cutting tools pointing −Z from z = 0 (use them in a `<difference>`);

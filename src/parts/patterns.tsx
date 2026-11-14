@@ -1,3 +1,4 @@
+/** @jsxImportSource tscad */
 /**
  * Mounting hole patterns of common boards and motors (published dimensions), and components
  * that repeat a child at a pattern's points.

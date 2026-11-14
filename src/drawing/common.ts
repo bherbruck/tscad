@@ -3,22 +3,24 @@ import type { Vec2 } from "../core/math";
 import { line, nurbsPoint, type Loop2, type Nurbs2 } from "../core/sketch/seg";
 
 /** What the writers accept: drawings, loops, or closed polylines (e.g. from `section`). */
-export type DrawingInput = Drawing | readonly Drawing[] | readonly Loop2[] | { loops: readonly Loop2[]; name?: string };
+export type DrawingInput = Drawing | readonly Drawing[] | readonly Loop2[] | { loops: readonly Loop2[]; name?: string; layer?: string };
 
 /** A named set of loops (one layer / SVG group). */
 export interface Layer {
   name: string;
   loops: readonly Loop2[];
+  /** Output layer (DXF layer, SVG `data-layer`); default the name. */
+  layer?: string;
 }
 
 export function layers(input: DrawingInput, fallback = "0"): Layer[] {
   if (Array.isArray(input)) {
     if (input.length === 0) return [];
-    if (isDrawing(input[0])) return (input as Drawing[]).map((d) => ({ name: d.name, loops: d.loops }));
+    if (isDrawing(input[0])) return (input as Drawing[]).map((d) => ({ name: d.name, loops: d.loops, ...(d.layer ? { layer: d.layer } : {}) }));
     return [{ name: fallback, loops: input as Loop2[] }];
   }
-  const d = input as { loops: readonly Loop2[]; name?: string };
-  return [{ name: d.name ?? fallback, loops: d.loops }];
+  const d = input as { loops: readonly Loop2[]; name?: string; layer?: string };
+  return [{ name: d.name ?? fallback, loops: d.loops, ...(d.layer ? { layer: d.layer } : {}) }];
 }
 
 function isDrawing(x: unknown): x is Drawing {

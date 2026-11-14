@@ -1,3 +1,4 @@
+/** @jsxImportSource tscad */
 /**
  * Fastener holes as **cutting tools**: each points down −Z from z = 0, so it drops into a
  * `<difference>` at the top face of a part (move it with placement props, flip it with

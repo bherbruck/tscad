@@ -1,3 +1,4 @@
+/** @jsxImportSource tscad */
 /** Stock profiles. */
 import type { Placement } from "../core/intrinsics";
 import { placement, positive } from "./place";

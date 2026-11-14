@@ -63,7 +63,9 @@ The first release: CAD as TSX.
   sections of meshes.
 - **`tscad/parts`:** ISO metric holes (clearance, counterbore, countersink, tap), nut traps,
   heat-set insert pockets, standoffs, mounting patterns (Raspberry Pi 4 and Zero, Arduino Uno,
-  NEMA 17/23), 2020 extrusion, hex prisms, and the `metric` data table.
+  NEMA 17/23), 2020 extrusion, hex prisms, and the `metric` data table. Laser-cut generators:
+  `<FingerJointBox>` (finger joints, kerf, lid, dividers, flat or assembled) and
+  `<LivingHinge>`. Drawings take a `layer` (CUT and ENGRAVE in DXF and SVG).
 - **`tscad/check`:** overhangs per triangle and face, wall thickness by BVH ray casting, bed
   fit, interference between parts, watertightness.
 - **`tscad/testing`:** `evaluateModel`; the matchers `toEvaluate`, `toHaveVolume`, `toFitIn`,

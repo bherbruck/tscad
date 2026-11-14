@@ -106,6 +106,11 @@ export interface DrawingProps extends Placement2D, SketchChildren {
   name?: string;
   /** Sheet thickness, mm: also emit the drawing as an extruded part. */
   thickness?: number;
+  /**
+   * Output layer in DXF/SVG, e.g. `"cut"` or `"engrave"` (SVG colours `engrave` blue). Default:
+   * the drawing's name.
+   */
+  layer?: string;
   /** Display colour of the part. */
   color?: string;
   /** Material preset of the part (see `<part material>`). */
