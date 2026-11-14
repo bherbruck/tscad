@@ -381,3 +381,31 @@ structure (the same lines and arcs in the same order) loft cleanly. See
 `examples/sketch-vase.tsx`: three rounded squares (four lines and four tangent arcs, sized by
 params) at the foot, belly and neck, smoothly lofted and shelled. No point positions are
 drawn at all: the loop layout below finds the shape.
+
+## Importing 2D drawings: `<dxf>` and `<svg>`
+
+Both are 2D shapes, so they work anywhere a `<rect>` does: in extrude, revolve, loft sections,
+drawings, 2D booleans, offset and hull. Read the file as text with Bun's import attribute:
+
+```tsx
+// @ts-ignore — a text import
+import logo from "./logo.svg" with { type: "text" }
+// @ts-ignore
+import plate from "./plate.dxf" with { type: "text" }
+
+<extrude height={1}><svg data={logo} select="#mark" scale={0.5} center /></extrude>
+<extrude height={3}><dxf data={plate} layer="CUT" units="in" /></extrude>
+```
+
+| | `<dxf>` | `<svg>` |
+|---|---|---|
+| geometry | LINE, ARC, CIRCLE, LWPOLYLINE / POLYLINE (bulges → exact arcs), SPLINE (control points, rational too), ELLIPSE (exact rational NURBS), INSERT of BLOCKs (nested; base point, scale, rotation, arrays), OCS-flipped arcs | `<path>` (every command; circular arcs exact, elliptical arcs exact rational NURBS), `<rect rx ry>`, `<circle>`, `<ellipse>`, `<polygon>`, `<polyline>` (closed), `<g transform>` (matrix / translate / scale / rotate / skew; non-uniform scale turns arcs into exact NURBS) |
+| units | `$INSUNITS` → mm (unitless = mm); `units="mm" \| "cm" \| "m" \| "in" \| "ft"` overrides | the viewBox and `width` / `height` (`mm`, `cm`, `in`, `pt`, `px`); without them 1 user unit = 1 px = 0.2646 mm. y is flipped to point up (`flipY={false}` keeps it) |
+| loops | closed entities as they are; loose ones chained end to end (ends within `tolerance`, default 1e-5 × size, at least 0.001 mm). An open chain warns with its entity handles and is left out | each element's `fill-rule` decides its holes (nonzero by default); separate elements that overlap are unioned, as SVG paints them. Fill and stroke colours are ignored, so stroke-only laser files work |
+| pick | `layer="CUT"` or a list | `select="#id"` or `".class"` (that element and its children) |
+| both | `scale`, `center` (move the bounding-box centre to the origin), placement `x` `y` `rotate` `mirror` | same |
+
+A near-full arc closed by a tiny line (a common way SVG editors draw circles) becomes a full
+circle, and slivers shorter than 1e-4 × the shape's size are dropped. Text, `<line>`,
+`<use>` and images are skipped with a warning (convert text to paths). Our own `toDXF` /
+`toSVG` output re-imports to the same loops (tested). See `examples/engraved-logo.tsx`.

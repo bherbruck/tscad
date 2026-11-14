@@ -476,6 +476,49 @@ export interface OffsetProps extends Placement2D, SketchChildren {
  * inside, it is a **constraint sketch**: solved, then its closed loops become profiles.
  */
 /**
+ * An imported DXF drawing as 2D shapes: LINE, ARC, CIRCLE, LWPOLYLINE/POLYLINE (bulges become
+ * exact arcs), SPLINE, ELLIPSE, INSERTed BLOCKs. `$INSUNITS` → mm. Loose entities are chained
+ * into closed loops; nested loops are holes.
+ * @example import plate from "./plate.dxf" with { type: "text" }
+ * <extrude height={3}><dxf data={plate} layer="CUT" /></extrude>
+ */
+export interface DxfProps extends Placement2D {
+  /** The DXF file's text. */
+  data: string;
+  /** Only these layers. */
+  layer?: string | readonly string[];
+  /** Override the file's units. */
+  units?: "mm" | "cm" | "m" | "in" | "ft";
+  /** Extra scale factor. */
+  scale?: number;
+  /** Move the drawing's bounding-box centre to the origin. */
+  center?: boolean;
+  /** End-point snapping tolerance when chaining, mm. */
+  tolerance?: number;
+}
+
+/**
+ * An imported SVG as 2D shapes: paths (arcs stay exact), rect, circle, ellipse, polygon,
+ * closed polylines, nested groups with transforms. Units come from the viewBox and the
+ * width/height (else 1 px = 0.2646 mm); y is flipped to point up. Each element's fill-rule
+ * decides its holes; overlapping elements are unioned.
+ * @example import logo from "./logo.svg" with { type: "text" }
+ * <extrude height={1}><svg data={logo} center /></extrude>
+ */
+export interface SvgProps extends Placement2D {
+  /** The SVG file's text. */
+  data: string;
+  /** Only the element with this id (`"logo"`, `"#logo"`) or class (`".cut"`), with its children. */
+  select?: string;
+  /** Extra scale factor. */
+  scale?: number;
+  /** Flip y so the drawing reads the right way up. Default true. */
+  flipY?: boolean;
+  /** Move the drawing's bounding-box centre to the origin. */
+  center?: boolean;
+}
+
+/**
  * The exact convex hull of the child shapes: polygons stay polygons, circles and arcs give
  * tangent lines and arcs (two circles → a slot, three → a rounded triangle), NURBS and text
  * are flattened.
@@ -802,6 +845,10 @@ export interface IntrinsicElements extends ConstraintSketchElements, AssemblyEle
   offset: OffsetProps;
   /** 2D: the convex hull of the children (exact arcs and tangents). */
   hull: HullProps;
+  /** 2D: an imported DXF drawing. */
+  dxf: DxfProps;
+  /** 2D: an imported SVG drawing. */
+  svg: SvgProps;
   /** 2D: union of the child shapes (exact; arcs stay arcs). */
   sketchUnion: SketchBooleanProps;
   /** 2D: the first child shape minus the others (exact). */

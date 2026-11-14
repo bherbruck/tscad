@@ -201,6 +201,14 @@ describe("geometric equivalence (kernel volumes)", () => {
     near(d.volume, PI * (400 - 100) * 10 - 2 * (2 * PI * 15 * PI));
   }, 30_000);
 
+  test("import(\"*.svg\"/\"*.dxf\") → <svg>/<dxf> with a text import of the file", async () => {
+    writeFileSync(new URL("disc.svg", TMP), `<svg xmlns="http://www.w3.org/2000/svg" width="20mm" height="20mm" viewBox="0 0 20 20"><circle cx="10" cy="10" r="10"/></svg>`);
+    const { volume, tsx, warnings } = await run(`linear_extrude(3) import("disc.svg", center = true);`);
+    expect(warnings).toEqual([]);
+    expect(tsx).toContain(`import disc_svg from "./disc.svg" with { type: "text" }`);
+    near(volume, PI * 100 * 3);
+  }, 30_000);
+
   test("minkowski: 2D ⊕ circle = rounded offset", async () => {
     const { volume, warnings } = await run("linear_extrude(2) minkowski() { square([10, 6]); circle(r = 2); }");
     expect(warnings).toEqual([]);

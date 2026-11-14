@@ -116,6 +116,7 @@ OpenSCAD's placement conventions are kept, so shapes land exactly where they did
 | 2D `minkowski() { shape; circle(r); }` | `<offset distance={r}>` (rounded): exact |
 | `minkowski() { cube(s); sphere(r); }` | `<fillet radius={r}><box>` grown by r on every side: exact (a box ⊕ a ball *is* the grown box with every edge filleted r) |
 | `minkowski() { cube(s); cylinder(r, h); }` | `<extrude height={z + h}><roundedRect>` grown by r: exact |
+| `import("logo.svg")` / `import("plate.dxf", layer=...)` (literal file names, 2D) | `<svg data>` / `<dxf data>`, with a text import of the file added at the top |
 | `multmatrix(m)` | `<transform matrix={m}>` (4×4 or 3×4, row-major, column-vector) |
 | `resize([x, y, z])` (literal sizes) on one cube/square | the primitive with the new size (0 keeps a dimension) |
 | `resize([x, y, z])` on one sphere/circle/cylinder of literal size | `<scale by>` of the computed factors |
@@ -134,7 +135,7 @@ become solids. A 2D object where a solid is expected (top level) is extruded 1 m
 warning.
 
 **Not converted (warnings):** other 3D `hull`s and `minkowski`s (children unioned),
-`polyhedron`, `import`, `surface`, `projection`, other `resize`s (`auto`, expressions), `linear_extrude` `twist` / `scale`,
+`polyhedron`, `import` of anything but `.svg`/`.dxf`, `surface`, `projection`, other `resize`s (`auto`, expressions), `linear_extrude` `twist` / `scale`,
 `offset(chamfer)`, 2D `scale()` of non-circles inside a 2D boolean or `rotate_extrude`, `color` (set it on
 the `<part>`), text fonts (metrics differ, so check the size), `search`, `rands` (works but
 random).

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A small mark: a ring with a "T" inside and a leaf, in a 60 × 60 viewBox (60 mm) -->
+<svg xmlns="http://www.w3.org/2000/svg" width="60mm" height="60mm" viewBox="0 0 60 60">
+  <g id="mark">
+    <!-- ring: outer and inner circle as one even-odd path (arcs stay exact) -->
+    <path fill-rule="evenodd" d="M30 2 A28 28 0 1 1 29.999 2 Z M30 8 A22 22 0 1 0 30.001 8 Z"/>
+    <!-- the T -->
+    <path d="M16 16 H44 V22 H33 V44 H27 V22 H16 Z"/>
+    <!-- a leaf: two arcs -->
+    <path d="M36 30 A9 9 0 0 1 46 40 A9 9 0 0 1 36 30 Z" transform="rotate(10 41 35)"/>
+  </g>
+  <text x="2" y="58">tscad</text>
+</svg>

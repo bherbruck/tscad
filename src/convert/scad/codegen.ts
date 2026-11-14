@@ -94,6 +94,8 @@ const PASS = new Set(["union", "difference", "intersection", "hull", "minkowski"
 export class Gen {
   readonly warnings: Warning[] = [];
   private readonly helpers = new Set<string>();
+  /** Files read by import("x.svg"/"x.dxf"): path → identifier. */
+  private readonly fileImports = new Map<string, string>();
   private readonly modules = new Map<string, ModuleInfo>();
   private readonly functions = new Map<string, FunctionInfo>();
   private readonly warned = new Set<string>();
@@ -197,6 +199,9 @@ export class Gen {
     const modelFn = `export default function ${pascal(modelName.replace(/[^A-Za-z0-9_]/g, "_")) || "Model"}(${params.length ? "p: ParamValues<typeof params>" : ""}) {\n${indent(inner.join("\n"))}\n}`;
     const imports = ["defineParams", ...(this.usesChildrenType || this.helpers.has("$leaf1") ? ["type Children"] : []), "type ParamValues"];
     out.push(`import { ${imports.join(", ")} } from "tscad"`);
+    if (this.fileImports.size) {
+      out[out.length - 1] += "\n" + [...this.fileImports].map(([f, id]) => `// @ts-ignore — the file's text (Bun text import)\nimport ${id} from ${JSON.stringify(f.startsWith(".") || f.startsWith("/") ? f : `./${f}`)} with { type: "text" }`).join("\n");
+    }
     out.push(`export const params = defineParams({${params.length ? "\n" + indent(params.map((p) => p.code).join("\n")) + "\n" : ""}})`);
     out.push(...defs);
     out.push(modelFn);
@@ -335,6 +340,7 @@ export class Gen {
     if (s.t === "if") return this.dimOfAll([...s.then, ...(s.else ?? [])]);
     if (s.t === "block") return this.dimOfAll(s.body);
     if (s.t !== "inst") return "any";
+    if (s.name === "import" && /\.(svg|dxf)$/i.test(importFile(s) ?? "")) return "2d";
     if (s.name === "linear_extrude" || s.name === "rotate_extrude" || PRIMS_3D.has(s.name)) return "3d";
     if (PRIMS_2D.has(s.name)) return "2d";
     if (s.name === "children") return "any";
@@ -616,8 +622,27 @@ export class Gen {
       case "polyhedron":
         this.warn(s.line, "polyhedron() isn't supported (tscad builds exact B-reps, not meshes): left out");
         return [`{/* polyhedron(...) — not converted */}`];
+      case "import": {
+        const file = importFile(s);
+        const ext = /\.(svg|dxf)$/i.exec(file ?? "")?.[1]?.toLowerCase();
+        if (file && ext) {
+          let id = this.fileImports.get(file);
+          if (!id) {
+            id = jsName(file.split(/[\\/]/).pop()!.replace(/\.[^.]*$/, "").replace(/[^A-Za-z0-9_]/g, "_").replace(/^(\d)/, "_$1") + `_${ext}`);
+            this.fileImports.set(file, id);
+          }
+          const props = [`data={${id} as string}`];
+          const layer = A(-1, "layer"), center = A(-1, "center"), scale = A(-1, "scale");
+          if (layer && ext === "dxf") props.push(`layer={${E(layer)}}`);
+          if (center?.t === "bool" && center.v) props.push("center");
+          if (scale) props.push(`scale={${E(scale)}}`);
+          if (A(-1, "dpi")) this.warn(s.line, "import dpi ignored: units come from the SVG's width/height and viewBox");
+          return leaf(el(ext, props, []));
+        }
+        this.warn(s.line, `import(${file ? JSON.stringify(file) : "..."}) isn't supported${file ? " (only .svg and .dxf)" : " (the file name must be a literal)"}: left out`);
+        return [`{/* import(...) — not converted */}`];
+      }
       case "surface":
-      case "import":
       case "projection":
         this.warn(s.line, `${s.name}() isn't supported: left out`);
         return [`{/* ${s.name}(...) — not converted */}`];
@@ -1497,6 +1522,12 @@ function sectionAt(comments: Comment[], line: number): string | undefined {
     if (m) s = m[1]!.trim();
   }
   return s;
+}
+
+/** The literal file name of an import() statement. */
+function importFile(s: Extract<Stmt, { t: "inst" }>): string | undefined {
+  const a = s.args.find((x) => x.name === "file") ?? s.args.find((x) => !x.name);
+  return a?.value.t === "str" ? a.value.v : undefined;
 }
 
 function usesChildren(stmts: Stmt[]): boolean {

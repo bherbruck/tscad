@@ -18,8 +18,9 @@ import { layoutText, loadFont } from "./text/font";
 import { toSelector, type SelectorLike } from "./select";
 import { offsetLoops, OffsetError } from "./sketch/offset";
 import { hullLoops, HullError } from "./sketch/hull";
-import { booleanLoops, BooleanError, type BooleanOp } from "./sketch/boolean";
+import { booleanLoops, BooleanError, loopsOverlap, normalizeLoops, type BooleanOp } from "./sketch/boolean";
 import { sweepPathOf } from "./sketch/sweep-path";
+import { importDxf, importSvg, ImportError } from "./sketch/import";
 import { CONSTRAINT_TAGS, isConstrainedSketch, SketchRecorder, type SketchInfo } from "./sketch/constrained";
 import { AssemblyRecorder, ASSEMBLY_TAGS, type AssemblyInfo } from "./assembly";
 import { parsePath, PathSyntaxError } from "./sketch/path";
@@ -139,7 +140,7 @@ const SOLID_TAGS = new Set([
   "union", "difference", "subtract", "intersection", "intersect", "extrude", "revolve", "loft", "sweep",
   "linearPattern", "gridPattern", "polarPattern", "fillet", "chamfer", "shell", "draft", "pushPull", "offsetFaces", "split",
 ]);
-const SHAPE_TAGS = new Set(["text", "rect", "roundedRect", "circle", "ellipse", "polygon", "regularPolygon", "slot", "path", "star"]);
+const SHAPE_TAGS = new Set(["text", "rect", "roundedRect", "circle", "ellipse", "polygon", "regularPolygon", "slot", "path", "star", "dxf", "svg"]);
 /** 2D booleans (and their short aliases) → the operation. */
 const SKETCH_BOOLEANS: Record<string, BooleanOp> = {
   sketchUnion: "union",
@@ -821,7 +822,7 @@ class Compiler {
         for (const l of inner) this.checkClosed(l);
         let loops: Loop2[];
         try {
-          loops = offsetLoops(inner.map((l) => l.loop), d, c.props.round !== false);
+          loops = offsetLoops(this.mergeOverlaps(inner, c).map((l) => l.loop), d, c.props.round !== false);
         } catch (e) {
           if (e instanceof OffsetError) this.fail(c, e.message, "use a smaller distance, or round the shape's corners first", e);
           throw e;
@@ -919,6 +920,19 @@ class Compiler {
     switch (h.tag) {
       case "text":
         return this.text(h);
+      case "dxf":
+      case "svg": {
+        // imported 2D drawings (loops in mm, y up)
+        try {
+          const r = h.tag === "dxf" ? importDxf(p) : importSvg(p);
+          for (const w of r.warnings) this.warn(h, w);
+          if (!r.loops.length) this.warn(h, "imported nothing");
+          return r.loops;
+        } catch (e) {
+          if (e instanceof ImportError) this.fail(h, e.message, `import the file as text: import logo from "./logo.${h.tag}" with { type: "text" }`, e);
+          throw e;
+        }
+      }
       case "rect":
       case "roundedRect": {
         let size: [number, number] | undefined;
@@ -1025,11 +1039,23 @@ class Compiler {
       if (h.children.length === 0) this.fail(h, "has no 2D shapes", `<${h.tag} ...><rect w={20} h={10} /></${h.tag}>`);
       this.warn(h, "its 2D shapes draw nothing (empty text?); skipped");
     }
-    for (const l of loops) {
-      this.checkClosed(l);
-      l.loop = ccw(l.loop);
+    for (const l of loops) this.checkClosed(l);
+    // overlapping (crossing) loops union, fully nested ones are holes
+    const merged = this.mergeOverlaps(loops, h);
+    for (const l of merged) l.loop = ccw(l.loop);
+    return merged;
+  }
+
+  /** Union overlapping loops (keeping nested ones as holes); unchanged when none cross. */
+  mergeOverlaps(loops: SketchLoop[], h: Host): SketchLoop[] {
+    const raw = loops.map((l) => l.loop);
+    if (!loopsOverlap(raw)) return loops;
+    try {
+      return normalizeLoops(raw).map((loop) => ({ loop, host: loops.length === 1 ? loops[0]!.host : h }));
+    } catch (e) {
+      if (e instanceof BooleanError) this.fail(h, e.message, undefined, e);
+      throw e;
     }
-    return loops;
   }
 
   checkClosed(l: SketchLoop): void {
@@ -1061,7 +1087,7 @@ class Compiler {
     if (!loops.length) this.warn(h, "is empty");
     // outer loops CCW, holes CW
     const out: Loop2[] = [];
-    for (const r of regions(loops.map((l) => l.loop), (l) => l)) {
+    for (const r of regions(this.mergeOverlaps(loops, h).map((l) => l.loop), (l) => l)) {
       out.push(ccw(r.outer));
       for (const hole of r.holes) out.push(reverseLoop(ccw(hole)));
     }
