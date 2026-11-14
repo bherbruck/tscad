@@ -49,6 +49,10 @@ export type { SketchDimensionInfo, SketchEntityInfo, SketchInfo, SolvedSketch } 
 export type * from "./core/sketch/constrained-props";
 export { sketchPath, SketchPath } from "./core/sketch/builder";
 export {
+  applyChange, applyChanges, dragSolve, editProp, insertChild, paramFor,
+  type DragChange, type DragRequest, type DragSolveResult, type EditResult, type ParamDrive, type TextEdit,
+} from "./core/sketch/drag";
+export {
   sketchRef, sketchRefs, isSketchRef,
   type ArcHandle, type CircleHandle, type CurveHandle, type LineHandle, type PointHandle, type RefKind, type RoundHandle, type SketchRef, type SplineHandle,
 } from "./core/sketch/refs";

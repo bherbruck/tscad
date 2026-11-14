@@ -409,3 +409,46 @@ A near-full arc closed by a tiny line (a common way SVG editors draw circles) be
 circle, and slivers shorter than 1e-4 × the shape's size are dropped. Text, `<line>`,
 `<use>` and images are skipped with a warning (convert text to paths). Our own `toDXF` /
 `toSVG` output re-imports to the same loops (tested). See `examples/engraved-logo.tsx`.
+
+## Drag-to-edit (for editors)
+
+`dragSolve` re-solves a sketch with one point dragged. The point is cheap to place and
+expensive to move: a weighted minimum-norm solve, walked to the target in steps. Everything
+else moves as little as it can. The result says what to change in the source to make that the
+new design. `applyChange` makes the minimal text edit.
+
+```ts
+import { dragSolve, applyChanges, renderModule } from "tscad"
+
+const r = renderModule(mod, values)                      // the sketch's loc: r.sketches[i].loc
+const d = dragSolve(mod, r.values, { sketch: r.sketches[0].loc!, point: "h", target: [25, 12], changeDimensions: false })
+d.points / d.entities                                     // the dragged shape, for the overlay
+d.reached                                                 // got to the target?
+d.blockedBy                                               // [{ label: 'length=20 on line "side"', loc, dimension: { kind, value, prop } }]
+d.changes                                                 // what to edit (below)
+const { source, applied, refused } = applyChanges(text, d.changes)
+```
+
+`changes`:
+
+- `{ kind: "prop", loc, tag, prop, value, reason: "point" | "dimension", param? }`:
+  - **`reason: "point"`**: a moved free `<point>`'s `x`/`y` guess (inserted when absent, made
+    relative to `at`).
+  - **`reason: "dimension"`** (with `changeDimensions: true`): the dimensions that blocked the
+    drag are released, and those whose value changed get their new value (`length`, `radius`,
+    `diameter`, `distance`, `dx`, `angle`... with the prop that set them).
+  - **`param`**: when the prop is an expression that varies linearly with exactly one numeric
+    param (found by perturbing each param and re-rendering), `param: { name, value }` is the
+    param value that gives `value`.
+- `{ kind: "addPoint", sketch, id, x, y }`: a free implicit point (named in a line's `from`/`to`,
+  no `<point>`) gets a `<point id x y />`, inserted right after `<sketch>`.
+
+`applyChange` replaces a number literal or inserts the prop. It refuses expressions
+(`length={p.width}`) with `{ ok: false, reason: "... driven by param width", param }`, so the UI
+can move the param slider instead. `editProp` / `insertChild` are the plain text functions
+(`src/core/sketch/edit.ts`). They find the element by its `SourceLoc` (the `<`), with no
+TypeScript parser.
+
+`blockedBy` lists the constraints left with residuals when the target is enforced in least
+squares, those on the dragged point first. A point on a line slides along it, and reports the
+`<onCurve>` as what blocks the rest of the motion.

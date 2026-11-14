@@ -82,7 +82,11 @@ export function tolerance(scale: number): number {
  * Minimise ½‖F‖² from `x0` over the constraints `which`. Steps are minimum-norm
  * (dx = −Jᵀ(JJᵀ + λI)⁻¹F), so variables the constraints don't pin stay where they were drawn.
  */
-export function lm(sys: System, which: number[], x0: Float64Array = sys.x0, maxIter = 200): SolveResult {
+/**
+ * `metric`: optional per-variable weights for the minimum-norm step (dx = −W²Jᵀ(JW²Jᵀ + λI)⁻¹F):
+ * a small weight makes a variable expensive to move (a dragged point stays where it's put).
+ */
+export function lm(sys: System, which: number[], x0: Float64Array = sys.x0, maxIter = 200, metric?: Float64Array): SolveResult {
   const n = x0.length;
   let x = Float64Array.from(x0);
   const tol = tolerance(sys.scale);
@@ -101,7 +105,8 @@ export function lm(sys: System, which: number[], x0: Float64Array = sys.x0, maxI
     for (let i = 0; i < m; i++)
       for (let j = 0; j <= i; j++) {
         let s = 0;
-        for (let k = 0; k < n; k++) s += e.J[i * n + k]! * e.J[j * n + k]!;
+        if (metric) for (let k = 0; k < n; k++) s += e.J[i * n + k]! * e.J[j * n + k]! * metric[k]! * metric[k]!;
+        else for (let k = 0; k < n; k++) s += e.J[i * n + k]! * e.J[j * n + k]!;
         A[i * m + j] = s;
         A[j * m + i] = s;
         if (i === j) diag = Math.max(diag, s);
@@ -119,7 +124,7 @@ export function lm(sys: System, which: number[], x0: Float64Array = sys.x0, maxI
       for (let i = 0; i < m; i++) {
         const yi = y[i]!;
         if (yi === 0) continue;
-        for (let k = 0; k < n; k++) dx[k]! -= e.J[i * n + k]! * yi;
+        for (let k = 0; k < n; k++) dx[k]! -= e.J[i * n + k]! * yi * (metric ? metric[k]! * metric[k]! : 1);
       }
       const dn = norm2(dx);
       if (dn > trust) for (let k = 0; k < n; k++) dx[k]! *= trust / dn;

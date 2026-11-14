@@ -172,6 +172,8 @@ type DimKind = SketchDimensionInfo["kind"];
 interface Dim {
   kind: DimKind;
   value: number;
+  /** The prop that set it (for edits): `length`, `radius`, `distance`, `dx`... */
+  prop?: string;
 }
 
 type SpecBody =
@@ -666,12 +668,12 @@ function onCurve(m: Model, p: Pt, c: Curve, h: Host, label: string): void {
   else m.fail(h, "a point can't be constrained onto a spline (only onto its control points)");
 }
 
-function lengthOrRadius(m: Model, h: Host, names: [string, string][]): [string, number] | undefined {
+function lengthOrRadius(m: Model, h: Host, names: [string, string][]): [string, number, string] | undefined {
   for (const [n, kind] of names) {
     const v = h.props[n];
     if (v === undefined) continue;
     if (num(v) === undefined || !(v > 0)) m.fail(h, `${n} must be a number greater than 0 (got ${show(v)})`);
-    return [kind, v];
+    return [kind, v, n];
   }
   return undefined;
 }
@@ -722,7 +724,7 @@ function entityProps(m: Model, c: Curve, h: Host): void {
     const r = lengthOrRadius(m, h, [["radius", "radius"], ["r", "radius"], ["diameter", "diameter"], ["d", "diameter"]]);
     if (!r) return;
     const v = r[0] === "diameter" ? r[1] / 2 : r[1];
-    m.add({ k: "radius", c: self, v, host: h, label: on(`${r[0]}=${fmt(r[1])}`), dim: { kind: r[0] as DimKind, value: r[1] } });
+    m.add({ k: "radius", c: self, v, host: h, label: on(`${r[0]}=${fmt(r[1])}`), dim: { kind: r[0] as DimKind, value: r[1], prop: r[2] } });
   };
   switch (c.kind) {
     case "line": {
@@ -732,12 +734,12 @@ function entityProps(m: Model, c: Curve, h: Host): void {
       if (p.length !== undefined) {
         const v = num(p.length);
         if (v === undefined || !(v > 0)) m.fail(h, `length must be a number greater than 0 (got ${show(p.length)})`);
-        m.add({ k: "dist", p: c.a, q: c.b, v, host: h, label: on(`length=${fmt(v)}`), dim: { kind: "length", value: v } });
+        m.add({ k: "dist", p: c.a, q: c.b, v, host: h, label: on(`length=${fmt(v)}`), dim: { kind: "length", value: v, prop: "length" } });
       }
       if (p.angle !== undefined) {
         const v = num(p.angle);
         if (v === undefined) m.fail(h, `angle must be a number of degrees (got ${show(p.angle)})`);
-        m.add({ k: "angAbs", l: c, v: v * DEG, host: h, label: on(`angle=${fmt(v)}`), dim: { kind: "angle", value: v } });
+        m.add({ k: "angAbs", l: c, v: v * DEG, host: h, label: on(`angle=${fmt(v)}`), dim: { kind: "angle", value: v, prop: "angle" } });
       }
       for (const r of refs(p.parallel)) m.add({ k: "ang", l1: c, l2: m.line(r, h, "parallel"), v: 0, host: h, label: on(`parallel="${r}"`) });
       for (const r of refs(p.perpendicular)) m.add({ k: "ang", l1: c, l2: m.line(r, h, "perpendicular"), v: Math.PI / 2, host: h, label: on(`perpendicular="${r}"`) });
@@ -750,7 +752,7 @@ function entityProps(m: Model, c: Curve, h: Host): void {
       if (p.angle !== undefined) {
         const v = num(p.angle);
         if (v === undefined || !(v > 0 && v < 360)) m.fail(h, `angle (the arc's sweep) must be between 0 and 360 degrees (got ${show(p.angle)})`);
-        m.add({ k: "sweep", a: c, v: v * DEG, host: h, label: on(`angle=${fmt(v)}`), dim: { kind: "sweep", value: v } });
+        m.add({ k: "sweep", a: c, v: v * DEG, host: h, label: on(`angle=${fmt(v)}`), dim: { kind: "sweep", value: v, prop: "angle" } });
       }
       equals();
       concentric(c);
@@ -802,10 +804,10 @@ function constraintElement(m: Model, h: Host): void {
         if (!r) m.fail(h, "needs a value", `<dimension of="hole" diameter={10} /> or <dimension of="base" length={40} />`);
         if (r[0] === "length") {
           if (c.kind !== "line") m.fail(h, `length needs a line (${c.name} is a ${c.kind})`);
-          m.add({ k: "dist", p: c.a, q: c.b, v: r[1], host: h, label, dim: { kind: "length", value: r[1] } });
+          m.add({ k: "dist", p: c.a, q: c.b, v: r[1], host: h, label, dim: { kind: "length", value: r[1], prop: r[2] } });
         } else {
           if (c.kind !== "arc" && c.kind !== "circle") m.fail(h, `${r[0]} needs an arc or circle (${c.name} is a ${c.kind})`);
-          m.add({ k: "radius", c, v: r[0] === "diameter" ? r[1] / 2 : r[1], host: h, label, dim: { kind: r[0] as DimKind, value: r[1] } });
+          m.add({ k: "radius", c, v: r[0] === "diameter" ? r[1] / 2 : r[1], host: h, label, dim: { kind: r[0] as DimKind, value: r[1], prop: r[2] } });
         }
         return;
       }
@@ -816,7 +818,7 @@ function constraintElement(m: Model, h: Host): void {
         if (p[key] === undefined) continue;
         const v = num(p[key]);
         if (v === undefined) m.fail(h, `${key} must be a number (got ${show(p[key])})`);
-        m.add({ k: "dxy", p: asPoint(m, a, h, "a"), q: asPoint(m, b, h, "b"), axis, v, host: h, label, dim: { kind: key, value: v } });
+        m.add({ k: "dxy", p: asPoint(m, a, h, "a"), q: asPoint(m, b, h, "b"), axis, v, host: h, label, dim: { kind: key, value: v, prop: key } });
         any = true;
       }
       const raw = p.distance ?? p.value;
@@ -826,7 +828,7 @@ function constraintElement(m: Model, h: Host): void {
       }
       const v = num(raw);
       if (v === undefined || v < 0) m.fail(h, `distance must be a number ≥ 0 (got ${show(raw)})`);
-      const dim: Dim = { kind: "distance", value: v };
+      const dim: Dim = { kind: "distance", value: v, prop: p.distance !== undefined ? "distance" : "value" };
       /** `side`: which side of the line (seen along from → to) the other thing lies. */
       const side = (): { side?: 1 | -1 } => {
         if (p.side === undefined) return {};
@@ -952,7 +954,7 @@ function angleEl(m: Model, h: Host, label: string): void {
   const l1 = m.line(A, h, "a"), l2 = m.line(B, h, "b");
   // rays leave the shared vertex when the lines meet; otherwise they point from → to
   const f1 = l1.b === l2.a || l1.b === l2.b, f2 = l2.b === l1.a || l2.b === l1.b;
-  m.add({ k: "angle", l1, l2, v: v * DEG, f1, f2, host: h, label, dim: { kind: "angle", value: v } });
+  m.add({ k: "angle", l1, l2, v: v * DEG, f1, f2, host: h, label, dim: { kind: "angle", value: v, prop: p.angle !== undefined ? "angle" : "value" } });
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -2166,6 +2168,133 @@ function pathChain(m: Model, edges: { c: Curve; s: number; e: number; seg: Seg2 
   }
   if (used.size !== edges.length) m.fail(m.sketch, "the sweep path falls apart into several pieces", "every curve must continue from the previous one's end");
   return chain;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Dragging (interactive editing)
+
+/** A constraint's user-facing label, element and dimension (when it is one). */
+export interface DragConstraint {
+  label: string;
+  host: Host;
+  /** The dimension it sets: kind, value and the prop that set it. */
+  dim?: { kind: DimKind; value: number; prop?: string };
+}
+
+export interface DragResult {
+  /** Every point after the drag (display ids), with whether it moved and is free. */
+  points: { id: string; x: number; y: number; moved: boolean; free: boolean; host?: Host }[];
+  /** The dragged point got to the target. */
+  reached: boolean;
+  /** Constraints that keep the point from the target (empty when reached). */
+  blockedBy: DragConstraint[];
+  /** With `changeDimensions`: the dimensions that changed to reach the target, with new values. */
+  dimensionChanges: (DragConstraint & { to: number })[];
+  /** The sketch's entities after the drag, for drawing. */
+  entities: SketchEntityInfo[];
+}
+
+/**
+ * Re-solve a constraint `<sketch>` host with point `point` dragged towards `target` (sketch
+ * coordinates): the point is cheap to place and expensive to move, everything else moves as
+ * little as possible (weighted minimum norm), so free geometry follows and constrained geometry
+ * holds. With `changeDimensions`, the dimensions that block the drag are released and their new
+ * values reported.
+ */
+export function dragSketch(sketch: Host, point: string, target: Vec2, o: { changeDimensions?: boolean } = {}): DragResult {
+  const base = solve(sketch, { warn: () => {} });
+  const m = base.m, x = Float64Array.from(base.x);
+  const pt = m.points.find((p) => display(p.name) === point || p.name === point);
+  if (!pt) throw new TscadError(`no point "${point}" in the sketch`, sketch.loc ? { loc: sketch.loc } : {});
+  const pts = m.points.map((p) => [x[p.ix]!, x[p.ix + 1]!] as Vec2);
+  const ext = Math.hypot(Math.max(...pts.map((p) => p[0])) - Math.min(...pts.map((p) => p[0])), Math.max(...pts.map((p) => p[1])) - Math.min(...pts.map((p) => p[1])));
+  const S = Math.max(1, ext, ...m.specs.map((s) => ("v" in s && s.k !== "ang" && s.k !== "angle" && s.k !== "angAbs" && s.k !== "sweep" ? s.v : 0)));
+  const constraints = equations(m, x, S);
+  const order = [...constraints.keys()].sort((a, b) => Number(!constraints[a]!.structural) - Number(!constraints[b]!.structural));
+  const freedom = analyze({ x0: x, constraints, scale: S }, x, order).freedom;
+  const tol = 1e-6 * S;
+  const at = (v: Float64Array): Vec2 => [v[pt.ix]!, v[pt.ix + 1]!];
+  const pin = (): Constraint => ({ label: "drag", vars: [pt.ix, pt.ix + 1], eval: ([px, py]) => [d.addc(px!, -target[0]), d.addc(py!, -target[1])] });
+
+  /** Weighted min-norm solve, walking the point to the target in steps. */
+  const walk = (cs: Constraint[], ord: number[], from: Float64Array): Float64Array => {
+    const metric = new Float64Array(from.length).fill(1);
+    metric[pt.ix] = metric[pt.ix + 1] = 1e-3;
+    let cur = Float64Array.from(from);
+    const start = at(cur);
+    const steps = 8;
+    for (let k = 1; k <= steps; k++) {
+      const goal: Vec2 = [start[0] + ((target[0] - start[0]) * k) / steps, start[1] + ((target[1] - start[1]) * k) / steps];
+      const xs = Float64Array.from(cur);
+      xs[pt.ix] = goal[0];
+      xs[pt.ix + 1] = goal[1];
+      const r = lm({ x0: xs, constraints: cs, scale: S }, ord, xs, 200, metric);
+      if (!r.converged) break;
+      cur = Float64Array.from(r.x);
+    }
+    return cur;
+  };
+  let xd = walk(constraints, order, x);
+  let reached = vlen(vsub(at(xd), target)) < tol;
+  const spec = (i: number) => constraints[i]!.data as Spec;
+  const asDrag = (s: Spec): DragConstraint => ({ label: display(s.label), host: s.host, ...(s.dim ? { dim: { ...s.dim } } : {}) });
+
+  // who blocks: the constraints left with residuals when the target is enforced (least squares)
+  let blockers: number[] = [];
+  if (!reached) {
+    const withPin = [...constraints, pin()];
+    const ord = [...order, withPin.length - 1];
+    const r = lm({ x0: xd, constraints: withPin, scale: S }, ord, xd, 300);
+    const big = r.F.reduce((a, b) => Math.max(a, Math.abs(b)), 0);
+    const seen = new Set<number>();
+    r.F.forEach((f, i) => {
+      const c = r.owner[i]!;
+      if (c < constraints.length && !constraints[c]!.structural && Math.abs(f) > Math.max(1e-7 * S, 1e-4 * big)) seen.add(c);
+    });
+    // the constraints on the dragged point itself first (a point-on-line before the line's own fix)
+    const direct = (i: number) => (constraints[i]!.vars.includes(pt.ix) || constraints[i]!.vars.includes(pt.ix + 1) ? 0 : 1);
+    blockers = [...seen].sort((a, b) => direct(a) - direct(b) || a - b);
+  }
+
+  const dimensionChanges: DragResult["dimensionChanges"] = [];
+  if (!reached && o.changeDimensions) {
+    const released = blockers.filter((i) => spec(i).dim);
+    if (released.length) {
+      const keep = constraints.map((_, i) => i).filter((i) => !released.includes(i));
+      const withPin = [...constraints, pin()];
+      const ord = [...keep.sort((a, b) => Number(!constraints[a]!.structural) - Number(!constraints[b]!.structural)), withPin.length - 1];
+      const metric = new Float64Array(x.length).fill(1);
+      const r = lm({ x0: xd, constraints: withPin, scale: S }, ord, xd, 300, metric);
+      if (r.converged) {
+        xd = r.x;
+        reached = vlen(vsub(at(xd), target)) < tol;
+        for (const i of released) {
+          const s = spec(i);
+          // the released constraint's residual at the new shape is (measured − value)
+          const c = constraints[i]!;
+          const local = c.vars.map((vi, k) => d.variable(xd[vi]!, k, c.vars.length));
+          const res = c.eval(local).map((q) => q.v);
+          const avg = res.reduce((a, b) => a + b, 0) / res.length;
+          const angular = s.k === "angAbs" || s.k === "angle" || s.k === "ang" || s.k === "sweep";
+          const internal = ("v" in s ? s.v : 0) + (angular ? avg / S : avg);
+          const to = angular ? internal / DEG : s.dim!.kind === "diameter" ? internal * 2 : internal;
+          // a released dimension that kept its value didn't change
+          if (Math.abs(to - s.dim!.value) > 1e-9 * Math.max(1, Math.abs(to))) dimensionChanges.push({ ...asDrag(s), to: Number(to.toFixed(9)) });
+        }
+        blockers = blockers.filter((i) => !released.includes(i));
+      }
+    }
+  }
+  return {
+    points: m.points.map((p) => {
+      const nx = xd[p.ix]!, ny = xd[p.ix + 1]!;
+      return { id: display(p.name), x: nx, y: ny, moved: Math.hypot(nx - x[p.ix]!, ny - x[p.ix + 1]!) > tol, free: freedom[p.ix]! > 1e-6 || freedom[p.ix + 1]! > 1e-6, ...(p.host ? { host: p.host } : {}) };
+    }),
+    reached,
+    blockedBy: reached ? [] : blockers.map((i) => asDrag(spec(i))),
+    dimensionChanges,
+    entities: m.curves.map((c) => entityInfo(c, xd)),
+  };
 }
 
 // ---------------------------------------------------------------------------------------------
