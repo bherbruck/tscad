@@ -129,7 +129,7 @@ async function main() {
     onSourceClick: (loc, target) => {
       if (!sameFile(loc.file)) return void viewer.toast(`${loc.file}:${loc.line}`);
       document.body.classList.remove("pg-code-hidden");
-      const props = target.kind === "dimension" ? DIMENSION_PROPS[target.dimension.kind] : undefined;
+      const props = target.kind === "dimension" ? DIMENSION_PROPS[target.dimension.kind] : target.kind === "mate" ? ["angle", "offset"] : undefined;
       editor?.revealSource(loc.line, loc.column, props);
       if (target.kind === "dimension") viewer.toast(`${target.dimension.text} — line ${loc.line}`);
     },

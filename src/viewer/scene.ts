@@ -527,6 +527,18 @@ export class Viewport {
     this.#needsRender = true;
   }
 
+  /** Move a part's display (explode view); picking and highlights follow. */
+  setPartOffset(name: string, offset: THREE.Vector3) {
+    const v = this.parts.get(name);
+    if (!v || v.group.position.equals(offset)) return;
+    v.group.position.copy(offset);
+    this.#needsRender = true;
+  }
+
+  partOffset(name: string): THREE.Vector3 {
+    return this.parts.get(name)?.group.position ?? new THREE.Vector3();
+  }
+
   setPartVisible(name: string, visible: boolean) {
     const v = this.parts.get(name);
     if (!v) return;
@@ -849,6 +861,13 @@ export class Viewport {
     return new THREE.Vector2(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
   }
 
+  /** A raycaster through the given client point (for overlays' own picking). */
+  raycasterAt(clientX: number, clientY: number): THREE.Raycaster {
+    const rc = new THREE.Raycaster();
+    rc.setFromCamera(this.#ndc(clientX, clientY), this.camera);
+    return rc;
+  }
+
   /** What's under the cursor: an edge within a few px wins over the face behind it. */
   hitTest(clientX: number, clientY: number): Hit | undefined {
     const ndc = this.#ndc(clientX, clientY);
@@ -890,8 +909,8 @@ export class Viewport {
         const n = counts[e]!;
         for (let i = 0; i < n - 1; i++) {
           const ia = 3 * (start + i), ib = ia + 3;
-          tmpA.set(pts[ia]!, pts[ia + 1]!, pts[ia + 2]!);
-          tmpB.set(pts[ib]!, pts[ib + 1]!, pts[ib + 2]!);
+          tmpA.set(pts[ia]!, pts[ia + 1]!, pts[ia + 2]!).add(v.group.position);
+          tmpB.set(pts[ib]!, pts[ib + 1]!, pts[ib + 2]!).add(v.group.position);
           if (this.section.enabled && this.#clipPlane.distanceToPoint(tmpA) < 0 && this.#clipPlane.distanceToPoint(tmpB) < 0) continue;
           const pa = tmpV.copy(tmpA).project(this.camera);
           if (pa.z > 1) continue;
@@ -992,10 +1011,10 @@ export class Viewport {
     if (!v) return;
     if (hit.kind === "face") {
       this.#hoverFace = this.#faceMesh(v, hit.index, 0x5b8cff, 0.28);
-      if (this.#hoverFace) this.overlay.add(this.#hoverFace);
+      if (this.#hoverFace) v.group.add(this.#hoverFace);
     } else {
       this.#hoverEdge = this.#edgeLine(v, hit.index, 0x7fa7ff, 3.5);
-      if (this.#hoverEdge) this.overlay.add(this.#hoverEdge);
+      if (this.#hoverEdge) v.group.add(this.#hoverEdge);
     }
     this.#needsRender = true;
   }
@@ -1015,10 +1034,10 @@ export class Viewport {
     if (!v) return;
     if (hit.kind === "face") {
       this.#selFace = this.#faceMesh(v, hit.index, 0xffb020, 0.45);
-      if (this.#selFace) this.overlay.add(this.#selFace);
+      if (this.#selFace) v.group.add(this.#selFace);
     } else {
       this.#selEdge = this.#edgeLine(v, hit.index, 0xffb020, 4);
-      if (this.#selEdge) this.overlay.add(this.#selEdge);
+      if (this.#selEdge) v.group.add(this.#selEdge);
     }
     this.#needsRender = true;
   }
@@ -1046,7 +1065,7 @@ export class Viewport {
       for (let e = 0; e < v.data.edgeCounts.length; e++) {
         const s = v.edgeStarts[e]!, n = v.data.edgeCounts[e]!;
         for (const i of [s, s + n - 1]) {
-          tmpA.set(pts[3 * i]!, pts[3 * i + 1]!, pts[3 * i + 2]!);
+          tmpA.set(pts[3 * i]!, pts[3 * i + 1]!, pts[3 * i + 2]!).add(v.group.position);
           const p = tmpV.copy(tmpA).project(this.camera);
           const d = Math.hypot(((p.x + 1) / 2) * r.width - mx, ((1 - p.y) / 2) * r.height - my);
           if (d < bestD && tmpA.distanceTo(hit.point) < this.#bounds.getSize(tmpB).length() * 0.2) {

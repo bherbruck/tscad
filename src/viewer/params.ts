@@ -101,6 +101,22 @@ export class ParamsPanel {
     }
   }
 
+  /** Set one value as if the user moved its control (`committed` false while dragging). */
+  setValue(key: string, value: unknown, committed = false) {
+    const spec = this.#schema[key];
+    if (!spec) return;
+    let v = value;
+    if (typeof v === "number") {
+      if (spec.type === "int") v = Math.round(v);
+      else if (spec.step) v = Number((Math.round(v / spec.step) * spec.step).toFixed(6));
+      if (spec.min !== undefined) v = Math.max(spec.min, v as number);
+      if (spec.max !== undefined) v = Math.min(spec.max, v as number);
+    }
+    if (v === this.#values[key] && !committed) return;
+    this.#inputs.get(key)?.(v);
+    this.#set(key, v, committed);
+  }
+
   reset() {
     for (const [k, spec] of Object.entries(this.#schema)) this.#values[k] = spec.default;
     for (const [k, set] of this.#inputs) set(this.#values[k]);

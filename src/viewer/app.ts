@@ -7,7 +7,10 @@ import { hashToValues, ParamsPanel, valuesToHash } from "./params";
 import type { CodeFrame, EvalData, ExportFormat, FromWorker, Loc, ParamSchemaData, ParamValuesData, PartData, StageError, ToWorker } from "./protocol";
 import { fmtNum, PALETTE, type Hit, type SectionAxis, type ViewName, Viewport } from "./scene";
 import { SketchOverlay } from "./sketch-overlay";
-import type { SketchData, SketchDimensionData } from "./protocol";
+import { AssemblyOverlay } from "./assembly-overlay";
+import { CheckOverlay, type CheckMode } from "./check-overlay";
+import type { InterferenceData, PrintabilityData } from "./protocol";
+import type { MateData, SketchData, SketchDimensionData } from "./protocol";
 import { describe, selectorAttr } from "./selectors";
 import type { PickInfo } from "../ir";
 
@@ -32,7 +35,9 @@ export interface ViewerConfig {
    * A sketch chip or dimension label was clicked: reveal `loc` in the code. Default: show
    * file:line and copy it.
    */
-  onSourceClick?: (loc: Loc, target: { kind: "sketch"; sketch: SketchData } | { kind: "dimension"; sketch: SketchData; dimension: SketchDimensionData }) => void;
+  onSourceClick?: (loc: Loc, target: { kind: "sketch"; sketch: SketchData } | { kind: "dimension"; sketch: SketchData; dimension: SketchDimensionData } | { kind: "mate"; mate: MateData }) => void;
+  /** Max kernels evaluating parts in parallel (default cores − 1, ≤ 4; 1 = off). `?pool=n` in the URL overrides. */
+  pool?: number;
   /** Expose `window.__tscadViewer` (tests). Default true. */
   debugGlobal?: boolean;
 }
@@ -106,6 +111,16 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
   const stage = h("div", { class: "stage" });
   const viewport = new Viewport(stage);
   const sketches = new SketchOverlay(viewport);
+  const assembly = new AssemblyOverlay(viewport);
+  assembly.setShowAnchors(localStorage.getItem("tscad.anchors") !== "0");
+  assembly.onDrag = (u) => {
+    params.setValue(u.param, u.value, false);
+    showTip(`${u.field === "angle" ? `${+u.shown.toFixed(1)}°` : `${+u.shown.toFixed(2)} mm`} · ${u.param} = ${fmtNum(Number(params.values[u.param]))}`);
+  };
+  assembly.onDragEnd = () => {
+    viewport.controls.enabled = true;
+    hoverTip.classList.add("hidden");
+  };
   /** The user's choice for the sketch overlay (undefined: on when the model has sketches). */
   let sketchPref: boolean | undefined = (() => {
     const v = localStorage.getItem("tscad.sketches");
@@ -195,9 +210,15 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
     section: tool("section", "Section (X)", () => toggleSection()),
     measure: tool("ruler", "Measure (M)", () => toggleMeasure()),
     sketch: tool("sketch", "Sketch overlay (K)", () => toggleSketches()),
+    anchors: tool("anchor", "Anchors & joints (A)", () => toggleAnchors()),
+    checks: tool("shield", "Checks: overhangs, thin walls, interference (C)", () => checksPop.classList.toggle("hidden")),
   };
   tb.edges.classList.add("active");
   const sectionPop = buildSectionPopover();
+  const checks = new CheckOverlay(viewport);
+  const checkState = { mode: "none" as CheckMode, maxOverhang: 45, minWall: 0.8, busy: false, again: false };
+  const checkSummary = h("div", { class: "check-summary muted" }, "Pick a check to colour the model.");
+  const checksPop = buildChecksPopover();
   const toolbar = h(
     "div",
     { class: "toolbar" },
@@ -205,14 +226,14 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
     h("div", { class: "tool-sep" }),
     h("div", { class: "tool-group" }, tb.fit, tb.ortho),
     h("div", { class: "tool-sep" }),
-    h("div", { class: "tool-group" }, tb.edges, tb.wire, tb.xray, tb.section, tb.measure, tb.sketch),
+    h("div", { class: "tool-group" }, tb.edges, tb.wire, tb.xray, tb.section, tb.measure, tb.sketch, tb.anchors, tb.checks),
   );
   const exportMenu = buildExportMenu();
   const helpPop = buildHelp();
 
   stage.append(gizmo, hoverTip);
   new ResizeObserver(() => updateInsets()).observe(stage);
-  const workspace = h("main", { class: "workspace" }, stage, left, right, h("div", { class: "bottom" }, sectionPop, errorBox, toolbar), toasts, exportMenu, helpPop);
+  const workspace = h("main", { class: "workspace" }, stage, left, right, h("div", { class: "bottom" }, checksPop, sectionPop, errorBox, toolbar), toasts, exportMenu, helpPop);
   app.append(topbar, cfg.sidePane ? h("div", { class: "body-row" }, cfg.sidePane, workspace) : workspace, loader);
 
   function card(title: string, ico: string, body: HTMLElement, actions: HTMLElement[] = []) {
@@ -283,6 +304,7 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
         break;
       case "pick":
       case "export":
+      case "check":
         pending.get(m.id)?.(m);
         pending.delete(m.id);
         break;
@@ -334,7 +356,8 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
     });
   }
 
-  send({ type: "init", wasmUrl: cfg.wasmUrl, glueUrl: cfg.glueUrl });
+  const poolParam = new URLSearchParams(location.search).get("pool");
+  send({ type: "init", wasmUrl: cfg.wasmUrl, glueUrl: cfg.glueUrl, pool: poolParam ? Number(poolParam) : cfg.pool });
 
   // ───────────────────────── results ─────────────────────────
 
@@ -353,6 +376,11 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
     viewport.setParts(
       data.parts.map((p, i) => ({ name: p.name, color: state.colors[p.name] ?? p.color ?? PALETTE[i % PALETTE.length], mesh: p.mesh, failed: !p.ok })),
     );
+    if (checkState.mode !== "none") queueMicrotask(runChecks);
+    assembly.values = data.values;
+    assembly.set(data.assembly);
+    assembly.refresh();
+    applyAnchorButton();
     renderParts();
     renderStats();
     renderError();
@@ -453,7 +481,12 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
           cached ? h("span", { class: "cache-badge" }, icon("zap", 11), "cached") : h("span", { class: "muted" }, `${d.cacheHits}/${d.cacheHits + d.cacheMisses} cache hits`),
         ),
       ),
-      h("div", { class: "stat-rows" }, row("Triangles", tris.toLocaleString()), row("Kernel", state.kernelVersion ? `solidcore ${state.kernelVersion}` : "—")),
+      h(
+        "div",
+        { class: "stat-rows" },
+        row("Triangles", tris.toLocaleString()),
+        row("Kernel", state.kernelVersion ? `solidcore ${state.kernelVersion}${d.workers > 1 ? ` · ${d.workers}× parallel` : ""}` : "—"),
+      ),
     );
     for (const w of d.warnings) statsBody.append(h("div", { class: "warning" }, icon("alert", 12), w));
   }
@@ -486,7 +519,10 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
       });
       const eye = h("button", { class: "icon-btn sm", title: visible ? "Hide" : "Show", onclick: () => { viewport.setPartVisible(p.name, !(viewport.parts.get(p.name)?.visible ?? true)); isolated = undefined; renderParts(); } }, icon(visible ? "eye" : "eyeOff", 14));
       const iso = h("button", { class: `icon-btn sm${isolated === p.name ? " active" : ""}`, title: "Isolate", onclick: () => isolate(p.name) }, icon("target", 14));
+      const asmPart = d.assembly?.parts.find((x) => x.name === p.name);
       const meta: string[] = [];
+      if (asmPart && asmPart.dof > 0) meta.push(`⚠ ${asmPart.dof} DOF free`);
+      if (asmPart?.grounded) meta.push("grounded");
       if (p.ok && p.volume !== undefined) meta.push(fmtVol(p.volume));
       if (p.ok && p.density !== undefined && p.volume !== undefined) meta.push(fmtMass((p.volume / 1000) * p.density));
       if (p.counts) meta.push(`${p.counts[0]}F ${p.counts[1]}E`);
@@ -507,6 +543,36 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
       el.title = p.bbox ? `${p.name}\nbbox ${p.bbox[0].map((v) => fmtNum(v)).join(", ")} → ${p.bbox[1].map((v) => fmtNum(v)).join(", ")}\n${p.counts ? `${p.counts[0]} faces, ${p.counts[1]} edges, ${p.counts[2]} vertices` : ""}\n${fmtMs(p.millis)}` : p.name;
       partsList.append(el);
     });
+    if (d.assembly?.mates.length) {
+      if (d.parts.length > 1) {
+        const ex = h("input", { type: "range", min: 0, max: 1, step: 0.01, value: String(assembly.explode) }) as HTMLInputElement;
+        const paint = () => ex.style.setProperty("--fill", `${Number(ex.value) * 100}%`);
+        paint();
+        ex.addEventListener("input", () => {
+          paint();
+          assembly.setExplode(Number(ex.value));
+        });
+        partsList.prepend(h("div", { class: "explode-row" }, h("span", null, "Explode"), ex));
+      }
+      for (const m of d.assembly.mates) {
+        const val = [m.angle !== undefined ? `${+m.angle.toFixed(2)}°` : "", m.offset !== undefined ? `${+m.offset.toFixed(2)} mm` : ""].filter(Boolean).join(" ");
+        const drive = [m.drive?.angle?.param, m.drive?.offset?.param].filter(Boolean);
+        const chip = m.ok ? h("span", { class: "sk-chip ok", title: `residual ${m.residual.toExponential(1)} mm` }, icon("check", 11), "ok") : h("span", { class: "sk-chip bad", title: `residual ${m.residual.toFixed(3)} mm` }, icon("x", 11), "unsolved");
+        const row = h(
+          "button",
+          { class: "part sketch-row", title: `${m.type} mate${m.loc ? ` — click to show it in the code (${shortFile(m.loc.file)}:${m.loc.line})` : ""}${drive.length ? `\ndriven by ${drive.join(", ")} — drag its gizmo` : ""}` },
+          h("span", { class: "swatch mate-swatch" }, icon(m.type === "slider" ? "slider" : m.type === "fastened" ? "link" : "joint", 12)),
+          h(
+            "div",
+            { class: "part-main" },
+            h("div", { class: "part-name" }, m.type, chip, drive.length ? h("span", { class: "chip" }, drive.join(", ")) : null),
+            h("div", { class: "part-meta" }, `${m.a} → ${m.b}${val ? ` · ${val}` : ""}`),
+          ),
+        );
+        row.addEventListener("click", () => m.loc && sourceClick(m.loc, { kind: "mate", mate: m }));
+        partsList.append(row);
+      }
+    }
     (d.sketches ?? []).forEach((sk, i) => {
       const status = sk.status === "ok" ? "ok" : sk.status === "under" ? "under" : "bad";
       const chip =
@@ -675,6 +741,12 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
     hoverFrame = requestAnimationFrame(() => {
       hoverFrame = 0;
       const ev = lastMove!;
+      const giz = !state.measure ? assembly.hover(ev.clientX, ev.clientY) : undefined;
+      if (giz) {
+        viewport.setHover(undefined);
+        viewport.canvas.style.cursor = giz.drive ? "grab" : "help";
+        return showTip(assembly.describe(giz));
+      }
       const hit = viewport.hitTest(ev.clientX, ev.clientY);
       viewport.setHover(hit);
       viewport.canvas.style.cursor = hit ? (state.measure ? "crosshair" : "pointer") : state.measure ? "crosshair" : "";
@@ -691,6 +763,49 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
     hoverTip.classList.add("hidden");
   });
   viewport.canvas.addEventListener("pointerdown", (e) => (downAt = { x: e.clientX, y: e.clientY, t: performance.now() }));
+  // Joint gizmos get the pointer before the orbit controls (capture phase on the stage).
+  stage.addEventListener(
+    "pointerdown",
+    (e) => {
+      if (e.button !== 0 || state.measure || e.target !== viewport.canvas) return;
+      const g = assembly.beginDrag(e.clientX, e.clientY);
+      if (g === false) return;
+      e.stopPropagation();
+      downAt = undefined;
+      if (!g?.drive) {
+        if (g) toast(`${assembly.describe(g)} — bind its ${g.field} to a param to drag it`);
+        return;
+      }
+      viewport.controls.enabled = false;
+      try {
+        viewport.canvas.setPointerCapture(e.pointerId);
+      } catch {
+        /* synthetic pointer */
+      }
+      viewport.canvas.style.cursor = "grabbing";
+    },
+    { capture: true },
+  );
+  stage.addEventListener(
+    "pointermove",
+    (e) => {
+      if (!assembly.dragging) return;
+      lastMove = e;
+      e.stopPropagation();
+      assembly.drag(e.clientX, e.clientY);
+    },
+    { capture: true },
+  );
+  stage.addEventListener(
+    "pointerup",
+    (e) => {
+      if (!assembly.dragging) return;
+      e.stopPropagation();
+      assembly.endDrag();
+      runParams({ ...params.values });
+    },
+    { capture: true },
+  );
   viewport.canvas.addEventListener("pointerup", (e) => {
     if (!downAt || e.button !== 0) return;
     const moved = Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y);
@@ -804,6 +919,30 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
 
   // ───────────────────────── toolbar actions ─────────────────────────
 
+  function toggleAnchors() {
+    if (!assembly.present) return void toast("This model has no anchors or mates");
+    assembly.setShowAnchors(!assembly.showAnchors);
+    try {
+      localStorage.setItem("tscad.anchors", assembly.showAnchors ? "1" : "0");
+    } catch {
+      /* private mode */
+    }
+    applyAnchorButton();
+  }
+
+  function applyAnchorButton() {
+    tb.anchors.classList.toggle("active", assembly.present && assembly.showAnchors);
+    tb.anchors.classList.toggle("dim", !assembly.present);
+  }
+
+  function showTip(text: string) {
+    if (!lastMove) return;
+    const r = stage.getBoundingClientRect();
+    hoverTip.classList.remove("hidden");
+    hoverTip.textContent = text;
+    hoverTip.style.transform = `translate(${lastMove.clientX - r.left + 14}px, ${lastMove.clientY - r.top + 16}px)`;
+  }
+
   function applySketchVisibility() {
     const has = sketches.count > 0;
     const on = has && (sketchPref ?? true);
@@ -863,6 +1002,103 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
     tb.measure.classList.toggle("active", state.measure);
     if (!state.measure) viewport.clearMeasure();
     else toast("Click two points to measure · Esc to clear");
+  }
+
+  function buildChecksPopover() {
+    const modes: [CheckMode, string][] = [
+      ["none", "Off"],
+      ["overhang", "Overhang"],
+      ["thin", "Thin walls"],
+      ["interference", "Interference"],
+    ];
+    const seg = h("div", { class: "segmented sm" });
+    const btns = modes.map(([m, label]) =>
+      h("button", { class: m === "none" ? "active" : "", onclick: () => { checkState.mode = m; btns.forEach((b, i) => b.classList.toggle("active", modes[i]![0] === m)); tb.checks.classList.toggle("active", m !== "none"); runChecks(); } }, label),
+    );
+    seg.append(...btns);
+    const num = (value: number, step: number, unit: string, set: (v: number) => void) => {
+      const i = h("input", { type: "number", value: String(value), step: String(step), min: "0", class: "num" }) as HTMLInputElement;
+      i.addEventListener("change", () => {
+        const v = Number(i.value);
+        if (v > 0) {
+          set(v);
+          runChecks();
+        }
+      });
+      return h("div", { class: "num-wrap sm" }, i, h("span", { class: "unit" }, unit));
+    };
+    return h(
+      "div",
+      { class: "checks-pop hidden" },
+      h("div", { class: "checks-row" }, icon("shield", 15), seg, h("span", { class: "spacer" }), h("button", { class: "icon-btn sm", title: "Close", onclick: () => checksPop.classList.add("hidden") }, icon("x", 14))),
+      h(
+        "div",
+        { class: "checks-row opts" },
+        h("label", null, "Max overhang", num(checkState.maxOverhang, 1, "°", (v) => (checkState.maxOverhang = v))),
+        h("label", null, "Min wall", num(checkState.minWall, 0.1, "mm", (v) => (checkState.minWall = v))),
+        h("div", { class: "legend" }, h("i"), h("span", null, "ok → past limit")),
+      ),
+      checkSummary,
+    );
+  }
+
+  /** Run the active check (latest wins), then colour the model. */
+  async function runChecks() {
+    if (checkState.mode === "none") {
+      checks.clear();
+      checkSummary.textContent = "Pick a check to colour the model.";
+      return;
+    }
+    if (checkState.busy) return void (checkState.again = true);
+    const d = state.data;
+    if (!d) return;
+    checkState.busy = true;
+    const mode = checkState.mode;
+    checkSummary.textContent = "Checking…";
+    try {
+      const visible = d.parts.filter((p) => p.ok && !p.empty && (viewport.parts.get(p.name)?.visible ?? true));
+      if (mode === "interference") {
+        const r = await request<{ interference?: InterferenceData; error?: string }>({ type: "check", kind: "interference", parts: visible.map((p) => p.name) });
+        if (r.error || !r.interference) throw new Error(r.error ?? "no result");
+        if (checkState.mode !== mode) return;
+        checks.showInterference(r.interference);
+        const pr = r.interference.pairs;
+        checkSummary.replaceChildren(
+          pr.length
+            ? h("span", { class: "bad" }, `${pr.length} interfering pair${pr.length > 1 ? "s" : ""}: ${pr.map((p) => `${p.a} ∩ ${p.b} ${fmtVol(p.volume)}`).join(" · ")}`)
+            : h("span", { class: "good" }, `No interference (${r.interference.checked} pair${r.interference.checked === 1 ? "" : "s"} checked, ${fmtMs(r.interference.millis)})`),
+        );
+      } else {
+        const parts = visible
+          .map((p) => viewport.parts.get(p.name))
+          .filter((v) => !!v)
+          .map((v) => ({ name: v!.name, positions: v!.data.positions.slice(), indices: v!.data.indices.slice(), faceIds: v!.data.faceIds.slice() }));
+        const r = await request<{ printability?: PrintabilityData[]; error?: string }>({ type: "check", kind: "printability", parts, maxOverhangDeg: checkState.maxOverhang, minWall: checkState.minWall, thickness: mode === "thin" });
+        if (r.error || !r.printability) throw new Error(r.error ?? "no result");
+        if (checkState.mode !== mode) return;
+        checks.showPrintability(r.printability, mode, checkState.minWall);
+        if (mode === "overhang") {
+          const area = r.printability.reduce((s, x) => s + x.overhangArea, 0);
+          checkSummary.replaceChildren(area > 0 ? h("span", { class: "warn" }, `Overhang past ${checkState.maxOverhang}°: ${fmtArea(area)} — needs support`) : h("span", { class: "good" }, `No overhangs past ${checkState.maxOverhang}° (build direction +Z)`));
+        } else {
+          const min = Math.min(...r.printability.map((x) => x.minWall ?? Infinity));
+          const thin = r.printability.some((x) => (x.thinFraction ?? 0) > 0);
+          checkSummary.replaceChildren(thin ? h("span", { class: "bad" }, `Thinnest wall ${fmtNum(min)} mm — under ${checkState.minWall} mm in red`) : h("span", { class: "good" }, `Thinnest wall ${isFinite(min) ? `${fmtNum(min)} mm` : "—"}: all ≥ ${checkState.minWall} mm`));
+        }
+      }
+    } catch (e) {
+      checkSummary.textContent = `Check failed: ${(e as Error).message}`;
+    } finally {
+      checkState.busy = false;
+      if (checkState.again) {
+        checkState.again = false;
+        runChecks();
+      }
+    }
+  }
+
+  function fmtArea(mm2: number) {
+    return mm2 >= 1e4 ? `${fmtNum(mm2 / 100)} cm²` : `${fmtNum(mm2)} mm²`;
   }
 
   function buildSectionPopover() {
@@ -961,6 +1197,8 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
       ["X", "Section plane"],
       ["M", "Measure"],
       ["K", "Sketch overlay"],
+      ["A", "Anchors & joints (drag a joint to drive it)"],
+      ["C", "Checks: overhang, thin walls, interference"],
       ["Click", "Select face / edge → selectors"],
       ["Double-click", "Fit (on empty space)"],
       ["Esc", "Clear selection / measure"],
@@ -1004,6 +1242,10 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
         return toggleSection();
       case "k":
         return toggleSketches();
+      case "a":
+        return toggleAnchors();
+      case "c":
+        return checksPop.classList.toggle("hidden");
       case "m":
         return toggleMeasure();
       case "?":
@@ -1121,7 +1363,7 @@ export function mountViewer(root: HTMLElement, config: Partial<ViewerConfig> = {
   renderStats();
 
   // For tests and debugging.
-  if (cfg.debugGlobal !== false) (window as any).__tscadViewer = { state, viewport, select, request };
+  if (cfg.debugGlobal !== false) (window as any).__tscadViewer = { state, viewport, select, request, assembly, params };
 
   return {
     load(url: string, map?: object, opts?: { resetParams?: boolean; refit?: boolean }) {

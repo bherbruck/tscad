@@ -98,7 +98,36 @@ export interface SketchData {
   part?: string;
 }
 
+/** A param that drives a mate value linearly: value ≈ base + scale × (param − its current value). */
+export interface MateDrive {
+  param: string;
+  /** d(mate value) / d(param) at the current values. */
+  scale: number;
+}
+
+export interface MateData {
+  a: string;
+  b: string;
+  type: "fastened" | "revolute" | "slider" | "cylindrical" | "planar" | "ball" | (string & {});
+  angle?: number;
+  offset?: number;
+  flip: boolean;
+  residual: number;
+  ok: boolean;
+  loc?: Loc;
+  /** Params found to drive `angle` / `offset` (by perturbing them and re-rendering). */
+  drive?: { angle?: MateDrive; offset?: MateDrive };
+}
+
+/** Core's `AssemblyInfo`, locations mapped to the TSX. */
+export interface AssemblyData {
+  parts: { name: string; transform: number[]; dof: number; grounded: boolean }[];
+  mates: MateData[];
+  anchors: { part: string; id: string; frame: number[]; loc?: Loc }[];
+}
+
 export interface EvalData {
+  assembly?: AssemblyData;
   parts: PartData[];
   drawings: DrawingData[];
   sketches: SketchData[];
@@ -108,6 +137,8 @@ export interface EvalData {
   cacheHits: number;
   cacheMisses: number;
   timings: { render: number; kernel: number; mesh: number; total: number };
+  /** Kernels that evaluated this result in parallel. */
+  workers: number;
   /** Increments with every evaluation. */
   seq: number;
 }
@@ -121,16 +152,47 @@ export interface StageError {
 }
 
 export type ToWorker =
-  | { type: "init"; wasmUrl: string; glueUrl: string }
+  | { type: "init"; wasmUrl: string; glueUrl: string; /** Max kernels evaluating parts in parallel (default: cores − 1, ≤ 4; 1 = off). */ pool?: number }
   | { type: "load"; url: string; values?: ParamValuesData; /** Raw source map (else `${url}.map` is fetched). */ map?: object }
   | { type: "params"; values: ParamValuesData }
   | { type: "pick"; id: number; kind: "edge" | "face"; part: string; index: number }
-  | { type: "export"; id: number; format: ExportFormat; parts: { name: string; color?: string }[]; tolerance?: number };
+  | { type: "export"; id: number; format: ExportFormat; parts: { name: string; color?: string }[]; tolerance?: number }
+  | { type: "check"; id: number; kind: "printability"; parts: CheckMeshData[]; maxOverhangDeg: number; minWall: number; thickness: boolean }
+  | { type: "check"; id: number; kind: "interference"; parts: string[] };
+
+/** A display mesh sent to the worker for printability checks (a copy; triangle order kept). */
+export interface CheckMeshData {
+  name: string;
+  positions: Float32Array;
+  indices: Uint32Array;
+  faceIds: Uint32Array;
+}
+
+export interface PrintabilityData {
+  name: string;
+  /** Per triangle, 0 = fine … 1 = flat ceiling. */
+  severity: Float32Array;
+  overhangArea: number;
+  overhangFraction: number;
+  /** Per vertex wall thickness, mm (absent when skipped). */
+  thickness?: Float32Array;
+  minWall?: number;
+  thinFraction?: number;
+  warnings: string[];
+}
+
+export interface InterferenceData {
+  pairs: { a: string; b: string; volume: number; mesh?: { positions: Float32Array; indices: Uint32Array } }[];
+  checked: number;
+  errors: { a: string; b: string; message: string }[];
+  millis: number;
+}
 
 export type FromWorker =
-  | { type: "ready"; version: string; loadMs: number }
+  | { type: "ready"; version: string; loadMs: number; pool: number }
   | { type: "busy"; stage: "loading" | "rendering" | "evaluating" }
   | { type: "result"; data: EvalData }
   | { type: "error"; error: StageError; schema?: ParamSchemaData; values?: ParamValuesData }
   | { type: "pick"; id: number; info?: PickInfo; error?: string }
-  | { type: "export"; id: number; data?: Uint8Array | string; error?: string };
+  | { type: "export"; id: number; data?: Uint8Array | string; error?: string }
+  | { type: "check"; id: number; printability?: PrintabilityData[]; interference?: InterferenceData; error?: string };

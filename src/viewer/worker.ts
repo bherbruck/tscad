@@ -6,17 +6,22 @@
  */
 import { loadKernel, type KernelHost, KernelPanic } from "../kernel";
 import { renderModule } from "../index";
-import { exportModel } from "../export";
+import { toGLB, toOBJ, toSTL, to3MF, type ExportPart } from "../export";
+import { ChildEvaluator, LocalEvaluator, Pool, serveChild } from "./pool";
+import { checkInterference, checkPrintability } from "../check";
+import type { InterferenceData, PrintabilityData } from "./protocol";
 import type { Document, PartResult } from "../ir";
 import type { EvalData, FromWorker, Loc, ParamSchemaData, ParamValuesData, PartData, StageError, ToWorker } from "./protocol";
 import { codeFrame, parseStack, SourceMap, stripQuery } from "./sourcemap";
-import type { DrawingData, SketchData } from "./protocol";
+import type { AssemblyData, DrawingData, MateData, SketchData } from "./protocol";
 import { flattenNurbs } from "../drawing/common";
 import { polylineLoops, section, toDXF, toSVG } from "../drawing";
 
 declare const self: DedicatedWorkerGlobalScope;
 
 let kernel: Promise<KernelHost> | undefined;
+let pool: Pool | undefined;
+let lastDoc: Document | undefined;
 let mod: any;
 let modUrl = "";
 let sourceMap: Promise<SourceMap | undefined> | undefined;
@@ -29,7 +34,7 @@ let lastDrawings: any[] = [];
 let lastBoxes = new Map<string, PartData["bbox"]>();
 
 /** DXF/SVG: the model's `<drawing>`s, else the parts cut at mid-height. */
-async function export2D(k: KernelHost, parts: { name: string }[], format: "dxf" | "svg"): Promise<string> {
+async function export2D(k: Pool, parts: { name: string }[], format: "dxf" | "svg"): Promise<string> {
   let layers: { name: string; loops: any[] }[] = lastDrawings;
   if (!layers.length) {
     const boxes = parts.map((p) => lastBoxes.get(p.name)).filter((b) => !!b);
@@ -44,15 +49,23 @@ function post(msg: FromWorker, transfer: Transferable[] = []) {
   self.postMessage(msg, transfer);
 }
 
-self.onmessage = async (e: MessageEvent<ToWorker>) => {
+self.onmessage = async (e: MessageEvent<ToWorker | { type: "child-init"; module: WebAssembly.Module; glueUrl: string }>) => {
   const msg = e.data;
+  // A nested kernel worker (see pool.ts): from now on it only serves evaluate/pick/mesh/step.
+  if (msg.type === "child-init") return serveChild(self, msg.module, msg.glueUrl);
   try {
     switch (msg.type) {
       case "init": {
         const t = performance.now();
-        kernel = loadKernel(msg.wasmUrl, msg.glueUrl);
+        const wasm = new URL(msg.wasmUrl, self.location.href);
+        const res = await fetch(wasm);
+        const module = await WebAssembly.compile(await res.arrayBuffer());
+        kernel = loadKernel(module, msg.glueUrl);
         const k = await kernel;
-        post({ type: "ready", version: k.version, loadMs: performance.now() - t });
+        const cores = (self.navigator as any)?.hardwareConcurrency ?? 2;
+        const size = Math.max(1, Math.min(4, msg.pool ?? cores - 1));
+        pool = new Pool(new LocalEvaluator(k), size, () => new ChildEvaluator(self.location.href, module, msg.glueUrl));
+        post({ type: "ready", version: k.version, loadMs: performance.now() - t, pool: size });
         break;
       }
       case "load": {
@@ -78,22 +91,53 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
         schedule();
         break;
       case "pick": {
-        const k = await requireKernel();
+        await requireKernel();
         try {
-          const info = msg.kind === "edge" ? await k.pickEdge(msg.part, msg.index) : await k.pickFace(msg.part, msg.index);
+          const info = await pool!.pick(msg.kind, msg.part, msg.index);
           post({ type: "pick", id: msg.id, info });
         } catch (err) {
           post({ type: "pick", id: msg.id, error: String((err as Error)?.message ?? err) });
         }
         break;
       }
-      case "export": {
+      case "check": {
         const k = await requireKernel();
+        try {
+          if (msg.kind === "printability") {
+            const out: PrintabilityData[] = [];
+            const transfer: Transferable[] = [];
+            for (const m of msg.parts) {
+              const r = checkPrintability(m, { maxOverhangDeg: msg.maxOverhangDeg, minWall: msg.minWall, skipThickness: !msg.thickness });
+              const d: PrintabilityData = {
+                name: m.name,
+                severity: r.overhang.severity,
+                overhangArea: r.overhang.area,
+                overhangFraction: r.overhang.fraction,
+                warnings: r.warnings,
+                ...(r.thickness ? { thickness: r.thickness.byVertex, minWall: r.thickness.min, thinFraction: r.thickness.thinFraction } : {}),
+              };
+              transfer.push(d.severity.buffer as ArrayBuffer);
+              if (d.thickness) transfer.push(d.thickness.buffer as ArrayBuffer);
+              out.push(d);
+            }
+            post({ type: "check", id: msg.id, printability: out }, transfer);
+          } else {
+            post({ type: "check", id: msg.id, interference: await interference(k, msg.parts) });
+          }
+        } catch (err) {
+          post({ type: "check", id: msg.id, error: String((err as Error)?.message ?? err) });
+        }
+        break;
+      }
+      case "export": {
+        await requireKernel();
         try {
           const data =
             msg.format === "dxf" || msg.format === "svg"
-              ? await export2D(k, msg.parts, msg.format)
-              : await exportModel(k, msg.parts, msg.format, { tolerance: msg.tolerance });
+              ? await export2D(pool!, msg.parts, msg.format)
+              : msg.format === "step"
+                ? await pool!.step(msg.parts.map((p) => p.name), lastDoc)
+                : await exportMesh(msg.parts, msg.format, msg.tolerance ?? 0.01);
           post({ type: "export", id: msg.id, data }, typeof data === "string" ? [] : [data.buffer as ArrayBuffer]);
         } catch (err) {
           post({ type: "export", id: msg.id, error: String((err as Error)?.message ?? err) });
@@ -105,6 +149,31 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
     post({ type: "error", error: await stageError("worker", err) });
   }
 };
+
+/** Interference in the local kernel (all parts together), with a mesh of each overlap; then restore. */
+async function interference(k: KernelHost, names: string[]): Promise<InterferenceData> {
+  if (!lastDoc) return { pairs: [], checked: 0, errors: [], millis: 0 };
+  const doc = { parts: (lastDoc.parts ?? []).filter((p) => names.includes(p.name ?? "")) };
+  const r = await checkInterference(k, doc, { restore: false });
+  const pairs: InterferenceData["pairs"] = r.pairs.map((p) => ({ a: p.a, b: p.b, volume: p.volume }));
+  if (pairs.length) {
+    const byName = new Map(doc.parts.map((p) => [p.name, p.node]));
+    const shared = { parts: pairs.map((p, i) => ({ name: `__overlap_${i}`, node: { type: "intersection" as const, children: [byName.get(p.a)!, byName.get(p.b)!] } })) };
+    await k.evaluate(shared);
+    for (let i = 0; i < pairs.length; i++) {
+      const m = await k.mesh(`__overlap_${i}`);
+      if (m) pairs[i]!.mesh = { positions: m.positions, indices: m.indices };
+    }
+  }
+  await pool!.restoreLocal(lastDoc);
+  return { pairs, checked: r.checked, errors: r.errors, millis: r.millis };
+}
+
+async function exportMesh(parts: { name: string; color?: string }[], format: "stl" | "3mf" | "glb" | "obj", tolerance: number): Promise<Uint8Array | string> {
+  const meshed: ExportPart[] = [];
+  for (const p of parts) meshed.push({ name: p.name, color: p.color, mesh: await pool!.meshAt(p.name, tolerance) });
+  return format === "stl" ? toSTL(meshed, { binary: true }) : format === "3mf" ? to3MF(meshed) : format === "glb" ? toGLB(meshed) : toOBJ(meshed);
+}
 
 function requireKernel(): Promise<KernelHost> {
   if (!kernel) throw new Error("kernel not initialised");
@@ -135,7 +204,7 @@ async function drain() {
 
 async function run() {
   if (!mod) return;
-  const k = await requireKernel();
+  await requireKernel();
   const t0 = performance.now();
   post({ type: "busy", stage: "rendering" });
   let rendered: { document: Document; sourceMap: Record<string, unknown>; params: ParamSchemaData; values: ParamValuesData; [k: string]: unknown };
@@ -148,8 +217,12 @@ async function run() {
   const t1 = performance.now();
   post({ type: "busy", stage: "evaluating" });
   let result;
+  let meshes: Map<string, import("../kernel").MeshArrays>;
   try {
-    result = await k.evaluate(rendered.document);
+    const ev = await pool!.evaluate(rendered.document);
+    result = ev.result;
+    meshes = ev.meshes;
+    lastDoc = rendered.document;
   } catch (err) {
     const error = await stageError("kernel", err);
     if (err instanceof KernelPanic) error.message = `${error.message}\n(the kernel was restarted; this is a solidcore bug, not your model)`;
@@ -180,7 +253,7 @@ async function run() {
     };
     if (r.error) data.error = { ...r.error, ...(await errorLoc(r, rendered.sourceMap)) };
     if (r.ok && !r.empty) {
-      const m = await k.mesh(r.name);
+      const m = meshes!.get(r.name);
       if (m) {
         data.mesh = m;
         for (const a of Object.values(m)) transfer.push((a as ArrayBufferView).buffer as ArrayBuffer);
@@ -203,12 +276,14 @@ async function run() {
     parts,
     drawings,
     sketches: await sketchesOf(rendered, docParts),
+    assembly: await assemblyOf(rendered),
     schema: lastSchema,
     values: rendered.values ?? values,
     warnings: (rendered.warnings as string[]) ?? [],
     cacheHits: result.cacheHits,
     cacheMisses: result.cacheMisses,
     timings: { render: t1 - t0, kernel: t2 - t1, mesh: t3 - t2, total: t3 - t0 },
+    workers: Math.min(pool!.size, docParts.length || 1),
     seq: ++seq,
   };
   post({ type: "result", data }, transfer);
@@ -233,6 +308,60 @@ function drawingSegments(loops: any[][]): Float32Array {
     }
   }
   return new Float32Array(out);
+}
+
+/** Mate drives are found once per module (they're structural), keyed by module URL + schema. */
+let driveCache: { key: string; drives: MateData["drive"][] } | undefined;
+
+/** Which numeric param moves each mate's angle/offset, and how fast: perturb each, re-render. */
+function findDrives(rendered: any): MateData["drive"][] {
+  const mates = rendered.assembly?.mates ?? [];
+  const key = `${modUrl}|${JSON.stringify(rendered.params)}`;
+  if (driveCache?.key === key) return driveCache.drives;
+  const drives: MateData["drive"][] = mates.map(() => undefined);
+  const wanted = mates.some((m: any) => m.angle !== undefined || m.offset !== undefined);
+  if (wanted) {
+    for (const [k, spec] of Object.entries((rendered.params ?? {}) as ParamSchemaData)) {
+      if (spec.type !== "number" && spec.type !== "int") continue;
+      const v = Number(rendered.values?.[k]);
+      if (!isFinite(v)) continue;
+      let d = spec.type === "int" ? 1 : Math.max(spec.step ?? 0, 1e-3 * Math.abs((spec.max ?? v + 1) - (spec.min ?? v - 1)), 1e-3);
+      if (spec.max !== undefined && v + d > spec.max) d = -d;
+      let r2: any;
+      try {
+        r2 = renderModule(mod, { ...rendered.values, [k]: v + d });
+      } catch {
+        continue;
+      }
+      r2.assembly?.mates?.forEach((m2: any, i: number) => {
+        const m = mates[i];
+        if (!m) return;
+        for (const field of ["angle", "offset"] as const) {
+          if (m[field] === undefined || m2[field] === undefined) continue;
+          const scale = (m2[field] - m[field]) / d;
+          if (Math.abs(scale) < 1e-9) continue;
+          const cur = (drives[i] ??= {});
+          cur[field] ??= { param: k, scale };
+        }
+      });
+    }
+  }
+  driveCache = { key, drives };
+  return drives;
+}
+
+async function assemblyOf(rendered: any): Promise<AssemblyData | undefined> {
+  const a = rendered.assembly;
+  if (!a) return undefined;
+  const drives = findDrives(rendered);
+  const mates: MateData[] = [];
+  for (let i = 0; i < a.mates.length; i++) {
+    const m = a.mates[i];
+    mates.push({ ...m, loc: (await locate(normalizeLoc(m.loc))).loc, ...(drives[i] ? { drive: drives[i] } : {}) });
+  }
+  const anchors = [];
+  for (const x of a.anchors) anchors.push({ part: x.part, id: x.id, frame: x.frame, loc: (await locate(normalizeLoc(x.loc))).loc });
+  return { parts: a.parts, mates, anchors };
 }
 
 /** The render's constraint sketches with their source locations mapped to the TSX. */
