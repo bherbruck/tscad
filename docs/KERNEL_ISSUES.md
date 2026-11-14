@@ -94,6 +94,18 @@ These have NOT been filed upstream.
   PointClassify findings (docs/upstream/pointclassify-cut-rounded-prism.md). Interference
   checks of board-vs-base and board-vs-lid work.
 
+## 15. Extrude depends on the profile's winding
+- A closed profile of one cubic Bézier + two lines (an involute gear's root fillet) extruded with
+  `ops::sweep::extrude` → "the result is not a closed solid"; the same loop traversed the other
+  way extrudes fine (0.3044 mm³ either way once built). Found by the example param sweep: it
+  sank spur-gear (7/33 combos) and the gear-pair recipe (19/33).
+- Repro: `crates/tscad-wasm/tests/fuzz_triage.rs` (`gear_fillet_extrude_orientation`).
+- Workaround: on failure tscad retries the extrude with the loop reversed (`eval::reversed`).
+
+## 16. Union of a 6×3 grid of overlapping cylinders fails
+- r 4.85, h 21, pitch 11.72 × 8.3 (rows overlap): "the result is not a closed solid" after ~18 s;
+  5×3, 6×2 and 3×3 work. Found by the example sweep.
+
 ## Notes (tscad bugs found and fixed, not kernel bugs)
 - `solidcore_ops::blend` takes the kernel's *native* edge order, not record order (its
   `SetBack` docs say so; the function's own docs read as record indices). tscad now uses

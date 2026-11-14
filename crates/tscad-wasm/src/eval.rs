@@ -192,13 +192,18 @@ fn eval_uncached(node: &Node, path: &str, cache: &mut Cache) -> R<Solid> {
             Ok(Some(b))
         }
         Node::Extrude { profile, direction, distance, draft } => {
-            let curves = curves(profile);
-            kernel(
-                path,
-                "extrude",
-                ops::sweep::extrude(&curves, *direction, *distance, *draft, ops::sweep::DraftCorner::default(), true),
-            )
-            .map(Some)
+            let run = |p: &[Curve]| {
+                ops::sweep::extrude(&curves(p), *direction, *distance, *draft, ops::sweep::DraftCorner::default(), true)
+            };
+            match run(profile) {
+                Ok(b) => Ok(Some(b)),
+                // solidcore refuses some profiles in one winding and builds them in the other
+                // (docs/KERNEL_ISSUES.md #15): the same loop traversed backwards
+                Err(first) => match run(&reversed(profile)) {
+                    Ok(b) => Ok(Some(b)),
+                    Err(_) => Err(fail(path, "extrude", format!("{first}"))),
+                },
+            }
         }
         Node::Revolve { profile, origin, axis, angle } => {
             let curves = curves(profile);
@@ -766,4 +771,32 @@ fn face_frame(body: &Body, faces: &Selector, index: usize, path: &str) -> R<crat
     let x = norm(x);
     let y = cross(n, x);
     Ok([x[0], y[0], n[0], c[0], x[1], y[1], n[1], c[1], x[2], y[2], n[2], c[2], 0.0, 0.0, 0.0, 1.0])
+}
+
+/// The same closed loop traversed the other way: curves in reverse order, each reversed.
+pub fn reversed(profile: &[Curve]) -> Vec<Curve> {
+    profile
+        .iter()
+        .rev()
+        .map(|c| match c {
+            Curve::Line { start, end } => Curve::Line { start: *end, end: *start },
+            // c + r(cos t·ref + sin t·(axis×ref)); about −axis the angle runs the other way
+            Curve::Arc { center, axis, reference, radius, start, end } => Curve::Arc {
+                center: *center,
+                axis: [-axis[0], -axis[1], -axis[2]],
+                reference: *reference,
+                radius: *radius,
+                start: -end,
+                end: -start,
+            },
+            Curve::Nurbs { degree, points, knots } => {
+                let (a, b) = (knots.first().copied().unwrap_or(0.0), knots.last().copied().unwrap_or(1.0));
+                Curve::Nurbs {
+                    degree: *degree,
+                    points: points.iter().rev().copied().collect(),
+                    knots: knots.iter().rev().map(|k| a + b - k).collect(),
+                }
+            }
+        })
+        .collect()
 }

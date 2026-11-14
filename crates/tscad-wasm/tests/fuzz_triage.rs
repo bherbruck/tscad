@@ -88,3 +88,33 @@ fn cone_special_cases() {
     let down = v(r#"{"type":"cone","bottomRadius":0,"topRadius":5,"height":10}"#);
     assert!(down.contains("ok=true") && down.contains("warn=[]"), "{down}");
 }
+
+#[test]
+fn gear_fillet_extrude_orientation() {
+    let fwd = r#"{"type":"extrude","profile":[{"type":"nurbs","degree":3,"points":[[1.89754,0.38838,0,1],[1.66027,0.34585,0,1],[1.33161,0.35727,0,1],[1.29836,0.45265,0,1]],"knots":[0,0,0,0,1,1,1,1]},{"type":"line","start":[1.29836,0.45265,0],"end":[0,0,0]},{"type":"line","start":[0,0,0],"end":[1.89754,0.38838,0]}],"direction":[0,0,1],"distance":2}"#;
+    let rev = r#"{"type":"extrude","profile":[{"type":"line","start":[1.89754,0.38838,0],"end":[0,0,0]},{"type":"line","start":[0,0,0],"end":[1.29836,0.45265,0]},{"type":"nurbs","degree":3,"points":[[1.29836,0.45265,0,1],[1.33161,0.35727,0,1],[1.66027,0.34585,0,1],[1.89754,0.38838,0,1]],"knots":[0,0,0,0,1,1,1,1]}],"direction":[0,0,1],"distance":2}"#;
+    println!("forward: {}", run(fwd));
+    println!("reversed: {}", run(rev));
+}
+
+#[test]
+fn reversed_arc_loop_extrudes_same() {
+    use tscad_wasm::ir::Curve;
+    let pi = std::f64::consts::PI;
+    let d = vec![
+        Curve::Arc { center: [0.0; 3], axis: [0.0, 0.0, 1.0], reference: [1.0, 0.0, 0.0], radius: 5.0, start: 0.0, end: pi },
+        Curve::Line { start: [-5.0, 0.0, 0.0], end: [5.0, 0.0, 0.0] },
+    ];
+    let back = tscad_wasm::eval::reversed(&d);
+    // the reversed arc starts where the original ended
+    if let Curve::Arc { start, end, axis, .. } = &back[1] {
+        assert_eq!((*start, *end, axis[2]), (-pi, 0.0, -1.0));
+    } else {
+        panic!("arc expected last");
+    }
+    let node = |p: &Vec<Curve>| format!(r#"{{"type":"extrude","direction":[0,0,1],"distance":3,"profile":{}}}"#, serde_json::to_string(p).unwrap());
+    let (a, b) = (run(&node(&d)), run(&node(&back)));
+    println!("{a}\n{b}");
+    let vol = |s: &str| s.split("vol=Some(").nth(1).and_then(|r| r.split(')').next()).and_then(|v| v.parse::<f64>().ok()).unwrap();
+    assert!((vol(&a) - pi * 25.0 / 2.0 * 3.0).abs() < 1e-6 && (vol(&a) - vol(&b)).abs() < 1e-6);
+}
