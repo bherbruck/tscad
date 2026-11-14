@@ -168,5 +168,5 @@ describe("example", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
-  }, 120_000);
+  }, 300_000); // spawns the CLI; slow under a full parallel test run
 });

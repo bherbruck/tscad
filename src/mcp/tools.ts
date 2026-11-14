@@ -104,7 +104,7 @@ function serial<T>(f: () => Promise<T>): Promise<T> {
 }
 
 /** Run a model; console output from the model is captured (never written to the MCP stdout). */
-async function run(m: ModelCtx, args: Record<string, any>, opts: { noMesh?: boolean } = {}): Promise<{ run?: ModelRun; error?: string; logs: string[] }> {
+async function run(m: ModelCtx, args: Record<string, any>, opts: { noMesh?: boolean; parallel?: boolean } = {}): Promise<{ run?: ModelRun; error?: string; logs: string[] }> {
   const logs: string[] = [];
   const saved = { log: console.log, info: console.info, debug: console.debug, warn: console.warn };
   const cap = (...a: unknown[]) => logs.push(a.map((x) => (typeof x === "string" ? x : Bun.inspect(x))).join(" "));
@@ -307,7 +307,8 @@ async function exportTool(args: Record<string, any>): Promise<ToolResult> {
   const fmt = String(args.format ?? (args.path ? String(args.path).split(".").pop() : "")).toLowerCase().replace(/^stp$/, "step");
   if (!(FORMATS as readonly string[]).includes(fmt)) throw new ToolInputError(`format must be one of ${FORMATS.join(", ")}`);
   return withModel(args, async (m) => {
-    const r = await run(m, args, { noMesh: fmt === "step" });
+    // STEP needs every part in one kernel session: skip the parallel kernel processes
+    const r = await run(m, args, { noMesh: fmt === "step", ...(fmt === "step" ? { parallel: false } : {}) });
     if (!r.run) return { content: [{ type: "text", text: r.error! }], isError: true };
     const { rendered, result, kernel } = r.run;
     const failed = result.parts.filter((p) => !p.ok);

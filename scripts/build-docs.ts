@@ -83,7 +83,7 @@ const GROUPS: [string, string, string[]][] = [
   ["Booleans", "Combine solids.", ["union", "difference", "subtract", "intersection", "intersect"]],
   ["Transforms", "Move, turn, scale and mirror children (every solid also has placement props).", ["translate", "rotate", "scale", "mirror", "transform"]],
   ["Sketch shapes", "2D shapes, used inside extrude, revolve, loft, sweep and drawing. Nested loops become holes.", ["rect", "roundedRect", "circle", "ellipse", "polygon", "regularPolygon", "slot", "path", "star", "text", "sketch", "offset", "hull", "section"]],
-  ["Sketch → solid", "Turn 2D shapes into solids.", ["extrude", "revolve", "loft", "sweep"]],
+  ["Sketch → solid", "Turn 2D shapes into solids.", ["extrude", "revolve", "loft", "sweep", "sweepPath"]],
   ["Patterns", "Repeat children.", ["linearPattern", "gridPattern", "polarPattern"]],
   ["Features", "Round, bevel, hollow, draft, push/pull and split. Edges and faces are picked with selectors.", ["fillet", "chamfer", "shell", "draft", "pushPull", "offsetFaces", "split"]],
 ];
