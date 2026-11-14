@@ -1,6 +1,6 @@
 /**
- * Electronics enclosure: a rounded tub with screw bosses in each corner, a grid of vent slots
- * in the lid and a USB cut-out — modelled as an assembly of two parts (body + lid).
+ * Electronics enclosure: a rounded tub with screw bosses in each corner, vent louvres and
+ * countersunk screws in the lid, and a USB-C cut-out — an assembly of two parts (body + lid).
  * Set `exploded` to lift the lid off for printing / inspection.
  */
 import { defineParams, edges, type ParamValues } from "tscad"
@@ -11,20 +11,17 @@ export const params = defineParams({
   height: { type: "number", default: 28, min: 12, max: 100, step: 1, unit: "mm", label: "Inner height" },
   wall: { type: "number", default: 2, min: 1.2, max: 5, step: 0.1, unit: "mm", label: "Wall" },
   radius: { type: "number", default: 4, min: 0, max: 15, step: 0.5, unit: "mm", label: "Corner radius" },
-  ventRows: { type: "int", default: 3, min: 0, max: 10, label: "Vent rows" },
-  ventCols: { type: "int", default: 5, min: 1, max: 16, label: "Vent columns" },
+  vents: { type: "int", default: 6, min: 0, max: 12, label: "Vent louvres" },
   usb: { type: "boolean", default: true, label: "USB-C cut-out" },
   exploded: { type: "boolean", default: true, label: "Exploded" },
 })
 
-/** A screw boss: a post with a pilot hole for a self-tapping M3 screw. */
-function Boss({ x, y, height, z = 0 }: { x: number; y: number; height: number; z?: number }) {
-  return (
-    <difference>
-      <cylinder r={3.5} h={height} x={x} y={y} z={z} />
-      <cylinder r={1.25} h={height} x={x} y={y} z={z + 2} />
-    </difference>
-  )
+/**
+ * A screw boss for a self-tapping M3 screw. `<Boss/>` is the post; `<Boss pilot/>` is the
+ * matching pilot hole, so all the holes can be drilled in a single cut.
+ */
+function Boss({ x, y, height, z = 0, pilot = false }: { x: number; y: number; height: number; z?: number; pilot?: boolean }) {
+  return pilot ? <cylinder r={1.25} h={height} x={x} y={y} z={z + 2} /> : <cylinder r={3.5} h={height} x={x} y={y} z={z} />
 }
 
 export default function Enclosure(p: ParamValues<typeof params>) {
@@ -39,9 +36,8 @@ export default function Enclosure(p: ParamValues<typeof params>) {
     [inset, D - inset],
     [W - inset, D - inset],
   ]
-  const slotL = (p.width * 0.6) / p.ventCols - 2
-  const ventPitchX = (p.width * 0.6) / p.ventCols
-  const ventPitchY = 5
+  const ventL = p.width * 0.55 // louvre length
+  const ventPitch = Math.min(5, (p.depth - 10) / Math.max(1, p.vents))
 
   return (
     <assembly name="enclosure">
@@ -63,11 +59,17 @@ export default function Enclosure(p: ParamValues<typeof params>) {
               <Boss x={x} y={y} height={H - p.wall - 1} z={p.wall / 2} />
             ))}
           </union>
-          {p.usb && (
-            <extrude height={p.wall * 3} y={-p.wall} x={W / 2} z={p.wall + 6} rotate={[-90, 0, 0]}>
-              <roundedRect w={9.5} h={3.5} r={1.6} />
-            </extrude>
-          )}
+          {/* every cut in one tool: the pilot holes and the USB-C opening */}
+          <union>
+            {corners.map(([x, y]) => (
+              <Boss pilot x={x} y={y} height={H - p.wall - 1} z={p.wall / 2} />
+            ))}
+            {p.usb && (
+              <extrude height={p.wall * 3} y={-p.wall} x={W / 2} z={p.wall + 6} rotate={[-90, 0, 0]}>
+                <roundedRect w={9.5} h={3.5} r={1.6} />
+              </extrude>
+            )}
+          </union>
         </difference>
       </part>
 
@@ -78,26 +80,22 @@ export default function Enclosure(p: ParamValues<typeof params>) {
               <roundedRect w={W} h={D} r={p.radius} />
             </extrude>
           </fillet>
-          {/* vent slots: one extrusion of a whole grid of slot outlines, cut in one go */}
-          {p.ventRows > 0 && (
-            <extrude height={lidT * 3} x={W / 2} y={D / 2} z={-lidT}>
-              {Array.from({ length: p.ventCols * p.ventRows }, (_, i) => (
-                <slot
-                  length={slotL}
-                  width={2}
-                  x={((i % p.ventCols) - (p.ventCols - 1) / 2) * ventPitchX}
-                  y={(Math.floor(i / p.ventCols) - (p.ventRows - 1) / 2) * ventPitchY}
-                />
-              ))}
-            </extrude>
-          )}
-          {/* countersunk screw holes over the bosses */}
-          {corners.map(([x, y]) => (
-            <union>
-              <cylinder r={1.7} h={lidT * 3} x={x} y={y} z={-lidT} />
-              <cone r1={1.7} r2={3.4} h={1.7} x={x} y={y} z={lidT - 1.7 + 0.001} />
-            </union>
-          ))}
+          {/* every cut in one tool: the vent louvres plus four countersunk screw holes */}
+          <union>
+            {p.vents > 0 && (
+              <extrude height={lidT * 3} x={W / 2} y={D / 2} z={-lidT}>
+                {Array.from({ length: p.vents }, (_, i) => (
+                  <slot length={ventL} width={2.4} y={(i - (p.vents - 1) / 2) * ventPitch} />
+                ))}
+              </extrude>
+            )}
+            {/* countersunk holes: one revolved profile each (shank, then a 90° cone) */}
+            {corners.map(([x, y]) => (
+              <revolve x={x} y={y}>
+                <polygon points={[[0, -lidT], [1.7, -lidT], [1.7, lidT - 1.7], [4.7, lidT + 1.3], [0, lidT + 1.3]]} />
+              </revolve>
+            ))}
+          </union>
         </difference>
       </part>
     </assembly>

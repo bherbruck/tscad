@@ -4,7 +4,7 @@
  *
  *   tscad dev examples/spur-gear.tsx
  */
-import { defineParams, type ParamValues } from "tscad"
+import { defineParams, edges, type ParamValues } from "tscad"
 
 export const params = defineParams({
   teeth: { type: "int", default: 24, min: 8, max: 80, label: "Teeth" },
@@ -14,6 +14,7 @@ export const params = defineParams({
   bore: { type: "number", default: 8, min: 2, max: 30, step: 0.5, unit: "mm", label: "Bore Ø" },
   hub: { type: "boolean", default: true, label: "Hub" },
   lightening: { type: "boolean", default: true, label: "Lightening holes" },
+  toothChamfer: { type: "boolean", default: false, label: "Chamfer teeth (slow: every tooth edge)" },
 })
 
 type Pt = [number, number]
@@ -61,22 +62,27 @@ export default function SpurGear(p: ParamValues<typeof params>) {
 
   return (
     <part name="gear" color="#c8a24a">
-      <difference>
-        <union>
-          <extrude height={p.thickness}>
-            <polygon points={involuteGear(p.teeth, p.module, p.pressureAngle)} />
-          </extrude>
-          {p.hub && <cylinder r={hubR} h={p.thickness * 1.6} />}
-        </union>
-        {/* bore */}
-        <cylinder r={p.bore / 2} h={p.thickness * 4} z={-p.thickness} />
-        {/* lightening holes between hub and rim */}
-        {showHoles && (
-          <polarPattern count={6}>
-            <cylinder r={holeR} h={p.thickness * 4} x={holeOrbit} z={-p.thickness} />
-          </polarPattern>
-        )}
-      </difference>
+      {/* break the bore's sharp edges (cheap: two circles) */}
+      <chamfer distance={0.5} edges={edges.radius(p.bore / 2)}>
+        <difference>
+          <union>
+            <chamfer distance={p.toothChamfer ? p.module * 0.2 : 0} edges=">Z or <Z">
+              <extrude height={p.thickness}>
+                <polygon points={involuteGear(p.teeth, p.module, p.pressureAngle)} />
+              </extrude>
+            </chamfer>
+            {p.hub && <cylinder r={hubR} h={p.thickness * 1.6} />}
+          </union>
+          {/* bore */}
+          <cylinder r={p.bore / 2} h={p.thickness * 4} z={-p.thickness} />
+          {/* lightening holes between hub and rim */}
+          {showHoles && (
+            <polarPattern count={6}>
+              <cylinder r={holeR} h={p.thickness * 4} x={holeOrbit} z={-p.thickness} />
+            </polarPattern>
+          )}
+        </difference>
+      </chamfer>
     </part>
   )
 }

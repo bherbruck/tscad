@@ -1,6 +1,6 @@
 /**
- * Honeycomb coaster: a round puck with a raised rim, a field of hexagonal pockets made with a
- * staggered gridPattern, clipped to a circle, and a filleted top edge.
+ * Honeycomb coaster: a round puck with a raised rim, a field of hexagonal pockets laid out on
+ * a staggered grid (only the cells that fit inside the rim), and a filleted top edge.
  */
 import { defineParams, edges, type ParamValues } from "tscad"
 
@@ -17,32 +17,32 @@ export default function Coaster(p: ParamValues<typeof params>) {
   const R = p.diameter / 2
   const inner = R - p.rim
   const pitch = p.cell + p.web // flat-to-flat pitch between neighbouring cells
-  const cols = Math.ceil((2 * inner) / (pitch * Math.sqrt(3))) + 1
-  const rows = Math.ceil((2 * inner) / pitch) + 1
+  const hexR = p.cell / Math.sqrt(3) // circumradius of one cell
+  const n = Math.ceil(inner / pitch) + 1
 
-  // Two interleaved rectangular grids (each centred on the origin) make the honeycomb.
-  const cells = (dx: number, dy: number) => (
-    <gridPattern nx={cols} ny={rows} dx={pitch * Math.sqrt(3)} dy={pitch}>
-      <extrude height={p.depth + 1} x={dx} y={dy} z={p.thickness - p.depth}>
-        <regularPolygon sides={6} flats={p.cell} />
-      </extrude>
-    </gridPattern>
-  )
+  // Honeycomb centres: rows `pitch` apart, every other column shifted by half a pitch.
+  // Keep only the cells that fit entirely inside the rim — it's just an array filter.
+  const centres: [number, number][] = []
+  for (let i = -2 * n; i <= 2 * n; i++) {
+    for (let j = -n; j <= n; j++) {
+      const x = (i * pitch * Math.sqrt(3)) / 2
+      const y = j * pitch + (i % 2 ? pitch / 2 : 0)
+      if (Math.hypot(x, y) + hexR <= inner) centres.push([x, y])
+    }
+  }
 
   return (
     <part name="coaster" color="#d9a066">
       <difference>
-        <fillet radius={1} edges={edges.max("z")}>
+        <fillet radius={1} edges={edges.top()}>
           <cylinder r={R} h={p.thickness} />
         </fillet>
-        {/* the honeycomb, clipped to the area inside the rim */}
-        <intersection>
-          <union>
-            {cells(0, 0)}
-            {cells((pitch * Math.sqrt(3)) / 2, pitch / 2)}
-          </union>
-          <cylinder r={inner} h={p.thickness * 2} />
-        </intersection>
+        {/* every pocket in one sketch, so the whole honeycomb is a single cut */}
+        <extrude height={p.depth + 1} z={p.thickness - p.depth}>
+          {centres.map(([x, y]) => (
+            <regularPolygon sides={6} flats={p.cell} x={x} y={y} />
+          ))}
+        </extrude>
       </difference>
     </part>
   )

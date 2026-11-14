@@ -76,13 +76,13 @@ To add tscad to an existing bun project: `bun add tscad`, then set
 | Example | Shows off |
 |---|---|
 | [`bracket.tsx`](examples/bracket.tsx) | L-bracket: unions, a gusset sketch, rounded corners and an inside-bend fillet picked with combined selectors, `gridPattern` holes, slots |
-| [`spur-gear.tsx`](examples/spur-gear.tsx) | involute gear profile computed from the math, hub, `polarPattern` lightening holes |
-| [`enclosure.tsx`](examples/enclosure.tsx) | `<assembly>` of body + lid, a `<Boss>` component, a grid of vent slots cut in one extrusion, filleted edges, countersinks |
+| [`spur-gear.tsx`](examples/spur-gear.tsx) | involute gear profile computed from the math, hub, `polarPattern` lightening holes, bore chamfer by `edges.radius()` |
+| [`enclosure.tsx`](examples/enclosure.tsx) | `<assembly>` of body + lid, a `<Boss>` component, vent louvres, revolved countersinks, filleted edges, every cut batched into one tool |
 | [`vase.tsx`](examples/vase.tsx) | smooth Bézier silhouette from an SVG `path`, `revolve`, `shell` |
 | [`bolt-and-nut.tsx`](examples/bolt-and-nut.tsx) | ISO metric table as a `choice` param, chamfered hex via intersection, cosmetic thread via `linearPattern` |
-| [`coaster.tsx`](examples/coaster.tsx) | honeycomb from two interleaved `gridPattern`s, clipped with `intersection` |
+| [`coaster.tsx`](examples/coaster.tsx) | honeycomb laid out with plain loops and filtered to the rim, cut as one sketch |
 | [`phone-stand.tsx`](examples/phone-stand.tsx) | angle-driven side profile as a `polygon` on the XZ plane, extruded and filleted |
-| [`component-library.tsx`](examples/component-library.tsx) | reusable typed components (`<Standoff/>`, `<CountersunkHole/>`, `<RoundedPlate/>`) and a board table → a mounting plate |
+| [`component-library.tsx`](examples/component-library.tsx) | reusable typed components (`<Standoff/>`, `<CountersunkHole/>` as revolved profiles, `<RoundedPlate/>`) and a board table → a mounting plate |
 
 Run one from a checkout with `bun src/cli/index.ts dev examples/spur-gear.tsx`.
 
@@ -201,7 +201,7 @@ tscad is young (v0.1). Known gaps, mostly in the kernel (details and repros in
 [docs/KERNEL_ISSUES.md](docs/KERNEL_ISSUES.md)):
 
 - **Speed.** Booleans cost around a second each on the first build (the bundled examples take
-  roughly 1–20 s); after that the subtree cache makes most parameter changes much faster. Prefer
+  roughly 1–8 s); after that the subtree cache makes most parameter changes much faster. Prefer
   one cut with many shapes (holes in a sketch, or one `<extrude>` of many slots) over many
   separate cuts.
 - **Shell** fails inward across tangent walls (e.g. an extruded `roundedRect`); use `outward`, or

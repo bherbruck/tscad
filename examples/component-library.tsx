@@ -9,15 +9,20 @@ import { defineParams, edges, type ParamValues } from "tscad"
 
 type XY = { x?: number; y?: number; z?: number }
 
-/** A round standoff with an optional pilot hole for a self-tapping screw. */
-export function Standoff({ height, od = 6, pilot = 2.5, ...at }: { height: number; od?: number; pilot?: number } & XY) {
+/**
+ * A round standoff with a chamfered top and a pilot hole for a self-tapping screw — one revolved
+ * profile, so it costs no booleans. It sinks `embed` mm below z = 0 to fuse with what it sits on.
+ */
+export function Standoff({ height, od = 6, pilot = 2.5, embed = 0.5, ...at }: { height: number; od?: number; pilot?: number; embed?: number } & XY) {
+  const r = od / 2, c = Math.min(0.6, r / 4), p = pilot / 2
+  const pts: [number, number][] =
+    pilot > 0
+      ? [[0, -embed], [r, -embed], [r, height - c], [r - c, height], [p, height], [p, 1], [0, 1]]
+      : [[0, -embed], [r, -embed], [r, height - c], [r - c, height], [0, height]]
   return (
-    <difference {...at}>
-      <chamfer distance={0.5} edges={edges.top()}>
-        <cylinder r={od / 2} h={height} />
-      </chamfer>
-      {pilot > 0 && <cylinder r={pilot / 2} h={height + 1} z={1} />}
-    </difference>
+    <revolve {...at}>
+      <polygon points={pts} />
+    </revolve>
   )
 }
 
@@ -25,11 +30,9 @@ export function Standoff({ height, od = 6, pilot = 2.5, ...at }: { height: numbe
 export function CountersunkHole({ d = 3.2, head = 6.5, depth = 20, ...at }: { d?: number; head?: number; depth?: number } & XY) {
   const sink = (head - d) / 2 // 90° countersink
   return (
-    <union {...at}>
-      <cylinder r={d / 2} h={depth} z={-depth} />
-      <cone r1={d / 2} r2={head / 2} h={sink} z={-sink} />
-      <cylinder r={head / 2} h={1} />
-    </union>
+    <revolve {...at}>
+      <polygon points={[[0, -depth], [d / 2, -depth], [d / 2, -sink], [head / 2, 0], [head / 2, 1], [0, 1]]} />
+    </revolve>
   )
 }
 
@@ -76,13 +79,19 @@ export default function BoardMount(p: ParamValues<typeof params>) {
             <Standoff height={p.standoff} x={p.margin + x} y={p.margin + y} z={p.plate} />
           ))}
         </union>
-        {p.mountingHoles &&
-          [
-            [p.margin / 2, p.margin / 2],
-            [W - p.margin / 2, p.margin / 2],
-            [p.margin / 2, D - p.margin / 2],
-            [W - p.margin / 2, D - p.margin / 2],
-          ].map(([x, y]) => <CountersunkHole x={x} y={y} z={p.plate} />)}
+        {/* all four holes in one cut */}
+        {p.mountingHoles && (
+          <union>
+            {[
+              [p.margin / 2, p.margin / 2],
+              [W - p.margin / 2, p.margin / 2],
+              [p.margin / 2, D - p.margin / 2],
+              [W - p.margin / 2, D - p.margin / 2],
+            ].map(([x, y]) => (
+              <CountersunkHole x={x} y={y} z={p.plate} />
+            ))}
+          </union>
+        )}
       </difference>
     </part>
   )
