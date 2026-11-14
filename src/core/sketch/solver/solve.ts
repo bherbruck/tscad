@@ -183,6 +183,8 @@ export interface Analysis {
   freedom: Float64Array;
   /** Constraints with an equation implied by earlier ones, and the constraints implying it. */
   redundant: { constraint: number; partners: number[] }[];
+  /** Orthonormal basis of the Jacobian's row space (rank × variables). */
+  basis: Float64Array[];
 }
 
 /** Rank, DOF, free variables and redundancy at a solution (modified Gram–Schmidt on rows). */
@@ -218,11 +220,12 @@ export function analyze(sys: System, x: Float64Array, which: number[]): Analysis
       T.push(t);
     } else {
       // row r ≈ Σ −t[i]·row i (i ≠ r): those rows' constraints imply it
+      // (an equation implied only by its own constraint's other rows is not news)
       const own = owner[r]!;
       const set = redundant.get(own) ?? new Set<number>();
       const big = t.reduce((a, b) => Math.max(a, Math.abs(b)), 0);
       for (let i = 0; i < m; i++) if (i !== r && Math.abs(t[i]!) > 1e-6 * big && owner[i] !== own) set.add(owner[i]!);
-      redundant.set(own, set);
+      if (set.size) redundant.set(own, set);
     }
   }
   const freedom = new Float64Array(n).fill(1);
@@ -233,6 +236,7 @@ export function analyze(sys: System, x: Float64Array, which: number[]): Analysis
     dof: n - Q.length,
     freedom,
     redundant: [...redundant].map(([constraint, s]) => ({ constraint, partners: [...s].sort((a, b) => a - b) })),
+    basis: Q,
   };
 }
 

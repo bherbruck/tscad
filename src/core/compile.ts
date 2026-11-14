@@ -18,6 +18,7 @@ import { layoutText, loadFont } from "./text/font";
 import { toSelector, type SelectorLike } from "./select";
 import { offsetLoops, OffsetError } from "./sketch/offset";
 import { CONSTRAINT_TAGS, isConstrainedSketch, SketchRecorder, type SketchInfo } from "./sketch/constrained";
+import { AssemblyRecorder, ASSEMBLY_TAGS, type AssemblyInfo } from "./assembly";
 import { parsePath, PathSyntaxError } from "./sketch/path";
 import { ccw, frame, frameAcross, pathStart, PLANES, regions, toCurves, type Frame, type PlaneName } from "./sketch/place";
 export type { Loop2, Seg2 } from "./sketch/seg";
@@ -54,6 +55,8 @@ export interface CompileResult {
   drawings: Drawing[];
   /** Solved constraint sketches (`<sketch>` with `<line>`, `<arc>`, constraints...), for overlays. */
   sketches: SketchInfo[];
+  /** Anchors, mates and the solved part motions, when the model has `<anchor>` or `<mate>`. */
+  assembly?: AssemblyInfo;
 }
 
 /**
@@ -131,7 +134,7 @@ const SOLID_TAGS = new Set([
 const SHAPE_TAGS = new Set(["text", "rect", "roundedRect", "circle", "ellipse", "polygon", "regularPolygon", "slot", "path", "star"]);
 const SKETCH_TAGS = new Set([...SHAPE_TAGS, "sketch", "section", "offset"]);
 const CONTAINER_TAGS = new Set(["part", "assembly", "drawing"]);
-const ALL_TAGS = [...SOLID_TAGS, ...SKETCH_TAGS, ...CONTAINER_TAGS, ...CONSTRAINT_TAGS];
+const ALL_TAGS = [...SOLID_TAGS, ...SKETCH_TAGS, ...CONTAINER_TAGS, ...CONSTRAINT_TAGS, ...ASSEMBLY_TAGS];
 /** Tags whose x/y/z mean something else (no universal placement). */
 const OWN_TRANSFORM = new Set(["translate", "rotate", "scale", "mirror"]);
 
@@ -146,6 +149,8 @@ class Compiler {
   readonly soft = new WeakSet<Node>();
   /** Solved constraint sketches, bound to the nodes built from them. */
   readonly sketchRec = new SketchRecorder();
+  /** Anchors and mates, solved once every part is built. */
+  readonly asm = new AssemblyRecorder({ placement: (h) => this.placement(h), warn: (h, msg) => this.warn(h, msg), emit: (n, h) => this.emit(n, h) });
 
   constructor(
     readonly warnings: string[],
@@ -242,17 +247,22 @@ class Compiler {
           return;
         }
         parts.push({ part: { name: "", node }, info: this.partInfo(h), host: h });
+        this.asm.part(h, mul(m, this.placement(h)));
         return;
       }
       if (h.tag === "assembly") {
         const mm = mul(m, this.placement(h));
-        for (const c of h.children) visit(c, mm);
+        for (const c of h.children) {
+          if (c.tag === "mate") this.asm.mate(c, h);
+          else visit(c, mm);
+        }
         return;
       }
       const node = this.solid(h);
       if (node) {
         loose.push(this.wrap(h, node, m));
         looseHosts.push(h);
+        this.asm.loose(h, m);
       }
     };
     for (const r of roots) visit(r, identity());
@@ -291,6 +301,9 @@ class Compiler {
       infos.push(info);
     }
 
+    // mates move whole parts: solved once every part is built and named
+    const assembly = this.asm.solve(parts);
+
     const sourceMap: Record<string, SourceLoc> = {};
     const walk = (node: Node, path: string, inherited: SourceLoc | undefined, acc: Mat4) => {
       const loc = this.locs.get(node) ?? inherited;
@@ -308,7 +321,7 @@ class Compiler {
       d.name = n;
       names.add(n);
     }
-    return { document: { parts: doc }, sourceMap, warnings: this.warnings, parts: infos, drawings, sketches: this.sketchRec.sketches };
+    return { document: { parts: doc }, sourceMap, warnings: this.warnings, parts: infos, drawings, sketches: this.sketchRec.sketches, ...(assembly ? { assembly } : {}) };
   }
 
   partInfo(h: Host): PartInfo {
@@ -386,6 +399,8 @@ class Compiler {
     if (SHAPE_TAGS.has(h.tag) || h.tag === "sketch" || h.tag === "section" || h.tag === "offset") {
       this.fail(h, `<${h.tag}> is a 2D sketch shape and can't stand alone as a solid`, `put it inside <extrude height={...}>, <revolve>, <loft> or <sweep>`);
     }
+    if (h.tag === "anchor") return null;
+    if (h.tag === "mate") this.fail(h, "<mate> belongs directly inside an <assembly>", `<assembly><part name="a">...</part><part name="b">...</part><mate a="a.x" b="b.y" /></assembly>`);
     if (CONSTRAINT_TAGS.has(h.tag)) {
       this.fail(h, `<${h.tag}> belongs in a constraint <sketch>`, `<extrude height={5}><sketch>...points, lines, arcs, constraints...</sketch></extrude>`);
     }

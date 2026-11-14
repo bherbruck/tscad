@@ -53,6 +53,12 @@ export {
   type ArcHandle, type CircleHandle, type CurveHandle, type LineHandle, type PointHandle, type RefKind, type RoundHandle, type SketchRef, type SplineHandle,
 } from "./core/sketch/refs";
 
+// assemblies: anchors & mates
+export {
+  anchorRef, assemblyRefs, isAnchorRef,
+  type AnchorProps, type AnchorRef, type AssemblyInfo, type Direction, type MateProps, type MateType, type PartRef,
+} from "./core/assembly";
+
 // element prop types
 export type * from "./core/intrinsics";
 

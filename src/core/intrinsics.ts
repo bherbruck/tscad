@@ -8,6 +8,7 @@ import type { Children, Key } from "./element";
 import type { MaterialName } from "./materials";
 import type { Path3 } from "./paths";
 import type { SelectorLike } from "./select";
+import type { AssemblyElements } from "./assembly/props";
 import type { ConstraintSketchElements, ConstraintSketchOptions, SketchCircleProps } from "./sketch/constrained-props";
 
 export type Vec3 = [number, number, number];
@@ -66,6 +67,10 @@ export type CenterSpec = boolean | [boolean, boolean, boolean];
 // Containers
 
 export interface AssemblyProps extends Placement, SolidChildren {
+  /** Don't warn about parts their mates leave free to move. */
+  allowFree?: boolean;
+  /** Mates must fix every part (free parts are errors) and redundant mates are reported. */
+  strict?: boolean;
   /** Assembly name (used as a prefix for loose solids' part name). */
   name?: string;
 }
@@ -84,6 +89,8 @@ export interface PartProps extends Placement, SolidChildren {
   density?: number;
   /** `false` leaves the part out of the document (and exports); default true. */
   visible?: boolean;
+  /** Ground this part for `<mate>`s: it never moves (default: the first part is grounded). */
+  fixed?: boolean;
 }
 
 /**
@@ -611,7 +618,7 @@ export interface ShellProps extends Placement, SolidChildren {
 // ---------------------------------------------------------------------------------------------
 
 /** Every intrinsic element and its props. */
-export interface IntrinsicElements extends ConstraintSketchElements {
+export interface IntrinsicElements extends ConstraintSketchElements, AssemblyElements {
   /** A collection of parts (may nest); placement props move every part in it. */
   assembly: AssemblyProps;
   /** One named, coloured solid — the unit of export. Several children are unioned. */
