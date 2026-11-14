@@ -15,8 +15,8 @@ The first release: CAD as TSX.
 - **Primitives:** `<box>`, `<cylinder>`, `<cone>`, `<sphere>`, `<torus>`. Box, cylinder and
   cone are centred in X/Y with their base on z = 0.
 - **Booleans:** `<union>`, `<difference>` (`<subtract>`), `<intersection>` (`<intersect>`).
-- **Transforms:** `<translate>`, `<rotate>`, `<scale>`, `<mirror keep>`, plus placement props on
-  every solid (`x y z at rotate rotateX/Y/Z scale mirror`).
+- **Transforms:** `<translate>`, `<rotate>`, `<scale>`, `<mirror keep>` and `<transform matrix>`,
+  plus placement props on every solid (`x y z at rotate rotateX/Y/Z scale mirror`).
 - **Patterns:** `<linearPattern>`, `<gridPattern>`, `<polarPattern>`.
 - **Features:**
   - `<fillet>`, `<chamfer>`, `<shell>`
@@ -31,6 +31,10 @@ The first release: CAD as TSX.
   - `<path d>` takes an SVG path subset; curves stay exact arcs and NURBS.
   - `<text>` uses opentype.js with an embedded DejaVu Sans subset, or a user font.
   - `<offset>` gives 2D offsets with exact arcs.
+  - `<hull>` gives the exact convex hull: tangent lines and true arcs.
+  - 2D booleans `<sketchUnion>`, `<sketchDifference>` and `<sketchIntersection>` (aliases
+    `<union2d>`, `<difference2d>`, `<intersection2d>`): exact over lines and arcs, fuzzed with
+    42k cases.
   - `<sketch>` groups shapes.
   - Nested loops become holes automatically.
 - **Sketch → solid:** `<extrude>` (planes, draft, centre), `<revolve>`, `<loft>`, `<sweep>`
@@ -39,6 +43,11 @@ The first release: CAD as TSX.
   dimensions, solved by Levenberg–Marquardt. Degree-of-freedom and conflict diagnostics point
   at TSX lines. Typed refs (`sketchRefs`) can be used with string ids, and `sketchPath()` is a
   fluent path builder.
+  - In-sketch patterns stay constrained: `mirrorEntities`, `circularPattern`, and
+    `linearPattern of`.
+  - Branch hints pick between solutions: an arc's major or minor side, which side a tangent
+    falls, and loop preference.
+  - Sketches drive sweeps (`<sweepPath>`) and lofts.
 - **Assemblies.**
   - `<anchor>` and `<mate>`: fastened, revolute, slider, cylindrical, planar, ball.
   - `<gear>` couples joints.
@@ -46,7 +55,7 @@ The first release: CAD as TSX.
 - **Parts and materials:** `<part name color material density visible>`, `<assembly>`,
   `<group>`, and `<step data>` (STEP import). There are material presets with densities for
   mass.
-- **Flat parts:** `<drawing name thickness?>` holds 2D parts for laser cutting and CNC.
+- **Flat parts:** `<drawing name layer? thickness?>` holds 2D parts for laser cutting and CNC.
 - **Parameters:** `defineParams` with `number | int | boolean | choice | text | color`.
   `ParamValues` infers types, including choices as literal unions. Values are coerced and
   clamped.
@@ -56,6 +65,10 @@ The first release: CAD as TSX.
 - **`tscad/kernel`:** the solidcore B-rep kernel in WebAssembly. It evaluates with a subtree
   cache, meshes, writes STEP AP242, picks edges and faces with selector suggestions, and
   recovers from panics.
+  - An optional native build (`bun scripts/build-native.ts`, through `bun:ffi`) is 2–3×
+    faster, and `loadKernel` picks it up automatically.
+  - With the native build, multi-part models evaluate on a pool of kernel processes in
+    `build`, `info`, `render` and `dev`, 1.6–1.8× faster.
 - **`tscad/export`:** STL, 3MF (with colours), GLB, OBJ and STEP.
 - **`tscad/render`:** a headless PNG renderer in pure TypeScript, with studio lighting, edges
   and shadow.
@@ -75,23 +88,40 @@ The first release: CAD as TSX.
   hypercube).
 - **`tscad/mcp`:** an MCP server (protocol 2025-06-18) with tools to evaluate, render, check,
   export, pick selectors, read examples, and read docs generated from the types.
+  - `tscad_check` suggests a better print orientation.
+  - Errors carry fix-it hints and TSX locations.
+  - [docs/mcp-dogfood.md](docs/mcp-dogfood.md) describes five models an agent designed through
+    it ([examples/agent](examples/agent)).
+- **`tscad/convert`:** OpenSCAD → tscad. Customizer variables become params and modules become
+  components. It covers `hull`, `minkowski`, `multmatrix` and `resize`, and keeps 2D booleans in
+  2D. Geometric equivalence tests cover it.
 
 ### Tools
 
 - **CLI:** `tscad init`, `dev` (live viewer with hot reload), `build` (step, stl, 3mf, glb,
-  obj, dxf, svg), `info`, `render`, `mcp`.
-- **Viewer:** param sliders, pick-to-selector, section and measure tools, sketch overlays,
-  export.
-- **Playground:** a static in-browser editor with autocompletion, error squiggles and share
-  links.
-- **Docs site:** landing page, guides, an element and parts reference generated from TSDoc, and
-  a gallery.
+  obj, dxf, svg), `info`, `render`, `convert`, `mcp`.
+  - `tscad dev` evaluates on the server with the native kernel when it's available, and falls
+    back to the browser.
+- **Viewer:**
+  - param sliders, pick-to-selector, section and measure tools, export;
+  - sketch overlays (dimensions, free points, patterns) with click-to-source;
+  - assembly gizmos with drag-to-drive joints and an explode slider;
+  - heatmaps for overhangs, wall thickness and interference.
+- **Playground:** a static in-browser editor with autocompletion, error squiggles, share links
+  and **Import .scad**.
+- **VS Code extension** (`editors/vscode`, not yet on the Marketplace):
+  - a live preview beside the editor;
+  - squiggles for compile, kernel and sketch problems;
+  - export CodeLenses, click-to-source and snippets.
+- **Docs site:** landing page, guides, a cookbook, an element and parts reference generated
+  from TSDoc, and a gallery.
 
 ### Known limitations
 
 See [docs/KERNEL_ISSUES.md](docs/KERNEL_ISSUES.md):
 
-- Booleans take around a second on a first build.
+- On WebAssembly, booleans take around a second on a first build (the native kernel is 2–3×
+  faster).
 - Helix sweeps are slow or not closed, and sharp-corner sweep paths fail.
 - Inward shells fail across tangent walls.
 - STEP import fails on blended corners.

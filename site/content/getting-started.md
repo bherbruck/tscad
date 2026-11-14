@@ -32,6 +32,10 @@ export from the **Export** button (top right).
 your platform, and otherwise in the browser with WebAssembly. The banner says which;
 `--browser-eval` forces the browser.
 
+Using VS Code? The extension in [`editors/vscode`](https://github.com/bherbruck/tscad/tree/main/editors/vscode)
+(not yet on the Marketplace) puts this viewer beside the editor, with squiggles on failing
+elements and export CodeLenses.
+
 To add tscad to an existing project:
 
 ```sh
@@ -88,6 +92,15 @@ bunx tscad render index.tsx -o plate.png --view iso     # a PNG, no browser need
 Formats: `step` (exact B-rep, AP242), `stl`, `3mf` (with colours), `glb`, `obj`. `dxf` and `svg`
 give flat [`<drawing>`](../reference/elements.html#drawing) parts; for solids they give a section
 at mid-height (`--section-z <mm>` picks the height).
+
+## Coming from OpenSCAD
+
+```sh
+bunx tscad convert box.scad -o box.tsx
+```
+
+Customizer variables become typed params, and modules become components. In the playground,
+**Import .scad** does the same. See [Converting OpenSCAD](convert.html).
 
 ## Design with an AI agent
 

@@ -14,6 +14,7 @@ shows the same documentation. Lengths are **mm**, angles are **degrees**, Z is u
 | [`tscad/check`](#tscadcheck) | printability, interference, watertightness | bun, browser |
 | [`tscad/testing`](#tscadtesting) | `bun:test` helpers and matchers | bun |
 | [`tscad/mcp`](#tscadmcp) | the MCP server for AI agents | bun |
+| [`tscad/convert`](#tscadconvert) | OpenSCAD → tscad | anywhere |
 | [`tscad/ir`](#tscadir) | IR types (`Document`, `Node`, `Curve`, `Selector`) | types only |
 | `tscad/jsx-runtime`, `tscad/jsx-dev-runtime` | the JSX runtime (set `"jsxImportSource": "tscad"`) | anywhere |
 
@@ -112,7 +113,9 @@ await kernel.pickFace("part", i)
 ```
 
 The session caches subtrees by structural equality: unchanged parts of the tree are not
-recomputed. A kernel panic throws `KernelPanic`, and the session is rebuilt.
+recomputed. When a native build exists (`bun scripts/build-native.ts`, written to
+`native/<platform>-<arch>/`), `loadKernel()` uses it through `bun:ffi`; it's 2–3× faster than
+the WebAssembly build. `TSCAD_NATIVE_LIB` points at a library elsewhere. A kernel panic throws `KernelPanic`, and the session is rebuilt.
 `MeshArrays` = `{ positions, normals, indices, faceIds, edgePoints, edgeCounts, edgeIds }`.
 
 ## `tscad/export`
@@ -166,6 +169,14 @@ only, fixed })` and `forEachParamCombo` generate parameter sweeps. See
 `tscad mcp`. `createMcpHandler()` handles one parsed message at a time. `TOOLS` lists the tool
 definitions. `elementsMarkdown()`, `partsMarkdown()`, `lookupReference(name)` and
 `referenceEntries()` give the generated element reference. See [MCP server](../docs/mcp.html).
+
+## `tscad/convert`
+
+`convertScad(source, { name })` → `{ tsx, warnings }`. It turns an OpenSCAD model into a tscad
+module: Customizer variables become `defineParams`, modules become components, and 2D booleans
+under `linear_extrude` become sketch booleans. A source that doesn't parse throws
+`ScadSyntaxError`, with the line. The CLI is `tscad convert in.scad -o out.tsx`. See
+[Converting OpenSCAD](../docs/convert.html).
 
 ## `tscad/ir`
 
